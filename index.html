@@ -57,14 +57,14 @@
       var loaderUrl = buildUrl + "/Build.loader.js";
       var config = {
         arguments: [],
-        dataUrl: buildUrl + "/Build.data",
-        frameworkUrl: buildUrl + "/Build.framework.js",
-        codeUrl: buildUrl + "/Build.wasm",
+        dataUrl: buildUrl + "/Build.data.gz",
+        frameworkUrl: buildUrl + "/Build.framework.js.gz",
+        codeUrl: buildUrl + "/Build.wasm.gz",
         streamingAssetsUrl: "StreamingAssets",
         companyName: "DefaultCompany",
         productName: "INVES_APP",
         productVersion: "1.0",
-        showBanner: unityShowBanner,
+        //showBanner: unityShowBanner,
       };
 
       // By default, Unity keeps WebGL canvas render target size matched with
