@@ -1,4 +1,9 @@
-body { padding: 0; margin: 0; background: #1a1a1a }
+body {
+  padding: 0;
+  margin: 0;
+  background: url('bg.png') no-repeat center center fixed;
+  background-size: cover;
+}
 #unity-container { position: absolute }
 #unity-container.unity-desktop { left: 50%; top: 50%; transform: translate(-50%, -50%) }
 #unity-container.unity-mobile { position: fixed; width: 100dvw; height: 100dvh; }
