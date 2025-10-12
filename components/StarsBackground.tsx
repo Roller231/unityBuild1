@@ -1,13 +1,11 @@
-import React, { useEffect, useRef, useMemo } from "react";
-import { View, Animated, Dimensions, StyleSheet } from "react-native";
-import { useTelegramPlatform } from "@/hooks/useTelegramPlatform"; // ✅ добавили
-
-const { width: screenWidth, height: screenHeight } = Dimensions.get("window");
+import React, { useEffect, useRef, useMemo, useState } from "react";
+import { View, Animated, Dimensions, StyleSheet, ScaledSize } from "react-native";
+import { useTelegramPlatform } from "@/hooks/useTelegramPlatform";
 
 const StarsBackground = () => {
   const platform = useTelegramPlatform();
 
-  // ✅ ограничиваем ширину на Telegram Desktop/Web
+  // ✅ детектим платформу
   const isDesktop =
     platform === "tdesktop" ||
     platform === "macos" ||
@@ -15,10 +13,21 @@ const StarsBackground = () => {
     platform === "weba" ||
     platform === "web";
 
-  const canvasWidth = isDesktop ? 470 : screenWidth;
-  const canvasHeight = screenHeight;
+  // 🔹 локальный стейт для width/height (чтобы реагировать на ресайз)
+  const [dimensions, setDimensions] = useState(Dimensions.get("window"));
 
-  // Используем useMemo, чтобы звёзды создавались один раз (не на каждом рендере)
+  // ✅ добавляем тип ScaledSize в колбэк
+  useEffect(() => {
+    const onChange = ({ window }: { window: ScaledSize }) => setDimensions(window);
+    const sub = Dimensions.addEventListener("change", onChange);
+    return () => sub.remove?.();
+  }, []);
+
+  // 💻 фиксируем ширину на десктопе, 📱 берем реальную ширину на телефонах
+  const canvasWidth = isDesktop ? 470 : dimensions.width;
+  const canvasHeight = dimensions.height;
+
+  // 🪐 создаём звёзды один раз, пересоздаём только если меняется ширина/высота
   const stars = useMemo(
     () =>
       Array.from({ length: 60 }).map(() => ({
@@ -26,6 +35,7 @@ const StarsBackground = () => {
         y: Math.random() * canvasHeight,
         size: Math.random() * 3 + 1,
         speed: Math.random() * 0.5 + 0.3,
+        opacity: Math.random() * 0.8 + 0.2,
       })),
     [canvasWidth, canvasHeight]
   );
@@ -59,9 +69,7 @@ const StarsBackground = () => {
     <View
       style={[
         StyleSheet.absoluteFillObject,
-        {
-          alignItems: "center",
-        },
+        { alignItems: "center", justifyContent: "center" },
       ]}
     >
       <View
@@ -88,7 +96,7 @@ const StarsBackground = () => {
                 height: star.size,
                 borderRadius: star.size / 2,
                 backgroundColor: "white",
-                opacity: Math.random() * 0.8 + 0.2,
+                opacity: star.opacity,
                 transform: [{ translateY }],
               }}
             />

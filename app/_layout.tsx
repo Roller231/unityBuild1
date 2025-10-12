@@ -18,17 +18,16 @@ const _layout = () => {
   return (
     <View style={styles.wrapper}>
       <View style={[styles.appFrame, isDesktop && styles.desktopFrame]}>
-        <Tabs
-          initialRouteName="profile"
-          screenOptions={{ headerShown: false }}
-          tabBar={(props) => <CustomTabBar {...props} />}
-        >
-          <Tabs.Screen name="index" options={{ title: "Home" }} />
-          <Tabs.Screen name="location" options={{ title: "Location" }} />
-          <Tabs.Screen name="search" options={{ title: "Search" }} />
-          <Tabs.Screen name="cart" options={{ title: "Cart" }} />
-          <Tabs.Screen name="profile" options={{ title: "Profile" }} />
-        </Tabs>
+      <Tabs
+  initialRouteName="case"
+  screenOptions={{ headerShown: false }}
+  tabBar={(props) => <CustomTabBar {...props} />}
+>
+  <Tabs.Screen name="case" options={{ title: "Кейсы" }} />
+  <Tabs.Screen name="crash" options={{ title: "Краш" }} />
+  <Tabs.Screen name="profile" options={{ title: "Профиль" }} />
+</Tabs>
+
       </View>
     </View>
   );

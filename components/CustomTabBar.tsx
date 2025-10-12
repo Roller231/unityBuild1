@@ -1,12 +1,19 @@
-import React from "react";
-import { View, TouchableOpacity, StyleSheet, Image, Text } from "react-native";
+import React, { useEffect, useState } from "react";
+import {
+  View,
+  TouchableOpacity,
+  StyleSheet,
+  Image,
+  Text,
+  Dimensions,
+  ScaledSize,
+} from "react-native";
 import { BottomTabBarProps } from "@react-navigation/bottom-tabs";
 import Animated, { useAnimatedStyle, withTiming } from "react-native-reanimated";
 import { BlurView } from "expo-blur";
+import { useTelegramPlatform } from "@/hooks/useTelegramPlatform";
 
-import { useTelegramPlatform } from "@/hooks/useTelegramPlatform"; // ✅ хук платформы
-
-// Иконки
+// 🔹 Иконки
 import CaseIcon from "./icons/gift.png";
 import CaseIconActive from "./icons/gift_active.png";
 import CrashIcon from "./icons/rocket.png";
@@ -19,10 +26,9 @@ const ACTIVE_COLOR = "#FFFFFF";
 const INACTIVE_COLOR = "rgba(255,255,255,0.6)";
 
 const CustomTabBar: React.FC<BottomTabBarProps> = ({ state, navigation }) => {
-  // ✅ определяем платформу Telegram
   const platform = useTelegramPlatform();
 
-  // если Telegram открыт на ПК / Web, фиксируем ширину
+  // ✅ определяем платформу
   const isDesktop =
     platform === "tdesktop" ||
     platform === "macos" ||
@@ -30,11 +36,25 @@ const CustomTabBar: React.FC<BottomTabBarProps> = ({ state, navigation }) => {
     platform === "weba" ||
     platform === "web";
 
-  const containerWidth = isDesktop ? 470 * 0.9 : "90%"; // 🔹 90% от рамки или 470px
+  // 🔹 состояние для ширины экрана
+  const [windowWidth, setWindowWidth] = useState(Dimensions.get("window").width);
+
+  useEffect(() => {
+    const onChange = ({ window }: { window: ScaledSize }) => setWindowWidth(window.width);
+    const sub = Dimensions.addEventListener("change", onChange);
+    return () => sub.remove?.();
+  }, []);
+
+  // 💻 фикс ширина на десктопе, 📱 адаптив на телефонах
+  const containerWidth = isDesktop ? 470 * 0.9 : windowWidth * 0.9;
 
   return (
     <View style={styles.wrapper}>
-      <BlurView intensity={20} tint="light" style={[styles.container, { width: containerWidth }]}>
+      <BlurView
+        intensity={20}
+        tint="light"
+        style={[styles.container, { width: containerWidth }]}
+      >
         {TABS_ORDER.map((tabName) => {
           const routeIndex = state.routes.findIndex((r) => r.name === tabName);
           if (routeIndex === -1) return null;
@@ -78,12 +98,12 @@ const TabItem = ({
   onPress: () => void;
 }) => {
   const rIconStyle = useAnimatedStyle(() => ({
-    transform: [{ scale: withTiming(active ? 1.25 : 1) }],
-    opacity: withTiming(active ? 1 : 0.8),
+    transform: [{ scale: withTiming(active ? 1.25 : 1, { duration: 150 }) }],
+    opacity: withTiming(active ? 1 : 0.8, { duration: 150 }),
   }));
 
   const rTextStyle = useAnimatedStyle(() => ({
-    transform: [{ scale: withTiming(active ? 1.1 : 1) }],
+    transform: [{ scale: withTiming(active ? 1.1 : 1, { duration: 150 }) }],
   }));
 
   return (

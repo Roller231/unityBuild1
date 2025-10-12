@@ -7,6 +7,7 @@ import {
   ScrollView,
   Animated,
   Image,
+  Dimensions,
 } from "react-native";
 import { LinearGradient } from "expo-linear-gradient";
 import StarsBackground from "../components/StarsBackground";
@@ -17,12 +18,15 @@ import { useTelegramPlatform } from "@/hooks/useTelegramPlatform";
 import FlagRU from "../components/icons/ru.png";
 import FlagEN from "../components/icons/us.png";
 
+const { width: screenWidth } = Dimensions.get("window");
+
 const Case = () => {
   const [activeTab, setActiveTab] = useState<"paid" | "free">("paid");
   const [language, setLanguage] = useState<"ru" | "en">("ru");
   const animation = useState(new Animated.Value(0))[0];
 
   const platform = useTelegramPlatform();
+
   const isDesktop =
     platform === "tdesktop" ||
     platform === "macos" ||
@@ -30,7 +34,8 @@ const Case = () => {
     platform === "weba" ||
     platform === "web";
 
-  const fixedWidth = isDesktop ? 470 : undefined;
+  // ✅ фиксируем ширину только для десктопа
+  const fixedWidth = isDesktop ? 470 : screenWidth;
 
   const handleSwitch = (tab: "paid" | "free") => {
     setActiveTab(tab);
@@ -41,10 +46,11 @@ const Case = () => {
     }).start();
   };
 
-  const switchWidth = fixedWidth ? fixedWidth * 0.9 : "90%";
+  // ширина переключателя
+  const switchWidth = fixedWidth * 0.9;
   const translateX = animation.interpolate({
     inputRange: [0, 1],
-    outputRange: [0, (fixedWidth ? fixedWidth * 0.9 : 360) / 2],
+    outputRange: [0, switchWidth / 2],
   });
 
   const toggleLanguage = () => setLanguage((prev) => (prev === "ru" ? "en" : "ru"));
@@ -54,7 +60,8 @@ const Case = () => {
     <LinearGradient colors={["#340A6F", "#18003A"]} style={styles.background}>
       <StarsBackground />
 
-      <View style={[styles.wrapper, fixedWidth && { width: fixedWidth }]}>
+      {/* ✅ Обёртка с динамической шириной */}
+      <View style={[styles.wrapper, { width: fixedWidth }]}>
         <ScrollView
           contentContainerStyle={styles.container}
           showsVerticalScrollIndicator={false}
@@ -103,7 +110,7 @@ const Case = () => {
                 </View>
               </View>
 
-              {/* 🎁 История подарков — теперь обрезается */}
+              {/* 🎁 История подарков (обрезка) */}
               <View style={styles.giftHistoryMask}>
                 <View style={styles.giftHistoryContainer}>
                   {Array.from({ length: 6 }).map((_, i) => (
@@ -120,12 +127,7 @@ const Case = () => {
             </View>
 
             {/* 💠 Переключатель */}
-            <View
-              style={[
-                styles.switchContainer,
-                fixedWidth && { width: fixedWidth * 0.9 },
-              ]}
-            >
+            <View style={[styles.switchContainer, { width: switchWidth }]}>
               <Animated.View
                 style={[styles.switchHighlight, { transform: [{ translateX }] }]}
               />
@@ -158,26 +160,25 @@ const Case = () => {
 
           {/* ===== Сетка подарков ===== */}
           <View style={styles.giftGrid}>
-          {Array.from({ length: 6 }).map((_, index) => (
-  <GiftCard
-    key={index}
-    price={activeTab === "paid" ? "0.5" : "0.1"}
-    gradientColors={
-      activeTab === "paid"
-        ? [
-            "rgba(0, 0, 0, 0)",        // прозрачный верх
-            "rgba(0, 255, 100, 0.2)", // 💚 зелёный переход
-            "rgba(0, 255, 100, 0.85)",  // насыщенный зелёный низ
-          ]
-        : [
-            "rgba(0, 0, 0, 0)",        // прозрачный верх
-            "rgba(255, 60, 60, 0.1)",  // ❤️ лёгкий полупрозрачный красный
-            "rgba(255, 0, 0, 0.85)",   // насыщенный красный низ
-          ]
-    }
-  />
-))}
-
+            {Array.from({ length: 6 }).map((_, index) => (
+              <GiftCard
+                key={index}
+                price={activeTab === "paid" ? "0.5" : "0.1"}
+                gradientColors={
+                  activeTab === "paid"
+                    ? [
+                        "rgba(0, 0, 0, 0)",
+                        "rgba(0, 255, 100, 0.25)",
+                        "rgba(0, 255, 100, 0.85)",
+                      ]
+                    : [
+                        "rgba(0, 0, 0, 0)",
+                        "rgba(255, 60, 60, 0.2)",
+                        "rgba(255, 0, 0, 0.85)",
+                      ]
+                }
+              />
+            ))}
           </View>
         </ScrollView>
       </View>
@@ -202,7 +203,7 @@ const styles = StyleSheet.create({
     justifyContent: "space-between",
     alignItems: "center",
     marginBottom: 20,
-    marginTop: 20
+    marginTop: 40,
   },
   langButton: {
     backgroundColor: "#1F0248",
@@ -212,7 +213,6 @@ const styles = StyleSheet.create({
   },
   flagIcon: { width: 28, height: 28, borderRadius: 14 },
   middlePanel: { alignItems: "center", width: "100%", marginBottom: 20 },
-
   subscribeButton: {
     width: "90%",
     height: 60,
@@ -228,7 +228,6 @@ const styles = StyleSheet.create({
   },
   subscribeText: { color: "#fff", fontWeight: "700", fontSize: 18 },
   subscribeIcon: { width: 26, height: 26, marginRight: 8 },
-
   giftHistoryWrapper: {
     flexDirection: "row",
     alignItems: "center",
@@ -238,22 +237,17 @@ const styles = StyleSheet.create({
     marginBottom: 20,
     gap: 12,
   },
-
-  // 👇 контейнер с обрезкой справа
   giftHistoryMask: {
     flexDirection: "row",
-    overflow: "hidden", // ✅ всё, что выходит за пределы — просто обрезается
+    overflow: "hidden",
     flexShrink: 1,
   },
-  
-
   giftHistoryContainer: {
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "flex-start",
     gap: 12,
   },
-
   onlineCircle: {
     width: 65,
     height: 65,
@@ -265,7 +259,6 @@ const styles = StyleSheet.create({
   onlineInner: { flexDirection: "row", alignItems: "center", gap: 4 },
   userIcon: { width: 20, height: 20 },
   onlineText: { color: "#00FF66", fontWeight: "700", fontSize: 14 },
-
   inactiveCircle: {
     width: 65,
     height: 65,
@@ -275,7 +268,6 @@ const styles = StyleSheet.create({
     alignItems: "center",
   },
   giftIcon: { width: 24, height: 24, opacity: 0.4 },
-
   switchContainer: {
     flexDirection: "row",
     alignItems: "center",
@@ -303,7 +295,6 @@ const styles = StyleSheet.create({
   },
   switchText: { color: "rgba(255,255,255,0.6)", fontSize: 16, fontWeight: "600" },
   switchTextActive: { color: "#fff", fontWeight: "700" },
-
   giftGrid: {
     flexDirection: "row",
     flexWrap: "wrap",
