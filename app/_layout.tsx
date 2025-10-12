@@ -10,10 +10,7 @@ const _layout = () => {
   // Проверяем, нужно ли ограничить ширину (ПК, Telegram Desktop или Web)
   const isDesktop =
     platform === "tdesktop" ||
-    platform === "macos" ||
-    platform === "weba" ||
-    platform === "webk" ||
-    platform === "web";
+    platform === "macos" ;
 
   return (
     <View style={styles.wrapper}>

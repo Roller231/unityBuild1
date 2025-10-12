@@ -28,13 +28,12 @@ const INACTIVE_COLOR = "rgba(255,255,255,0.6)";
 const CustomTabBar: React.FC<BottomTabBarProps> = ({ state, navigation }) => {
   const platform = useTelegramPlatform();
 
+  
+
   // ✅ определяем платформу
   const isDesktop =
     platform === "tdesktop" ||
-    platform === "macos" ||
-    platform === "webk" ||
-    platform === "weba" ||
-    platform === "web";
+    platform === "macos" ;
 
   // 🔹 состояние для ширины экрана
   const [windowWidth, setWindowWidth] = useState(Dimensions.get("window").width);
@@ -49,7 +48,15 @@ const CustomTabBar: React.FC<BottomTabBarProps> = ({ state, navigation }) => {
   const containerWidth = isDesktop ? 470 * 0.9 : windowWidth * 0.9;
 
   return (
+    
     <View style={styles.wrapper}>
+      {/* 📱 Отладка платформы */}
+<View style={{ padding: 10, alignItems: "center" }}>
+  <Text style={{ color: "#fff", fontSize: 14 }}>
+    Platform: {platform || "loading..."}
+  </Text>
+</View>
+
       <BlurView
         intensity={20}
         tint="light"

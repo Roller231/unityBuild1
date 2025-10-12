@@ -8,10 +8,7 @@ const StarsBackground = () => {
   // ✅ детектим платформу
   const isDesktop =
     platform === "tdesktop" ||
-    platform === "macos" ||
-    platform === "webk" ||
-    platform === "weba" ||
-    platform === "web";
+    platform === "macos";
 
   // 🔹 локальный стейт для width/height (чтобы реагировать на ресайз)
   const [dimensions, setDimensions] = useState(Dimensions.get("window"));

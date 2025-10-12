@@ -29,10 +29,7 @@ const Case = () => {
 
   const isDesktop =
     platform === "tdesktop" ||
-    platform === "macos" ||
-    platform === "webk" ||
-    platform === "weba" ||
-    platform === "web";
+    platform === "macos" ;
 
   // ✅ фиксируем ширину только для десктопа
   const fixedWidth = isDesktop ? 470 : screenWidth;
