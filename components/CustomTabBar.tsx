@@ -4,6 +4,8 @@ import { BottomTabBarProps } from "@react-navigation/bottom-tabs";
 import Animated, { useAnimatedStyle, withTiming } from "react-native-reanimated";
 import { BlurView } from "expo-blur";
 
+import { useTelegramPlatform } from "@/hooks/useTelegramPlatform"; // ✅ хук платформы
+
 // Иконки
 import CaseIcon from "./icons/gift.png";
 import CaseIconActive from "./icons/gift_active.png";
@@ -17,9 +19,22 @@ const ACTIVE_COLOR = "#FFFFFF";
 const INACTIVE_COLOR = "rgba(255,255,255,0.6)";
 
 const CustomTabBar: React.FC<BottomTabBarProps> = ({ state, navigation }) => {
+  // ✅ определяем платформу Telegram
+  const platform = useTelegramPlatform();
+
+  // если Telegram открыт на ПК / Web, фиксируем ширину
+  const isDesktop =
+    platform === "tdesktop" ||
+    platform === "macos" ||
+    platform === "webk" ||
+    platform === "weba" ||
+    platform === "web";
+
+  const containerWidth = isDesktop ? 470 * 0.9 : "90%"; // 🔹 90% от рамки или 470px
+
   return (
     <View style={styles.wrapper}>
-      <BlurView intensity={20} tint="light" style={styles.container}>
+      <BlurView intensity={20} tint="light" style={[styles.container, { width: containerWidth }]}>
         {TABS_ORDER.map((tabName) => {
           const routeIndex = state.routes.findIndex((r) => r.name === tabName);
           if (routeIndex === -1) return null;
@@ -74,12 +89,7 @@ const TabItem = ({
   return (
     <TouchableOpacity onPress={onPress} style={styles.tabItem} activeOpacity={0.7}>
       <Animated.View style={rIconStyle}>
-      <Image
-  source={icon}
-  style={{ width: 28, height: 28 }}
-  resizeMode="contain"
-/>
-
+        <Image source={icon} style={{ width: 28, height: 28 }} resizeMode="contain" />
       </Animated.View>
       <Animated.Text
         style={[
@@ -130,17 +140,14 @@ const styles = StyleSheet.create({
   },
   container: {
     flexDirection: "row",
-    width: 400,
     height: 70,
     paddingVertical: 3,
     paddingHorizontal: 8,
     justifyContent: "space-around",
     alignItems: "center",
-  
-    backgroundColor: "rgba(30, 30, 30, 0.4)",  // 🔹 Серый полупрозрачный слой поверх блюра
+    backgroundColor: "rgba(30, 30, 30, 0.4)",
     borderRadius: 16,
   },
-  
   tabItem: {
     flex: 1,
     justifyContent: "center",

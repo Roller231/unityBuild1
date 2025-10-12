@@ -36,12 +36,13 @@ const GiftCard = ({
 
 const styles = StyleSheet.create({
   cardWrapper: {
-    width: 164,
-    height: 164,
-    borderRadius: 16,
+    width: 200, // 🔹 увеличено (было 164)
+    height: 200, // 🔹 увеличено
+    borderRadius: 18,
     overflow: "hidden",
     backgroundColor: "rgba(255,255,255,0.05)",
-    margin: 8,
+    marginHorizontal: 7, // 🔹 меньше боковых отступов
+    marginVertical: 6,   // 🔹 чуть плотнее между рядами
   },
 
   gradient: {
@@ -49,37 +50,35 @@ const styles = StyleSheet.create({
     bottom: 0,
     width: "100%",
     height: "80%",
-    borderBottomLeftRadius: 16,
-    borderBottomRightRadius: 16,
+    borderBottomLeftRadius: 18,
+    borderBottomRightRadius: 18,
   },
 
   priceTag: {
     position: "absolute",
-    top: 8,
-    left: 8,
+    top: 10,
+    left: 10,
     zIndex: 10,
     borderRadius: 100,
-    overflow: "hidden", // 🔹 чтобы блюр был по форме
+    overflow: "hidden",
   },
 
-  // 🔹 Теперь фон полупрозрачный с блюром
   priceInner: {
     flexDirection: "row",
     alignItems: "center",
     borderRadius: 100,
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-    backgroundColor: "rgba(255, 255, 255, 0.2)", // лёгкий белый фон поверх блюра
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+    backgroundColor: "rgba(255, 255, 255, 0.25)",
   },
 
   iconCircle: {
-    width: 20,
-    height: 20,
-    borderRadius: 10,
+    width: 22,
+    height: 22,
+    borderRadius: 11,
     backgroundColor: "#0098EA",
     justifyContent: "center",
     alignItems: "center",
-    overflow: "hidden",
   },
   icon: {
     width: "100%",
@@ -88,7 +87,7 @@ const styles = StyleSheet.create({
   priceText: {
     color: "#fff",
     fontWeight: "700",
-    fontSize: 14,
+    fontSize: 15, // 🔹 немного крупнее
     marginLeft: 6,
   },
 });

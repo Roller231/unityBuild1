@@ -4,7 +4,6 @@ import {
   Text,
   StyleSheet,
   TouchableWithoutFeedback,
-  Dimensions,
   ScrollView,
   Animated,
   Image,
@@ -13,16 +12,25 @@ import { LinearGradient } from "expo-linear-gradient";
 import StarsBackground from "../components/StarsBackground";
 import BalanceButton from "../components/Buttons/BalanceButton";
 import GiftCard from "../components/Buttons/GiftCard";
+import { useTelegramPlatform } from "@/hooks/useTelegramPlatform";
 
 import FlagRU from "../components/icons/ru.png";
 import FlagEN from "../components/icons/us.png";
-
-const { width, height } = Dimensions.get("window");
 
 const Case = () => {
   const [activeTab, setActiveTab] = useState<"paid" | "free">("paid");
   const [language, setLanguage] = useState<"ru" | "en">("ru");
   const animation = useState(new Animated.Value(0))[0];
+
+  const platform = useTelegramPlatform();
+  const isDesktop =
+    platform === "tdesktop" ||
+    platform === "macos" ||
+    platform === "webk" ||
+    platform === "weba" ||
+    platform === "web";
+
+  const fixedWidth = isDesktop ? 470 : undefined;
 
   const handleSwitch = (tab: "paid" | "free") => {
     setActiveTab(tab);
@@ -33,143 +41,168 @@ const Case = () => {
     }).start();
   };
 
-  const switchWidth = width * 0.8; // ширина контейнера
+  const switchWidth = fixedWidth ? fixedWidth * 0.9 : "90%";
   const translateX = animation.interpolate({
     inputRange: [0, 1],
-    outputRange: [0, switchWidth / 2], // теперь движется ровно на половину
+    outputRange: [0, (fixedWidth ? fixedWidth * 0.9 : 360) / 2],
   });
-  
 
-  const toggleLanguage = () => {
-    setLanguage((prev) => (prev === "ru" ? "en" : "ru"));
-  };
-
-  const handleBalancePress = () => {
-    console.log("Balance clicked!");
-  };
+  const toggleLanguage = () => setLanguage((prev) => (prev === "ru" ? "en" : "ru"));
+  const handleBalancePress = () => console.log("Balance clicked!");
 
   return (
     <LinearGradient colors={["#340A6F", "#18003A"]} style={styles.background}>
       <StarsBackground />
 
-      <ScrollView contentContainerStyle={styles.container}>
-        {/* ===== Верхняя панель ===== */}
-        <View style={styles.topBar}>
-          <TouchableWithoutFeedback onPress={toggleLanguage}>
-            <View style={styles.langButton}>
-              <Image
-                source={language === "ru" ? FlagRU : FlagEN}
-                style={styles.flagIcon}
-                resizeMode="contain"
-              />
-            </View>
-          </TouchableWithoutFeedback>
-
-          <BalanceButton onPress={handleBalancePress} />
-        </View>
-
-        {/* ===== Средняя панель ===== */}
-        <View style={styles.middlePanel}>
-          {/* Кнопка подписки */}
-          <View style={styles.subscribeButton}>
-            <View style={styles.subscribeContent}>
-              <Image
-                source={require("../components/icons/cat.png")}
-                style={styles.subscribeIcon}
-                resizeMode="contain"
-              />
-              <Text style={styles.subscribeText}>Subscribe To Us</Text>
-            </View>
-          </View>
-
-          {/* Онлайн + История подарков */}
-          <View style={styles.giftHistoryWrapper}>
-            {/* 🔹 Онлайн-круг */}
-            <View style={styles.onlineCircle}>
-              <View style={styles.onlineInner}>
+      <View style={[styles.wrapper, fixedWidth && { width: fixedWidth }]}>
+        <ScrollView
+          contentContainerStyle={styles.container}
+          showsVerticalScrollIndicator={false}
+          pinchGestureEnabled={false}
+        >
+          {/* ===== Верхняя панель ===== */}
+          <View style={styles.topBar}>
+            <TouchableWithoutFeedback onPress={toggleLanguage}>
+              <View style={styles.langButton}>
                 <Image
-                  source={require("../components/icons/user.svg")}
-                  style={styles.userIcon}
+                  source={language === "ru" ? FlagRU : FlagEN}
+                  style={styles.flagIcon}
                   resizeMode="contain"
                 />
-                <Text style={styles.onlineText}>234</Text>
+              </View>
+            </TouchableWithoutFeedback>
+
+            <BalanceButton onPress={handleBalancePress} />
+          </View>
+
+          {/* ===== Средняя панель ===== */}
+          <View style={styles.middlePanel}>
+            {/* 💜 Кнопка подписки */}
+            <View style={styles.subscribeButton}>
+              <View style={styles.subscribeContent}>
+                <Image
+                  source={require("../components/icons/cat.png")}
+                  style={styles.subscribeIcon}
+                  resizeMode="contain"
+                />
+                <Text style={styles.subscribeText}>Subscribe To Us</Text>
               </View>
             </View>
 
-            {/* 🎁 История подарков */}
-            <View style={styles.giftHistoryContainer}>
-              {Array.from({ length: 6 }).map((_, i) => (
-                <View key={i} style={styles.inactiveCircle}>
+            {/* 🌟 Онлайн + История подарков */}
+            <View style={styles.giftHistoryWrapper}>
+              {/* 👤 Онлайн */}
+              <View style={styles.onlineCircle}>
+                <View style={styles.onlineInner}>
                   <Image
-                    source={require("../components/icons/gift.png")}
-                    style={styles.giftIcon}
+                    source={require("../components/icons/user.svg")}
+                    style={styles.userIcon}
                     resizeMode="contain"
                   />
+                  <Text style={styles.onlineText}>234</Text>
                 </View>
-              ))}
+              </View>
+
+              {/* 🎁 История подарков — теперь обрезается */}
+              <View style={styles.giftHistoryMask}>
+                <View style={styles.giftHistoryContainer}>
+                  {Array.from({ length: 6 }).map((_, i) => (
+                    <View key={i} style={styles.inactiveCircle}>
+                      <Image
+                        source={require("../components/icons/gift.png")}
+                        style={styles.giftIcon}
+                        resizeMode="contain"
+                      />
+                    </View>
+                  ))}
+                </View>
+              </View>
+            </View>
+
+            {/* 💠 Переключатель */}
+            <View
+              style={[
+                styles.switchContainer,
+                fixedWidth && { width: fixedWidth * 0.9 },
+              ]}
+            >
+              <Animated.View
+                style={[styles.switchHighlight, { transform: [{ translateX }] }]}
+              />
+              <TouchableWithoutFeedback onPress={() => handleSwitch("paid")}>
+                <View style={styles.switchButton}>
+                  <Text
+                    style={[
+                      styles.switchText,
+                      activeTab === "paid" && styles.switchTextActive,
+                    ]}
+                  >
+                    Paid
+                  </Text>
+                </View>
+              </TouchableWithoutFeedback>
+              <TouchableWithoutFeedback onPress={() => handleSwitch("free")}>
+                <View style={styles.switchButton}>
+                  <Text
+                    style={[
+                      styles.switchText,
+                      activeTab === "free" && styles.switchTextActive,
+                    ]}
+                  >
+                    Free
+                  </Text>
+                </View>
+              </TouchableWithoutFeedback>
             </View>
           </View>
 
-          {/* Переключатель */}
- {/* Переключатель */}
- <View style={styles.switchContainer}>
-            <Animated.View
-              style={[styles.switchHighlight, { transform: [{ translateX }] }]}
-            />
-            <TouchableWithoutFeedback onPress={() => handleSwitch("paid")}>
-              <View style={styles.switchButton}>
-                <Text
-                  style={[
-                    styles.switchText,
-                    activeTab === "paid" && styles.switchTextActive,
-                  ]}
-                >
-                  Paid
-                </Text>
-              </View>
-            </TouchableWithoutFeedback>
-            <TouchableWithoutFeedback onPress={() => handleSwitch("free")}>
-              <View style={styles.switchButton}>
-                <Text
-                  style={[
-                    styles.switchText,
-                    activeTab === "free" && styles.switchTextActive,
-                  ]}
-                >
-                  Free
-                </Text>
-              </View>
-            </TouchableWithoutFeedback>
-          </View>
-
-        </View>
-
-        {/* ===== Сетка подарков ===== */}
-        <View style={styles.giftGrid}>
+          {/* ===== Сетка подарков ===== */}
+          <View style={styles.giftGrid}>
           {Array.from({ length: 6 }).map((_, index) => (
-            <GiftCard key={index} price={activeTab === "paid" ? "0.5" : "0.1"} />
-          ))}
-        </View>
-      </ScrollView>
+  <GiftCard
+    key={index}
+    price={activeTab === "paid" ? "0.5" : "0.1"}
+    gradientColors={
+      activeTab === "paid"
+        ? [
+            "rgba(0, 0, 0, 0)",        // прозрачный верх
+            "rgba(0, 255, 100, 0.2)", // 💚 зелёный переход
+            "rgba(0, 255, 100, 0.85)",  // насыщенный зелёный низ
+          ]
+        : [
+            "rgba(0, 0, 0, 0)",        // прозрачный верх
+            "rgba(255, 60, 60, 0.1)",  // ❤️ лёгкий полупрозрачный красный
+            "rgba(255, 0, 0, 0.85)",   // насыщенный красный низ
+          ]
+    }
+  />
+))}
+
+          </View>
+        </ScrollView>
+      </View>
     </LinearGradient>
   );
 };
 
 const styles = StyleSheet.create({
-  background: { flex: 1 },
+  background: { flex: 1, alignItems: "center" },
+  wrapper: {
+    flex: 1,
+    alignSelf: "center",
+  },
   container: {
     alignItems: "center",
-    paddingTop: height * 0.05,
-    paddingBottom: height * 0.2,
+    paddingTop: 60,
+    paddingBottom: 150,
   },
-
-  // 🔹 Верхняя панель
   topBar: {
-    width: width * 0.9,
+    width: "90%",
     flexDirection: "row",
     justifyContent: "space-between",
     alignItems: "center",
-    marginBottom: height * 0.025,
+    marginBottom: 20,
+    marginTop: 20
   },
   langButton: {
     backgroundColor: "#1F0248",
@@ -177,122 +210,84 @@ const styles = StyleSheet.create({
     paddingVertical: 6,
     paddingHorizontal: 14,
   },
-  flagIcon: {
-    width: 28,
-    height: 28,
-    borderRadius: 14,
-  },
+  flagIcon: { width: 28, height: 28, borderRadius: 14 },
+  middlePanel: { alignItems: "center", width: "100%", marginBottom: 20 },
 
-  // 🔹 Средняя часть
-  middlePanel: {
-    alignItems: "center",
-    width: "100%",
-    marginBottom: height * 0.04,
-  },
-
-  // 💜 Кнопка подписки
   subscribeButton: {
-    width: width * 0.9,
-    height: height * 0.07,
+    width: "90%",
+    height: 60,
     borderRadius: 100,
     backgroundColor: "#6B3FD8",
-    shadowColor: "#250248",
-    shadowOffset: { width: 0, height: 8 },
-    shadowOpacity: 0.5,
-    shadowRadius: 16,
-    elevation: 8,
-    marginBottom: height * 0.03,
     justifyContent: "center",
+    marginBottom: 20,
   },
   subscribeContent: {
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "center",
   },
-  subscribeText: {
-    color: "#fff",
-    fontWeight: "700",
-    fontSize: 18,
-  },
-  subscribeIcon: {
-    width: 26,
-    height: 26,
-    marginRight: 8,
-  },
+  subscribeText: { color: "#fff", fontWeight: "700", fontSize: 18 },
+  subscribeIcon: { width: 26, height: 26, marginRight: 8 },
 
-  // 🌟 Онлайн + История подарков
   giftHistoryWrapper: {
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "flex-start",
     width: "100%",
-    paddingHorizontal: width * 0.05,
-    marginBottom: height * 0.03,
+    paddingHorizontal: 20,
+    marginBottom: 20,
     gap: 12,
   },
 
-  // 👤 Онлайн-круг
-  onlineCircle: {
-    width: width * 0.16,
-    height: width * 0.16,
-    borderRadius: (width * 0.16) / 2,
-    backgroundColor: "rgba(60, 0, 120, 0.8)",
-    justifyContent: "center",
-    alignItems: "center",
-  },
-  onlineInner: {
+  // 👇 контейнер с обрезкой справа
+  giftHistoryMask: {
     flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "center",
-    gap: 4,
+    overflow: "hidden", // ✅ всё, что выходит за пределы — просто обрезается
+    flexShrink: 1,
   },
-  userIcon: {
-    width: width * 0.05,
-    height: width * 0.05,
-  },
-  onlineText: {
-    color: "#00FF66",
-    fontWeight: "700",
-    fontSize: 14,
-  },
+  
 
-  // 🎁 Остальные круги
   giftHistoryContainer: {
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "flex-start",
     gap: 12,
-    flexShrink: 1,
   },
+
+  onlineCircle: {
+    width: 65,
+    height: 65,
+    borderRadius: 35,
+    backgroundColor: "rgba(60, 0, 120, 0.8)",
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  onlineInner: { flexDirection: "row", alignItems: "center", gap: 4 },
+  userIcon: { width: 20, height: 20 },
+  onlineText: { color: "#00FF66", fontWeight: "700", fontSize: 14 },
+
   inactiveCircle: {
-    width: width * 0.16,
-    height: width * 0.16,
-    borderRadius: (width * 0.16) / 2,
+    width: 65,
+    height: 65,
+    borderRadius: 35,
     backgroundColor: "rgba(255,255,255,0.05)",
     justifyContent: "center",
     alignItems: "center",
   },
-  giftIcon: {
-    width: width * 0.07,
-    height: width * 0.07,
-    opacity: 0.4,
-  },
+  giftIcon: { width: 24, height: 24, opacity: 0.4 },
 
-  // 💠 Переключатель
   switchContainer: {
     flexDirection: "row",
     alignItems: "center",
     alignSelf: "center",
-    width: width * 0.8,
-    height: 48,
+    height: 56,
     borderRadius: 100,
-    borderWidth: 1,
+    borderWidth: 1.2,
     borderColor: "#9028FF",
-    backgroundColor: "#1F0248", // var(--surface-color-2)
+    backgroundColor: "#1F0248",
     overflow: "hidden",
-    marginTop: height * 0.015,
+    paddingHorizontal: 0,
   },
-  
   switchHighlight: {
     position: "absolute",
     width: "50%",
@@ -300,31 +295,21 @@ const styles = StyleSheet.create({
     borderRadius: 100,
     backgroundColor: "#9028FF",
   },
-  
   switchButton: {
     flex: 1,
     justifyContent: "center",
     alignItems: "center",
-    zIndex: 2, // чтобы текст был поверх highlight
+    zIndex: 2,
   },
-  
-  switchText: {
-    color: "rgba(255,255,255,0.6)",
-    fontSize: 16,
-    fontWeight: "600",
-  },
-  
-  switchTextActive: {
-    color: "#fff",
-    fontWeight: "700",
-  },
+  switchText: { color: "rgba(255,255,255,0.6)", fontSize: 16, fontWeight: "600" },
+  switchTextActive: { color: "#fff", fontWeight: "700" },
 
-  // 🎁 Сетка подарков
   giftGrid: {
     flexDirection: "row",
     flexWrap: "wrap",
     justifyContent: "center",
-    gap: width * 0.04,
+    gap: 10,
+    paddingHorizontal: 6,
   },
 });
 
