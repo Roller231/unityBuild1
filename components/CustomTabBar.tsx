@@ -32,11 +32,7 @@ const CustomTabBar: React.FC<BottomTabBarProps> = ({ state, navigation }) => {
 
   // ✅ определяем платформу
   const isDesktop =
-    platform === "tdesktop" ||
-    platform === "macos" ||
-    platform === "webk" ||
-    platform === "weba" ||
-    platform === "web";
+    platform === "tdesktop";
 
   // 🔹 состояние для ширины экрана
   const [windowWidth, setWindowWidth] = useState(Dimensions.get("window").width);
