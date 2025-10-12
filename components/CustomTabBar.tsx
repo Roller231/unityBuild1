@@ -32,7 +32,8 @@ const CustomTabBar: React.FC<BottomTabBarProps> = ({ state, navigation }) => {
 
   // ✅ определяем платформу
   const isDesktop =
-    platform === "tdesktop";
+    platform === "tdesktop" ||
+    platform === "macos" ;
 
   // 🔹 состояние для ширины экрана
   const [windowWidth, setWindowWidth] = useState(Dimensions.get("window").width);
@@ -50,11 +51,11 @@ const CustomTabBar: React.FC<BottomTabBarProps> = ({ state, navigation }) => {
     
     <View style={styles.wrapper}>
       {/* 📱 Отладка платформы */}
-<View style={{ padding: 10, alignItems: "center" }}>
+{/* <View style={{ padding: 10, alignItems: "center" }}>
   <Text style={{ color: "#fff", fontSize: 14 }}>
     Platform: {platform || "loading..."}
   </Text>
-</View>
+</View> */}
 
       <BlurView
         intensity={20}
