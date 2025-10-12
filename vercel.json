@@ -1,7 +1,15 @@
 {
     "buildCommand": "npx expo export --platform web",
     "outputDirectory": "dist",
+    "rewrites": [
+    { "source": "/", "destination": "/index.html" },
+    { "source": "/case", "destination": "/case.html" },
+    { "source": "/crash", "destination": "/crash.html" },
+    { "source": "/profile", "destination": "/profile.html" },
+    { "source": "/(.*)", "destination": "/+not-found.html" }
+  ],
     "framework": "vite",
     "installCommand": "npm install"
+    
   }
   
