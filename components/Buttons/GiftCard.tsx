@@ -36,8 +36,8 @@ const GiftCard = ({
 
 const styles = StyleSheet.create({
   cardWrapper: {
-    width: 190, // 🔹 увеличено (было 164)
-    height: 190, // 🔹 увеличено
+    width: 160, // 🔹 увеличено (было 164)
+    height: 160, // 🔹 увеличено
     borderRadius: 18,
     overflow: "hidden",
     backgroundColor: "rgba(255,255,255,0.05)",
