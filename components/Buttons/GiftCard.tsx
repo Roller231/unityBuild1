@@ -2,17 +2,21 @@ import React from "react";
 import { View, Text, Image, StyleSheet } from "react-native";
 import { LinearGradient } from "expo-linear-gradient";
 import { BlurView } from "expo-blur";
-import TonIcon from "../icons/ton.png";
+import TonIcon from "../icons/ton.svg";
+
+interface GiftCardProps {
+  price?: string;
+  gradientColors?: string[];
+  cardWidth?: number;
+}
 
 const GiftCard = ({
   price = "0.5",
   gradientColors = ["rgba(0, 0, 0, 0)", "rgba(0, 0, 0, 0.25)", "#FFFFFF"],
-}: {
-  price?: string;
-  gradientColors?: string[];
-}) => {
+  cardWidth = 160,
+}: GiftCardProps) => {
   return (
-    <View style={styles.cardWrapper}>
+    <View style={[styles.cardWrapper, { width: cardWidth, height: cardWidth }]}>
       {/* 💎 Плашка стоимости с блюром */}
       <View style={styles.priceTag}>
         <BlurView intensity={40} tint="light" style={styles.priceInner}>
@@ -23,7 +27,7 @@ const GiftCard = ({
         </BlurView>
       </View>
 
-      {/* 🔹 Основной фон карточки (градиент снизу) */}
+      {/* 🔹 Основной фон карточки */}
       <LinearGradient
         colors={gradientColors}
         start={{ x: 0.5, y: 0 }}
@@ -36,13 +40,9 @@ const GiftCard = ({
 
 const styles = StyleSheet.create({
   cardWrapper: {
-    width: 160, // 🔹 увеличено (было 164)
-    height: 160, // 🔹 увеличено
     borderRadius: 18,
     overflow: "hidden",
     backgroundColor: "rgba(255,255,255,0.05)",
-    marginHorizontal: 7, // 🔹 меньше боковых отступов
-    marginVertical: 6,   // 🔹 чуть плотнее между рядами
   },
 
   gradient: {
@@ -87,7 +87,7 @@ const styles = StyleSheet.create({
   priceText: {
     color: "#fff",
     fontWeight: "700",
-    fontSize: 15, // 🔹 немного крупнее
+    fontSize: 15,
     marginLeft: 6,
   },
 });

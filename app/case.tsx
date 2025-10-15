@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 import {
   View,
   Text,
@@ -25,13 +25,12 @@ const Case = () => {
   const [language, setLanguage] = useState<"ru" | "en">("ru");
   const animation = useState(new Animated.Value(0))[0];
 
+  const [flagAnim] = useState(new Animated.Value(0));
+  const [currentFlag, setCurrentFlag] = useState(language);
+
+
   const platform = useTelegramPlatform();
-
-  const isDesktop =
-    platform === "tdesktop" ||
-    platform === "macos" ;
-
-  // ✅ фиксируем ширину только для десктопа
+  const isDesktop = platform === "tdesktop" || platform === "macos";
   const fixedWidth = isDesktop ? 470 : screenWidth;
 
   const handleSwitch = (tab: "paid" | "free") => {
@@ -43,45 +42,109 @@ const Case = () => {
     }).start();
   };
 
-  // ширина переключателя
   const switchWidth = fixedWidth * 0.9;
   const translateX = animation.interpolate({
     inputRange: [0, 1],
     outputRange: [0, switchWidth / 2],
   });
 
-  const toggleLanguage = () => setLanguage((prev) => (prev === "ru" ? "en" : "ru"));
+  const toggleLanguage = () => {
+    // анимация вылета старого флага вверх
+    Animated.sequence([
+      Animated.timing(flagAnim, {
+        toValue: -50, // поднимаем старый флаг вверх
+        duration: 200,
+        useNativeDriver: true,
+      }),
+      Animated.timing(flagAnim, {
+        toValue: 50, // опускаем "новый" флаг снизу
+        duration: 0,
+        useNativeDriver: true,
+      }),
+    ]).start(() => {
+      // меняем язык после вылета старого флага
+      setLanguage((prev) => (prev === "ru" ? "en" : "ru"));
+      setCurrentFlag((prev) => (prev === "ru" ? "en" : "ru"));
+  
+      // анимация вылета нового флага вверх (в центр)
+      Animated.timing(flagAnim, {
+        toValue: 0,
+        duration: 200,
+        useNativeDriver: true,
+      }).start();
+    });
+  };
+  
   const handleBalancePress = () => console.log("Balance clicked!");
+
+  // ✅ вычисляем ширину карточек (2 в ряд)
+  const contentWidth = switchWidth;
+  const cardSpacing = 10;
+  const cardWidth = (contentWidth - cardSpacing) / 2;
+
+  // 🚫 отключаем масштабирование/ресайз
+  useEffect(() => {
+    const metaTag = document.querySelector('meta[name="viewport"]');
+    if (metaTag) {
+      metaTag.setAttribute(
+        "content",
+        "width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no"
+      );
+    } else {
+      const newMeta = document.createElement("meta");
+      newMeta.name = "viewport";
+      newMeta.content =
+        "width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no";
+      document.head.appendChild(newMeta);
+    }
+
+    // блокировка ресайза окна (на десктопе)
+    const preventResize = (e: Event) => {
+      e.preventDefault();
+      return false;
+    };
+    window.addEventListener("resize", preventResize);
+    return () => window.removeEventListener("resize", preventResize);
+  }, []);
 
   return (
     <LinearGradient colors={["#340A6F", "#18003A"]} style={styles.background}>
       <StarsBackground />
 
-      {/* ✅ Обёртка с динамической шириной */}
       <View style={[styles.wrapper, { width: fixedWidth }]}>
         <ScrollView
           contentContainerStyle={styles.container}
           showsVerticalScrollIndicator={false}
           pinchGestureEnabled={false}
+          scrollEnabled
         >
           {/* ===== Верхняя панель ===== */}
           <View style={styles.topBar}>
-            <TouchableWithoutFeedback onPress={toggleLanguage}>
-              <View style={styles.langButton}>
-                <Image
-                  source={language === "ru" ? FlagRU : FlagEN}
-                  style={styles.flagIcon}
-                  resizeMode="contain"
-                />
-              </View>
-            </TouchableWithoutFeedback>
+          <TouchableWithoutFeedback onPress={toggleLanguage}>
+  <View style={styles.langButton}>
+    <Animated.Image
+      source={currentFlag === "ru" ? FlagRU : FlagEN}
+      style={[
+        styles.flagIcon,
+        {
+          transform: [{ translateY: flagAnim }],
+          opacity: flagAnim.interpolate({
+            inputRange: [-50, 0, 50],
+            outputRange: [0, 1, 0], // плавное появление/исчезание
+          }),
+        },
+      ]}
+      resizeMode="contain"
+    />
+  </View>
+</TouchableWithoutFeedback>
+
 
             <BalanceButton onPress={handleBalancePress} />
           </View>
 
           {/* ===== Средняя панель ===== */}
           <View style={styles.middlePanel}>
-            {/* 💜 Кнопка подписки */}
             <View style={styles.subscribeButton}>
               <View style={styles.subscribeContent}>
                 <Image
@@ -93,9 +156,7 @@ const Case = () => {
               </View>
             </View>
 
-            {/* 🌟 Онлайн + История подарков */}
             <View style={styles.giftHistoryWrapper}>
-              {/* 👤 Онлайн */}
               <View style={styles.onlineCircle}>
                 <View style={styles.onlineInner}>
                   <Image
@@ -107,7 +168,6 @@ const Case = () => {
                 </View>
               </View>
 
-              {/* 🎁 История подарков (обрезка) */}
               <View style={styles.giftHistoryMask}>
                 <View style={styles.giftHistoryContainer}>
                   {Array.from({ length: 6 }).map((_, i) => (
@@ -156,11 +216,12 @@ const Case = () => {
           </View>
 
           {/* ===== Сетка подарков ===== */}
-          <View style={styles.giftGrid}>
+          <View style={[styles.giftGrid, { width: contentWidth }]}>
             {Array.from({ length: 6 }).map((_, index) => (
               <GiftCard
                 key={index}
                 price={activeTab === "paid" ? "0.5" : "0.1"}
+                cardWidth={cardWidth}
                 gradientColors={
                   activeTab === "paid"
                     ? [
@@ -185,10 +246,7 @@ const Case = () => {
 
 const styles = StyleSheet.create({
   background: { flex: 1, alignItems: "center" },
-  wrapper: {
-    flex: 1,
-    alignSelf: "center",
-  },
+  wrapper: { flex: 1, alignSelf: "center" },
   container: {
     alignItems: "center",
     paddingTop: 60,
@@ -207,8 +265,14 @@ const styles = StyleSheet.create({
     borderRadius: 100,
     paddingVertical: 6,
     paddingHorizontal: 14,
+    overflow: "hidden", // ✅ чтобы флаг не вылезал за рамку при анимации
+    height: 40,
+    width: 60,
+    justifyContent: "center",
+    alignItems: "center",
   },
-  flagIcon: { width: 28, height: 28, borderRadius: 14 },
+  
+  flagIcon: { width: 28, height: 28, borderRadius: 1 },
   middlePanel: { alignItems: "center", width: "100%", marginBottom: 20 },
   subscribeButton: {
     width: "90%",
@@ -229,11 +293,12 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "flex-start",
-    width: "100%",
-    paddingHorizontal: 20,
+    width: "90%", // ✅ вместо 100%
+    alignSelf: "center", // ✅ добавляем
     marginBottom: 20,
     gap: 12,
   },
+  
   giftHistoryMask: {
     flexDirection: "row",
     overflow: "hidden",
@@ -249,7 +314,7 @@ const styles = StyleSheet.create({
     width: 65,
     height: 65,
     borderRadius: 35,
-    backgroundColor: "rgba(60, 0, 120, 0.8)",
+    backgroundColor: "#1F0248",
     justifyContent: "center",
     alignItems: "center",
   },
@@ -260,7 +325,7 @@ const styles = StyleSheet.create({
     width: 65,
     height: 65,
     borderRadius: 35,
-    backgroundColor: "rgba(255,255,255,0.05)",
+    backgroundColor: "#1F0248",
     justifyContent: "center",
     alignItems: "center",
   },
@@ -275,7 +340,6 @@ const styles = StyleSheet.create({
     borderColor: "#9028FF",
     backgroundColor: "#1F0248",
     overflow: "hidden",
-    paddingHorizontal: 0,
   },
   switchHighlight: {
     position: "absolute",
@@ -295,9 +359,9 @@ const styles = StyleSheet.create({
   giftGrid: {
     flexDirection: "row",
     flexWrap: "wrap",
-    justifyContent: "center",
-    gap: 10,
-    paddingHorizontal: 6,
+    justifyContent: "space-between",
+    rowGap: 10,
+    marginTop: 10,
   },
 });
 

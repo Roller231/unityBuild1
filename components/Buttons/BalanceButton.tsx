@@ -3,7 +3,7 @@ import { View, Text, Image, StyleSheet, TouchableWithoutFeedback } from "react-n
 import { BlurView } from "expo-blur";
 
 // Иконка токена (замени на свою)
-import TonIcon from "../icons/ton.png";
+import TonIcon from "../icons/ton.svg";
 
 const BalanceButton = ({ onPress }: { onPress?: () => void }) => {
   return (

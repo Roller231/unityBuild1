@@ -4,6 +4,24 @@ import { Tabs } from "expo-router";
 import { useTelegramPlatform } from "@/hooks/useTelegramPlatform";
 import CustomTabBar from "@/components/CustomTabBar";
 
+
+if (typeof window !== "undefined") {
+  window.addEventListener(
+    "wheel",
+    (e) => {
+      if (e.ctrlKey) e.preventDefault();
+    },
+    { passive: false }
+  );
+
+  window.addEventListener(
+    "gesturestart",
+    (e) => e.preventDefault(),
+    { passive: false }
+  );
+}
+
+
 const _layout = () => {
   const platform = useTelegramPlatform();
 
