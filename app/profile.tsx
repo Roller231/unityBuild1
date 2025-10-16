@@ -1,5 +1,4 @@
 import React, { useEffect, useState, useRef, useMemo } from "react";
-
 import {
   View,
   StyleSheet,
@@ -9,16 +8,16 @@ import {
   Dimensions,
   Text,
   Pressable,
-  ScrollView, // 👈 вот это добавь
+  ScrollView,
 } from "react-native";
-
-
 import BottomSheet, { BottomSheetView } from "@gorhom/bottom-sheet";
-
 import { LinearGradient } from "expo-linear-gradient";
 import StarsBackground from "../components/StarsBackground";
 import BalanceButton from "../components/Buttons/BalanceButton";
 import { useTelegramPlatform } from "@/hooks/useTelegramPlatform";
+
+import * as Font from "expo-font";
+
 
 // ===== Импорт иконок =====
 import FlagRU from "../components/icons/ru.png";
@@ -27,6 +26,9 @@ import IconGift from "../components/icons/gift.png";
 import IconStar from "../components/icons/star.svg";
 import IconTon from "../components/icons/ton.svg";
 import IconCopy from "../components/icons/copy.svg";
+
+import IconArrow from "../components/icons/arrow.svg"; // добавляем стрелку обратно
+
 
 const { width: screenWidth, height: screenHeight } = Dimensions.get("window");
 
@@ -44,40 +46,48 @@ const Profile = () => {
   const isDesktop = platform === "tdesktop" || platform === "macos";
   const fixedWidth = isDesktop ? 470 : screenWidth;
 
-
   // === BottomSheet (панель) ===
-// === BottomSheet (панель) ===
-const [openMenu, setOpenMenu] = useState<null | "deposit" | "stars" | "ton">(null);
-const bottomSheetRef = useRef<BottomSheet>(null);
+  const [openMenu, setOpenMenu] = useState<null | "deposit" | "stars" | "ton">(null);
+  const bottomSheetRef = useRef<BottomSheet>(null);
 
-const snapPoints = useMemo(() => {
-  if (!openMenu) return [];
-  switch (openMenu) {
-    case "deposit":
-      return ["80%", "80%"]; // 👈 первый — свернутый, второй — полностью открыт
-    case "stars":
-      return ["80%", "80%"];
-    case "ton":
-      return ["80%", "80%"];
-    default:
-      return ["80%", "80%"];
-  }
-}, [openMenu]);
+  const snapPoints = useMemo(() => {
+    if (!openMenu) return [];
+    return ["80%", "80%"];
+  }, [openMenu]);
 
 
+  const [fontLoaded, setFontLoaded] = useState(false);
 
+useEffect(() => {
+  const loadFont = async () => {
+    await Font.loadAsync({
+      "SF-Pro-Semibold": require("../fonts/SF-Pro-Display-Semibold.otf"),
+      "SF-Pro-Medium": require("../fonts/SF-Pro-Display-Medium.otf"),
+      "SF-Pro-Regular": require("../fonts/SF-Pro-Display-Regular.otf"),
+      "SF-Pro-Bold": require("../fonts/SF-Pro-Display-Bold.otf"),
+
+    });
+    setFontLoaded(true);
+  };
+  loadFont();
+}, []);
 
 
   // 🟣 Получаем данные Telegram пользователя
   useEffect(() => {
-    if (typeof window !== "undefined" && window.Telegram?.WebApp?.initDataUnsafe) {
-      const user = window.Telegram.WebApp.initDataUnsafe.user;
+    if (typeof window !== "undefined" && window.Telegram?.WebApp) {
+      const tg = window.Telegram.WebApp;
+      const user = tg?.initDataUnsafe?.user;
+  
       if (user) {
         setTgName(`${user.first_name || ""} ${user.last_name || ""}`.trim());
-        if (user.photo_url) setTgAvatar(user.photo_url);
+        setTgAvatar(user.photo_url || null); // безопасно
+      } else {
+        console.log("⚠️ Telegram user not found. Try opening Mini App from Telegram.");
       }
     }
   }, []);
+  
 
   // 🇷🇺 Переключение языка
   const toggleLanguage = () => {
@@ -95,31 +105,31 @@ const snapPoints = useMemo(() => {
   const handleInvitePress = () => console.log("Invite pressed!");
   const handleCopyPress = () => console.log("Copied!");
 
+  // === Размер ячеек инвентаря ===
+  const ITEM_GAP = 14;
+  const H_PADDING = 32;
+  const ITEMS_PER_ROW = 3;
+  const MAX_ITEM_SIZE = 110;
+
+  const itemSize = useMemo(() => {
+    const size =
+      (fixedWidth - H_PADDING * 2 - ITEM_GAP * (ITEMS_PER_ROW - 1)) / ITEMS_PER_ROW;
+    return Math.min(size, MAX_ITEM_SIZE);
+  }, [fixedWidth]);
+
   return (
     <LinearGradient colors={["#340A6F", "#18003A"]} style={styles.background}>
       <StarsBackground />
 
-
-
-
-
-
-      {/* === ScrollView вместо View === */}
       <ScrollView
         contentContainerStyle={[
           styles.wrapper,
-          {
-            width: fixedWidth,
-            paddingBottom: 120, // отступ снизу
-            minHeight: screenHeight + 100, // позволяет немного проскроллить
-          },
+          { width: fixedWidth, paddingBottom: 170, minHeight: screenHeight + 170 },
         ]}
         showsVerticalScrollIndicator={false}
         overScrollMode="always"
         bounces
       >
-
-
         {/* ===== Верхняя панель ===== */}
         <View style={styles.topBar}>
           <TouchableOpacity onPress={toggleLanguage} activeOpacity={0.8}>
@@ -158,12 +168,10 @@ const snapPoints = useMemo(() => {
 
         {/* ===== 🟣 Меню ===== */}
         <View style={[styles.menuContainer, styles.sectionGap]}>
-          {/* 🔹 Первая строка — кнопки */}
           <View style={styles.menuRow}>
             <TouchableOpacity
               activeOpacity={0.8}
               onPress={() => setOpenMenu("deposit")}
-
               style={[
                 styles.menuButton,
                 activeMenu === "deposit"
@@ -225,7 +233,7 @@ const snapPoints = useMemo(() => {
             </TouchableOpacity>
           </View>
 
-          {/* 🔹 Вторая строка — Inventory + Sell All */}
+          {/* Инвентарь */}
           <View style={styles.inventoryRow}>
             <Text style={styles.inventoryText}>Inventory (0)</Text>
             <Pressable style={styles.sellButton}>
@@ -233,36 +241,39 @@ const snapPoints = useMemo(() => {
             </Pressable>
           </View>
 
-          {/* 🔹 Третья строка — Инвентарь подарков */}
           <View style={styles.inventoryGrid}>
-            <View style={styles.inventoryItem}>
-              <View style={styles.giftIconWrapper}>
-                <Image
-                  source={require("../components/icons/gift.png")}
-                  style={styles.inventoryIcon}
-                />
-              </View>
-            </View>
-            <View style={styles.inventoryItem}>
-              <View style={styles.giftIconWrapper}>
-                <Image
-                  source={require("../components/icons/gift.png")}
-                  style={styles.inventoryIcon}
-                />
-              </View>
-            </View>
-            <View style={styles.inventoryItem}>
-              <View style={styles.giftIconWrapper}>
-                <Image
-                  source={require("../components/icons/arrow.svg")}
-                  style={styles.arrow}
-                />
-              </View>
-            </View>
-          </View>
+  {[1, 2, 3].map((_, i) => (
+    <View
+      key={i}
+      style={[styles.inventoryItem, { width: itemSize, height: itemSize }]}
+    >
+      <View style={styles.giftIconWrapper}>
+        {i === 2 ? (
+          <Image
+            source={IconArrow}
+            style={styles.arrow}
+            resizeMode="contain"
+          />
+        ) : (
+          <Image
+            source={IconGift}
+            style={[
+              styles.inventoryIcon,
+              i === 0 && { tintColor: "rgba(53, 40, 81, 1)" }, // 1 подарок — жёлтый
+              i === 1 && { tintColor: "rgba(53, 40, 81, 1)" }, // 2 подарок — красный
+            ]}
+            resizeMode="contain"
+          />
+        )}
+      </View>
+    </View>
+  ))}
+</View>
+
+
         </View>
 
-        {/* 🔹 Четвёртая строка — Invite friends */}
+        {/* Invite friends */}
         <View style={[styles.newMenuContainer, styles.sectionGap]}>
           <View style={styles.inviteTopRow}>
             <Text style={styles.inviteText}>
@@ -283,7 +294,8 @@ const snapPoints = useMemo(() => {
           </View>
         </View>
 
-{/* 🔹 Третья секция — Баланс и Рефералы */}
+
+        {/* 🔹 Баланс и рефералы */}
 <View style={[styles.emptyMenuContainer, styles.sectionGap]}>
   <View style={styles.balanceLeft}>
     <View style={styles.balanceRow}>
@@ -295,6 +307,7 @@ const snapPoints = useMemo(() => {
         resizeMode="contain"
       />
     </View>
+
     <View style={styles.balanceRow}>
       <Text style={styles.balanceLabel}>Referrals:</Text>
       <Text style={styles.balanceValue}>0.00</Text>
@@ -306,82 +319,74 @@ const snapPoints = useMemo(() => {
   </Pressable>
 </View>
 
+      </ScrollView>
 
-
-
-
-</ScrollView>
-
-
-
- {/* === Bottom Sheet Меню === */}
- {openMenu && snapPoints.length > 0 && (
-  <BottomSheet
-    ref={bottomSheetRef}
-    index={1} // ✅ Всегда открыта при появлении
-    snapPoints={snapPoints}
-    enablePanDownToClose
-    onClose={() => setOpenMenu(null)}
-    backgroundStyle={styles.sheetBackground}
-    handleIndicatorStyle={styles.sheetHandle}
-    animateOnMount
-  >
-    <BottomSheetView style={styles.sheetContent}>
-      {openMenu === "deposit" && (
-        <>
-          <Text style={styles.sheetTitle}>Deposit Funds</Text>
-          <Text style={styles.sheetText}>Choose how to deposit your funds:</Text>
-          <TouchableOpacity style={styles.modalButton}>
-            <Text style={styles.modalButtonText}>💎 Deposit TON</Text>
-          </TouchableOpacity>
-          <TouchableOpacity style={styles.modalButton}>
-            <Text style={styles.modalButtonText}>🎁 Deposit Gifts</Text>
-          </TouchableOpacity>
-        </>
+      {/* === Bottom Sheet Меню === */}
+      {openMenu && snapPoints.length > 0 && (
+        <BottomSheet
+          ref={bottomSheetRef}
+          index={1}
+          snapPoints={snapPoints}
+          enablePanDownToClose
+          onClose={() => setOpenMenu(null)}
+          backgroundStyle={styles.sheetBackground}
+          handleIndicatorStyle={styles.sheetHandle}
+          animateOnMount
+        >
+          <BottomSheetView style={styles.sheetContent}>
+            {openMenu === "deposit" && (
+              <>
+                <Text style={styles.sheetTitle}>Deposit Funds</Text>
+                <Text style={styles.sheetText}>
+                  Choose how to deposit your funds:
+                </Text>
+                <TouchableOpacity style={styles.modalButton}>
+                  <Text style={styles.modalButtonText}>💎 Deposit TON</Text>
+                </TouchableOpacity>
+                <TouchableOpacity style={styles.modalButton}>
+                  <Text style={styles.modalButtonText}>🎁 Deposit Gifts</Text>
+                </TouchableOpacity>
+              </>
+            )}
+          </BottomSheetView>
+        </BottomSheet>
       )}
-
-      {openMenu === "stars" && (
-        <>
-          <Text style={styles.sheetTitle}>Stars Info</Text>
-          <Text style={styles.sheetText}>
-            Stars can be used to participate in exclusive events and redeem bonuses.
-          </Text>
-        </>
-      )}
-
-      {openMenu === "ton" && (
-        <>
-          <Text style={styles.sheetTitle}>Connect Wallet</Text>
-          <Text style={styles.sheetText}>Your wallet is not connected.</Text>
-          <TouchableOpacity style={styles.modalButton}>
-            <Text style={styles.modalButtonText}>🔗 CONNECT WALLET</Text>
-          </TouchableOpacity>
-        </>
-      )}
-    </BottomSheetView>
-  </BottomSheet>
-
-)}
-
     </LinearGradient>
   );
 };
 
 // ===== Стили =====
 const styles = StyleSheet.create({
+  tonIcon: { width: 24, height: 24 },
+  emptyMenuContainer: { flexDirection: "row", justifyContent: "space-between", alignItems: "center", width: "90%", alignSelf: "center", borderRadius: 20, borderWidth: 1, borderColor: "rgba(255,255,255,0.2)", backgroundColor: "#352851", paddingVertical: 16, paddingHorizontal: 12, gap: 20, },
+
+  balanceLeft: { flexDirection: "column", justifyContent: "center", alignItems: "flex-start", gap: 6, }, 
+  balanceRow: { flexDirection: "row", alignItems: "center", gap: 6, }, 
+  balanceLabel: { color: "#C4BED4", fontSize: 18, fontWeight: "500", lineHeight: 23.4, fontFamily: "SF-Pro-regular" }, 
+  balanceValue: { color: "#FFFFFF", fontSize: 18, fontWeight: "200", fontFamily: "SF-Pro-regular" },
+
+  withdrawButton: { height: 56, justifyContent: "center", alignItems: "center", flex: 1, borderRadius: 100, backgroundColor: "#6B3FD8", }, 
+
+  withdrawText: { color: "#FFFFFF", fontSize: 18, fontWeight: "600", fontFamily: "SF-Pro-Semibold" },
+
   background: { flex: 1, alignItems: "center" },
   wrapper: { flex: 1, alignSelf: "center" },
   sectionGap: { marginTop: 20 },
-
   topBar: {
     width: "90%",
     flexDirection: "row",
     justifyContent: "space-between",
     alignItems: "center",
     marginTop: 100,
-    marginBottom: 0,
     alignSelf: "center",
   },
+  arrow: {
+    width: 36,
+    height: 36,
+    tintColor: "#A07BFF", // фиолетовая стрелка
+    opacity: 0.9,
+  },
+  
   langButton: {
     backgroundColor: "#1F0248",
     borderRadius: 100,
@@ -391,7 +396,6 @@ const styles = StyleSheet.create({
     alignItems: "center",
   },
   flagIcon: { width: 28, height: 28 },
-
   avatarContainer: {
     width: 140,
     flexDirection: "column",
@@ -417,13 +421,7 @@ const styles = StyleSheet.create({
     borderRadius: 70,
     backgroundColor: "rgba(255,255,255,0.05)",
   },
-  userName: {
-    color: "#fff",
-    fontWeight: "700",
-    fontSize: 24,
-    marginTop: 10,
-  },
-
+  userName: { color: "#fff", fontWeight: "700", fontSize: 24, marginTop: 10, lineHeight: 31.20, fontFamily: "SF-Pro-Semibold" },
   menuContainer: {
     height: 270,
     paddingVertical: 20,
@@ -463,10 +461,9 @@ const styles = StyleSheet.create({
     backgroundColor: "transparent",
   },
   menuButtonActive: { backgroundColor: "#6B3FD8" },
-  menuText: { color: "#fff", fontWeight: "600", fontSize: 16, opacity: 0.85 },
+  menuText: { color: "#fff", fontWeight: "600", fontSize: 16, opacity: 0.85,  fontFamily: "SF-Pro-Semibold", lineHeight: 20.80 , letterSpacing: 1},
   menuTextActive: { opacity: 1, fontWeight: "700" },
   icon: { width: 18, height: 18, marginLeft: 4 },
-
   inventoryRow: {
     width: "95%",
     flexDirection: "row",
@@ -474,54 +471,33 @@ const styles = StyleSheet.create({
     alignItems: "center",
     paddingHorizontal: 4,
   },
-  inventoryText: { color: "#C4BED4", fontSize: 18, fontWeight: "500", opacity: 0.8 },
+  inventoryText: { color: "#C4BED4", fontSize: 18, fontWeight: "500", opacity: 0.8, fontFamily: "SF-Pro-Regular", lineHeight: 23.40 },
   sellButton: {
     height: 34,
     paddingVertical: 4,
     paddingHorizontal: 12,
     alignItems: "center",
     justifyContent: "center",
-    flexDirection: "row",
-    gap: 10,
     borderRadius: 100,
     backgroundColor: "#1F0248",
   },
-  sellButtonText: { color: "#B98CFF", fontSize: 15, fontWeight: "600" },
-
+  sellButtonText: { color: "#B98CFF", fontSize: 15, fontWeight: "600",  },
   inventoryGrid: {
     flexDirection: "row",
-    justifyContent: "center",
+    justifyContent: "space-between",
     alignItems: "center",
-    gap: 14,
     alignSelf: "stretch",
     marginTop: 6,
+    paddingHorizontal: 16,
   },
   inventoryItem: {
-    width: 110,
-    height: 110,
-    padding: 29,
     justifyContent: "center",
     alignItems: "center",
     borderRadius: 20,
     backgroundColor: "#1F0248",
   },
-  giftIconWrapper: {
-    width: 2,
-    height: 1,
-    borderRadius: 12,
-    backgroundColor: "#352851",
-    justifyContent: "center",
-    alignItems: "center",
-  },
-  inventoryIcon: {
-    width: 36,
-    height: 36,
-    opacity: 0.9,
-    tintColor: "#352851",
-  },
-  arrow: { width: 36, height: 36, opacity: 0.9, tintColor: "#A07BFF" },
-
-  // === Invite Block ===
+  giftIconWrapper: { justifyContent: "center", alignItems: "center" },
+  inventoryIcon: { width: 36, height: 36, opacity: 0.9 },
   newMenuContainer: {
     height: 146,
     paddingVertical: 20,
@@ -546,52 +522,37 @@ const styles = StyleSheet.create({
   inviteText: {
     width: 227,
     color: "#C4BED4",
-    fontSize: 18,
+    fontSize: 19,
     fontWeight: "500",
     lineHeight: 23.4,
-    letterSpacing: -0.408,
+     fontFamily: "SF-Pro-Regular"
   },
   termsButton: {
     height: 34,
     width: "18%",
-    paddingVertical: 4,
-    paddingHorizontal: 12,
-    alignItems: "center",
     justifyContent: "center",
-    flexDirection: "row",
-    gap: 10,
+    alignItems: "center",
     borderRadius: 100,
-    backgroundColor: "#1F0248", // такой же фон, как у Sell All
+    backgroundColor: "#1F0248",
   },
-
-
-  termsText: {
-    color: "#B98CFF", // такой же цвет текста, как у Sell All
-    fontSize: 15,
-    fontWeight: "600",
+  termsText: { color: "#B98CFF", fontSize: 15, fontWeight: "600"  
   },
-    inviteBottomRow: {
+  inviteBottomRow: {
     flexDirection: "row",
     justifyContent: "space-between",
     alignItems: "center",
     width: "100%",
     gap: 12,
-
   },
   inviteButton: {
     flex: 1,
     height: 56,
-    padding: 4,
     justifyContent: "center",
     alignItems: "center",
     borderRadius: 100,
     backgroundColor: "#6B3FD8",
-    shadowColor: "rgba(37,2,72,0.5)",
-    shadowOffset: { width: 8, height: 8 },
-    shadowOpacity: 0.8,
-    shadowRadius: 32,
   },
-  inviteButtonText: { color: "#FFFFFF", fontSize: 18, fontWeight: "600" },
+  inviteButtonText: { color: "#FFFFFF", fontWeight: "600", fontSize: 19, fontFamily: "SF-Pro-Semibold" },
   copyButton: {
     width: 56,
     height: 56,
@@ -599,116 +560,28 @@ const styles = StyleSheet.create({
     alignItems: "center",
     borderRadius: 12,
     borderWidth: 2,
-    borderColor: "#6B3FD8",  
-
+    borderColor: "#6B3FD8",
   },
   copyIcon: { width: 28, height: 28, tintColor: "#FFFFFF" },
-
-
-
-  // ===== Баланс / Рефералы меню =====
-  emptyMenuContainer: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "center",
-    width: "90%",
-    alignSelf: "center",
-    borderRadius: 20,
-    borderWidth: 1,
-    borderColor: "rgba(255,255,255,0.2)",
+  sheetBackground: {
     backgroundColor: "#352851",
-    paddingVertical: 16,
-    paddingHorizontal: 12,
-    gap: 20,
+    borderTopLeftRadius: 20,
+    borderTopRightRadius: 20,
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.15)",
   },
-
-  balanceLeft: {
-    flexDirection: "column",
-    justifyContent: "center",
-    alignItems: "flex-start",
-    gap: 6,
-  },
-  balanceRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 6,
-  },
-  balanceLabel: {
-    color: "#C4BED4",
-    fontSize: 18,
-    fontWeight: "500",
-    lineHeight: 23.4,
-    letterSpacing: -0.408,
-  },
-  balanceValue: {
-    color: "#FFFFFF",
-    fontSize: 18,
-    fontWeight: "200",
-    lineHeight: 23.4,
-  },
-  tonIcon: {
-    width: 24,
-    height: 24,
-  },
-
-  withdrawButton: {
-    height: 56,
-    padding: 4,
-    justifyContent: "center",
-    alignItems: "center",
-    gap: 4,
-    flex: 1,
-    borderRadius: 100,
+  sheetHandle: { backgroundColor: "#6B3FD8", width: 60 },
+  sheetContent: { padding: 20, alignItems: "center" },
+  sheetTitle: { color: "#fff", fontSize: 20, fontWeight: "700", marginBottom: 10 },
+  sheetText: { color: "#C4BED4", fontSize: 16, textAlign: "center", marginBottom: 12 },
+  modalButton: {
     backgroundColor: "#6B3FD8",
-    shadowColor: "rgba(37, 2, 72, 0.5)",
-    shadowOffset: { width: 4, height: 4 },
-    shadowOpacity: 0.8,
-    shadowRadius: 16,
+    borderRadius: 100,
+    paddingVertical: 12,
+    paddingHorizontal: 24,
+    marginVertical: 6,
   },
-  withdrawText: {
-    color: "#FFFFFF",
-    fontSize: 18,
-    fontWeight: "600",
-  },
-
-
-  // === Bottom Sheet ===
-sheetBackground: {
-  backgroundColor: "#352851",
-  borderTopLeftRadius: 20,
-  borderTopRightRadius: 20,
-  borderWidth: 1,
-  borderColor: "rgba(255,255,255,0.15)",
-},
-sheetHandle: { backgroundColor: "#6B3FD8", width: 60 },
-sheetContent: { padding: 20, alignItems: "center" },
-sheetTitle: {
-  color: "#fff",
-  fontSize: 20,
-  fontWeight: "700",
-  marginBottom: 10,
-},
-sheetText: {
-  color: "#C4BED4",
-  fontSize: 16,
-  textAlign: "center",
-  marginBottom: 12,
-},
-modalButton: {
-  backgroundColor: "#6B3FD8",
-  borderRadius: 100,
-  paddingVertical: 12,
-  paddingHorizontal: 24,
-  marginVertical: 6,
-},
-modalButtonText: {
-  color: "#fff",
-  fontWeight: "700",
-  fontSize: 16,
-},
-
-
-  
+  modalButtonText: { color: "#fff", fontWeight: "700", fontSize: 16 },
 });
 
 export default Profile;

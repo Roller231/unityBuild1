@@ -2,16 +2,21 @@ import React, { useRef, useEffect } from "react";
 import { View, StyleSheet, Platform, Dimensions } from "react-native";
 import { CrashEngine } from "../components/CrashEngine";
 import Canvas from "react-native-canvas";
+import LottieView from "lottie-react-native";
+import lottieWeb from "lottie-web"; // 👈 для Web
+import catFly from "../components/icons/catFly.json";
 
 interface CrashGraphProps {
   engine: CrashEngine | null;
+  active?: boolean;
 }
 
-export default function CrashGraph({ engine }: CrashGraphProps) {
+export default function CrashGraph({ engine, active = true }: CrashGraphProps) {
   const canvasRef = useRef<any>(null);
-  const { width: screenWidth, height: screenHeight } = Dimensions.get("window");
+  const lottieRef = useRef<LottieView>(null);
+  const webLottieContainer = useRef<HTMLDivElement | null>(null);
 
-  // ✅ Telegram WebView — адаптивно под ширину экрана, без фиксированных пропорций
+  const { width: screenWidth, height: screenHeight } = Dimensions.get("window");
   const graphWidth = screenWidth * 0.95;
   const graphHeight =
     Platform.OS === "web" ? screenHeight * 0.45 : screenHeight * 0.5;
@@ -21,133 +26,147 @@ export default function CrashGraph({ engine }: CrashGraphProps) {
     backgroundColor: "transparent",
   };
 
-  const easeOutCubic = (t: number) => 1 - Math.pow(1 - t, 3);
+  // === Отрисовка графика ===
+  const renderFrame = (
+    ctx: CanvasRenderingContext2D,
+    width: number,
+    height: number,
+    offsetY: number
+  ) => {
+    if (!engine) return;
 
+    engine.onResize(width, height);
+    engine.tick();
+
+    ctx.clearRect(0, 0, width, height);
+
+    const startY = engine.plotHeight;
+    const mid = engine.getElapsedPosition(engine.elapsedTime * 0.5);
+    const end = engine.getElapsedPosition(engine.elapsedTime);
+
+    ctx.beginPath();
+    ctx.strokeStyle = "#A57BFF";
+    ctx.lineWidth = 3;
+    ctx.moveTo(0, startY);
+    ctx.quadraticCurveTo(mid.x, mid.y + offsetY, end.x, end.y);
+    ctx.stroke();
+
+    // === Текст множителя (приподнят вверх) ===
+    const text = `x${engine.multiplier.toFixed(2)}`;
+    const fontSize = 64;
+    ctx.font = `1000 ${fontSize}px "SF Pro", sans-serif`;
+    ctx.textAlign = "center";
+    ctx.textBaseline = "middle";
+
+    const textGradient = ctx.createLinearGradient(
+      0,
+      height / 2 - fontSize,
+      0,
+      height / 2 + fontSize
+    );
+    textGradient.addColorStop(0, "#FFAF4D");
+    textGradient.addColorStop(0.35, "#FFF7A7");
+    textGradient.addColorStop(0.75, "#FFAF4D");
+
+    ctx.lineWidth = 1.2;
+    ctx.strokeStyle = "#070908";
+    // ⬆️ Сдвигаем текст чуть выше центра
+    const textY = height / 2 - 60;
+    ctx.strokeText(text, width / 2, textY);
+    ctx.fillStyle = textGradient;
+    ctx.fillText(text, width / 2, textY);
+  };
+
+  // ======= Web (Canvas) =======
   useEffect(() => {
-    if (Platform.OS === "web") {
-      const canvas = canvasRef.current as HTMLCanvasElement;
-      if (!canvas) return;
+    if (Platform.OS !== "web" || !active) return;
 
-      // ✅ Telegram WebView адаптация под размер контейнера
-      canvas.width = graphWidth * window.devicePixelRatio;
-      canvas.height = graphHeight * window.devicePixelRatio;
-      canvas.style.width = `${graphWidth}px`;
-      canvas.style.height = `${graphHeight}px`;
+    const canvas = canvasRef.current as HTMLCanvasElement;
+    if (!canvas) return;
 
-      const ctx = canvas.getContext("2d");
-      if (!ctx) return;
-      ctx.scale(window.devicePixelRatio, window.devicePixelRatio);
-      ctx.imageSmoothingEnabled = true;
+    const scale = window.devicePixelRatio || 1;
+    canvas.width = graphWidth * scale;
+    canvas.height = graphHeight * scale;
+    canvas.style.width = `${graphWidth}px`;
+    canvas.style.height = `${graphHeight}px`;
 
-      const draw = (time: number) => {
-        if (!engine) return;
-        ctx.clearRect(0, 0, graphWidth, graphHeight);
-
-        engine.onResize(graphWidth, graphHeight);
-        engine.tick();
-
-        const t = easeOutCubic(Math.min(engine.elapsedTime / 4000, 1));
-        const startY = engine.plotHeight;
-        const mid = engine.getElapsedPosition(engine.elapsedTime * 0.5);
-        const end = engine.getElapsedPosition(engine.elapsedTime);
-        const offsetY = (1 - t) * 25;
-
-        // 🚫 Убираем любую “заливку под кривой”
-        // === Только линия траектории ===
-        ctx.beginPath();
-        ctx.strokeStyle = "#A57BFF";
-        ctx.lineWidth = 3;
-        ctx.moveTo(0, startY);
-        ctx.quadraticCurveTo(mid.x, mid.y + offsetY, end.x, end.y);
-        ctx.stroke();
-
-        // === Градиентный текст множителя ===
-        const text = `x${engine.multiplier.toFixed(2)}`;
-        const fontSize = 64;
-        ctx.font = `1000 ${fontSize}px "SF Pro", sans-serif`;
-        ctx.textAlign = "center";
-        ctx.textBaseline = "middle";
-
-        const textGradient = ctx.createLinearGradient(
-          0,
-          graphHeight / 2 - fontSize,
-          0,
-          graphHeight / 2 + fontSize
-        );
-        textGradient.addColorStop(0, "#FFAF4D");
-        textGradient.addColorStop(0.35, "#FFF7A7");
-        textGradient.addColorStop(0.75, "#FFAF4D");
-
-        ctx.lineWidth = 1.2;
-        ctx.strokeStyle = "#070908";
-        ctx.strokeText(text, graphWidth / 2, graphHeight / 2);
-
-        ctx.fillStyle = textGradient;
-        ctx.fillText(text, graphWidth / 2, graphHeight / 2);
-
-        requestAnimationFrame(draw);
-      };
-
-      requestAnimationFrame(draw);
-    }
-  }, [engine, graphWidth, graphHeight]);
-
-  // ======= Мобильная версия =======
-  const handleCanvas = (canvas: any) => {
-    if (!canvas || Platform.OS === "web") return;
     const ctx = canvas.getContext("2d");
+    if (!ctx) return;
+
+    ctx.setTransform(1, 0, 0, 1, 0, 0);
+    ctx.scale(scale, scale);
+    ctx.imageSmoothingEnabled = false;
+
+    let animationId: number;
+    const draw = () => {
+      renderFrame(ctx, graphWidth, graphHeight, 25);
+      animationId = requestAnimationFrame(draw);
+    };
+    animationId = requestAnimationFrame(draw);
+
+    return () => {
+      cancelAnimationFrame(animationId);
+      ctx.clearRect(0, 0, graphWidth, graphHeight);
+    };
+  }, [engine, active]);
+
+  // ======= Web (Lottie) =======
+  useEffect(() => {
+    if (Platform.OS !== "web") return;
+    if (!webLottieContainer.current) return;
+
+    const anim = lottieWeb.loadAnimation({
+      container: webLottieContainer.current,
+      renderer: "svg",
+      loop: true,
+      autoplay: active,
+      animationData: catFly,
+    });
+
+    if (!active) anim.pause();
+    return () => anim.destroy();
+  }, [active]);
+
+  // ======= Mobile Canvas =======
+  const handleCanvas = (canvas: any) => {
+    if (!canvas || Platform.OS === "web" || !active) return;
+    const ctx = canvas.getContext("2d");
+    let animationId: number;
 
     const draw = () => {
-      if (!engine) return;
-      engine.onResize(graphWidth, graphHeight);
-      engine.tick();
-
-      ctx.clearRect(0, 0, graphWidth, graphHeight);
-
-      const startY = engine.plotHeight;
-      const mid = engine.getElapsedPosition(engine.elapsedTime * 0.5);
-      const end = engine.getElapsedPosition(engine.elapsedTime);
-      const offsetY = 15;
-
-      // ❌ Без подложки — только линия
-      ctx.beginPath();
-      ctx.strokeStyle = "#A57BFF";
-      ctx.lineWidth = 3;
-      ctx.moveTo(0, startY);
-      ctx.quadraticCurveTo(mid.x, mid.y + offsetY, end.x, end.y);
-      ctx.stroke();
-
-      const text = `x${engine.multiplier.toFixed(2)}`;
-      const fontSize = 60;
-      ctx.font = `1000 ${fontSize}px "SF Pro"`;
-      ctx.textAlign = "center";
-      ctx.textBaseline = "middle";
-
-      const textGradient = ctx.createLinearGradient(
-        0,
-        graphHeight / 2 - fontSize,
-        0,
-        graphHeight / 2 + fontSize
-      );
-      textGradient.addColorStop(0, "#FFAF4D");
-      textGradient.addColorStop(0.35, "#FFF7A7");
-      textGradient.addColorStop(0.75, "#FFAF4D");
-
-      ctx.lineWidth = 1.2;
-      ctx.strokeStyle = "#070908";
-      ctx.strokeText(text, graphWidth / 2, graphHeight / 2);
-
-      ctx.fillStyle = textGradient;
-      ctx.fillText(text, graphWidth / 2, graphHeight / 2);
-
-      requestAnimationFrame(draw);
+      renderFrame(ctx, graphWidth, graphHeight, 15);
+      animationId = requestAnimationFrame(draw);
     };
+    animationId = requestAnimationFrame(draw);
 
-    requestAnimationFrame(draw);
+    return () => cancelAnimationFrame(animationId);
   };
+
+  // ======= Mobile Lottie =======
+  useEffect(() => {
+    if (Platform.OS === "web") return;
+    if (!lottieRef.current) return;
+    if (active) lottieRef.current.play();
+    else lottieRef.current.pause();
+  }, [active]);
 
   return (
     <View style={styles.container}>
+      {/* === Кот под множителем === */}
+      {active &&
+        (Platform.OS === "web" ? (
+          <div ref={webLottieContainer} style={styles.catLottieWeb as any} />
+        ) : (
+          <LottieView
+            ref={lottieRef}
+            source={catFly}
+            autoPlay
+            loop
+            style={styles.catLottieMobile}
+          />
+        ))}
+
+      {/* === Сам график === */}
       {Platform.OS === "web" ? (
         <canvas
           ref={canvasRef}
@@ -178,6 +197,27 @@ const styles = StyleSheet.create({
   },
   canvas: {
     borderRadius: 12,
-    backgroundColor: "transparent", // ✅ полностью прозрачный
+    backgroundColor: "transparent",
+  },
+  catLottieWeb: {
+    position: "absolute",
+    top: "48%", // 🔼 Было 58%, теперь выше
+    left: "50%",
+    transform: "translate(-100px, 0)",
+    width: 200,
+    height: 200,
+    opacity: 0.9,
+    zIndex: 10,
+    pointerEvents: "none",
+  },
+  catLottieMobile: {
+    position: "absolute",
+    top: "48%", // 🔼 Было 58%
+    left: "50%",
+    transform: [{ translateX: -100 }],
+    width: 200,
+    height: 200,
+    opacity: 0.9,
+    zIndex: 10,
   },
 });

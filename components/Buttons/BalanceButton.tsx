@@ -1,12 +1,59 @@
-import React from "react";
+import React, { useEffect, useState, useRef, useMemo } from "react";
 import { View, Text, Image, StyleSheet, TouchableWithoutFeedback } from "react-native";
 import { BlurView } from "expo-blur";
 
 // Иконка токена (замени на свою)
 import TonIcon from "../icons/ton.svg";
 
+
+import {
+
+  TouchableOpacity,
+  Animated,
+  Dimensions,
+  Pressable,
+  ScrollView,
+} from "react-native";
+import BottomSheet, { BottomSheetView } from "@gorhom/bottom-sheet";
+import { LinearGradient } from "expo-linear-gradient";
+import { useTelegramPlatform } from "@/hooks/useTelegramPlatform";
+
+import * as Font from "expo-font";
+
+
+// ===== Импорт иконок =====
+import FlagRU from "../components/icons/ru.png";
+import FlagEN from "../components/icons/us.png";
+import IconGift from "../components/icons/gift.png";
+import IconStar from "../components/icons/star.svg";
+import IconTon from "../components/icons/ton.svg";
+import IconCopy from "../components/icons/copy.svg";
+
+
+
 const BalanceButton = ({ onPress }: { onPress?: () => void }) => {
+
+  const [fontLoaded, setFontLoaded] = useState(false);
+
+
+  useEffect(() => {
+    const loadFont = async () => {
+      await Font.loadAsync({
+        "SF-Pro-Bold": require("../../fonts/SF-Pro-Display-Bold.otf"),
+  
+      });
+      setFontLoaded(true);
+    };
+    loadFont();
+  }, []);
+
+  
   return (
+
+
+
+
+
     <TouchableWithoutFeedback onPress={onPress}>
       {/* 🔹 Внешняя белая обводка */}
       <View style={styles.outerGlow}>
@@ -67,8 +114,9 @@ const styles = StyleSheet.create({
   text: {
     color: "#fff",
     fontWeight: "700",
-    fontSize: 16,
+    fontSize: 18,
     marginHorizontal: 6,
+    fontFamily: "SF-Pro-Bold"
   },
 
   plusCircle: {

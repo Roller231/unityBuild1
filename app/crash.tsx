@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useState, useCallback } from "react";
 import {
   View,
   Text,
@@ -7,8 +7,10 @@ import {
   Dimensions,
   Platform,
   ScrollView,
-  Image
+  Image,
 } from "react-native";
+
+import { useFocusEffect } from "@react-navigation/native";
 import MaskedView from "@react-native-masked-view/masked-view";
 import { CrashEngine, CrashEngineState } from "../components/CrashEngine";
 import CrashGraph from "../components/CrashGraph";
@@ -17,24 +19,26 @@ import OrangeBtn from "../components/OrangeBtn";
 import * as Font from "expo-font";
 import BetItem from "../components/BetItem";
 import StarsBackground from "../components/StarsBackground";
+import { useTelegramPlatform } from "@/hooks/useTelegramPlatform"; // ✅ добавлено
 
 import ava from "../components/icons/AvatarTest.svg";
-
 import Venus from "../components/icons/Venus.svg";
-
 
 const { height: screenHeight, width: screenWidth } = Dimensions.get("window");
 
 const Crash = () => {
-  const [phase, setPhase] = useState<"countdown" | "flight" | "crash">(
-    "countdown"
-  );
+  const platform = useTelegramPlatform(); // ✅ определяем платформу
+  const isDesktop = platform === "tdesktop" || platform === "macos";
+  const fixedWidth = isDesktop ? 470 : screenWidth; // ✅ фикс для desktop
+
+  const [phase, setPhase] = useState<"idle" | "countdown" | "flight" | "crash">("idle");
   const [count, setCount] = useState(3);
   const [multiplier, setMultiplier] = useState(1.0);
   const [engine, setEngine] = useState<CrashEngine | null>(null);
   const [fontLoaded, setFontLoaded] = useState(false);
+  const [active, setActive] = useState(true);
 
-  // ====== Загружаем шрифт SF Pro Heavy ======
+  // === Загружаем шрифт ===
   useEffect(() => {
     const loadFont = async () => {
       await Font.loadAsync({
@@ -45,130 +49,134 @@ const Crash = () => {
     loadFont();
   }, []);
 
-  // ===== Countdown phase =====
-  useEffect(() => {
-    if (phase === "countdown" && count > 0) {
-      const timer = setTimeout(() => setCount(count - 1), 1000);
-      return () => clearTimeout(timer);
-    } else if (count === 0) {
-      setPhase("flight");
-    }
-  }, [count, phase]);
-
-  // ===== Flight phase =====
-  useEffect(() => {
-    if (phase === "flight") {
-      const e = new CrashEngine();
-      e.onResize(600, 400);
-      e.startTime = Date.now();
-      e.state = CrashEngineState.Active;
-      setEngine(e);
-
-      const interval = setInterval(() => {
-        e.tick();
-        setMultiplier(e.multiplier);
-        if (e.multiplier >= 3.0) {
-          e.state = CrashEngineState.Over;
-          clearInterval(interval);
-          setPhase("crash");
-        }
-      }, 100);
-
-      return () => clearInterval(interval);
-    }
-  }, [phase]);
-
-  // ===== Reset after crash =====
-  useEffect(() => {
-    if (phase === "crash") {
-      setTimeout(() => {
+  // === При потере фокуса вырубаем движок ===
+  useFocusEffect(
+    useCallback(() => {
+      setActive(true);
+      console.log("▶️ Crash screen active");
+      return () => {
+        console.log("⏸ Crash screen paused");
+        setActive(false);
+        setPhase("idle");
+        setEngine(null);
         setMultiplier(1.0);
         setCount(3);
-        setPhase("countdown");
+      };
+    }, [])
+  );
+
+  // === Countdown phase ===
+  useEffect(() => {
+    if (!active || phase !== "countdown") return;
+    if (count > 0) {
+      const timer = setTimeout(() => setCount((c) => c - 1), 1000);
+      return () => clearTimeout(timer);
+    } else {
+      setPhase("flight");
+    }
+  }, [count, phase, active]);
+
+  // === Flight phase ===
+  useEffect(() => {
+    if (!active || phase !== "flight") return;
+    const e = new CrashEngine();
+    e.onResize(600, 400);
+    e.startTime = Date.now();
+    e.state = CrashEngineState.Active;
+    setEngine(e);
+
+    const interval = setInterval(() => {
+      e.tick();
+      setMultiplier(e.multiplier);
+      if (e.multiplier >= 3.0) {
+        e.state = CrashEngineState.Over;
+        clearInterval(interval);
+        setPhase("crash");
+      }
+    }, 100);
+
+    return () => {
+      clearInterval(interval);
+      e.state = CrashEngineState.Over;
+    };
+  }, [phase, active]);
+
+  // === Reset after crash ===
+  useEffect(() => {
+    if (phase === "crash") {
+      const resetTimer = setTimeout(() => {
+        setMultiplier(1.0);
+        setCount(3);
+        setPhase("idle");
       }, 2000);
+      return () => clearTimeout(resetTimer);
     }
   }, [phase]);
+
+  // === Нажатие кнопки PLACE BET ===
+  const handleStart = () => {
+    if (phase === "idle") setPhase("countdown");
+  };
 
   if (!fontLoaded) return null;
 
   return (
-    <View style={{ flex: 1 }}>
-      <View style={styles.container}>
+    <View style={{ flex: 1, backgroundColor: "#1B003B" }}>  {/* 👈 Добавили фон сюда */}
+      <View
+        style={[
+          styles.container,
+          isDesktop && { width: fixedWidth, borderRadius: 25, overflow: "hidden" },
+        ]}
+      >
         <StarsBackground />
 
-          {/* 🌍 Планета на фоне */}
-  <Image
-    source={Venus}
-    style={styles.planetBackground}
-    resizeMode="contain"
-  />
+        {/* 🌍 Планета адаптивная */}
+        <Image
+          source={Venus}
+          style={[
+            styles.planetBackground,
+            isDesktop ? styles.planetDesktop : styles.planetMobile,
+          ]}
+          resizeMode="contain"
+        />
 
-        {/* === Верхняя половина: график или отсчёт === */}
+        {/* === Верхняя часть === */}
         <View style={styles.topSection}>
-          {phase === "countdown" &&
-            (Platform.OS === "web" ? (
-              <Text
-                style={{
-                  ...(styles.countdownText as any),
-                  background:
-                    "linear-gradient(180deg, #FFAF4D 24.49%, #FFF7A7 57.14%, #FFAF4D 77.55%)",
-                  WebkitBackgroundClip: "text",
-                  WebkitTextFillColor: "transparent",
-                  fontFamily: "SF-Pro-Heavy",
-                }}
-              >
-                {count}
-              </Text>
-            ) : (
-              <MaskedView
-                maskElement={
-                  <View
-                    style={{ justifyContent: "center", alignItems: "center" }}
-                  >
-                    <Text
-                      style={[
-                        styles.countdownText,
-                        { color: "black", fontFamily: "SF-Pro-Heavy" },
-                      ]}
-                    >
-                      {count}
-                    </Text>
-                  </View>
-                }
-              >
-                <View
-                  style={{
-                    height: 200,
-                    width: "100%",
-                    backgroundColor: "transparent",
-                  }}
-                />
-              </MaskedView>
-            ))}
+          {phase === "countdown" && (
+            <Text
+              style={{
+                ...(styles.countdownText as any),
+                background:
+                  "linear-gradient(180deg, #FFAF4D 24.49%, #FFF7A7 57.14%, #FFAF4D 77.55%)",
+                WebkitBackgroundClip: "text",
+                WebkitTextFillColor: "transparent",
+                fontFamily: "SF-Pro-Heavy",
+              }}
+            >
+              {count}
+            </Text>
+          )}
 
-          {phase === "flight" && <CrashGraph engine={engine} />}
+          {phase === "flight" && (
+            <CrashGraph engine={engine} active={active && phase === "flight"} />
+          )}
 
           {phase === "crash" && <Text style={styles.crashText}>💥</Text>}
         </View>
 
-        {/* === Нижняя половина: кнопка и ставки === */}
+        {/* === Нижняя часть === */}
         <View style={styles.bottomSection}>
-          {/* === Кнопка PLACE BET === */}
           <TouchableOpacity
             activeOpacity={0.9}
-            style={styles.betButton}
-            onPress={() => console.log("PLACE BET")}
+            style={[styles.betButton, { width: fixedWidth * 0.9 }]}
+            onPress={handleStart}
           >
             <OrangeBtn
               width="100%"
               height="100%"
               style={StyleSheet.absoluteFillObject as any}
             />
-            <Svg
-              height="100%"
-              width="100%"
-              style={StyleSheet.absoluteFillObject}
-            >
+            <Svg height="100%" width="100%" style={StyleSheet.absoluteFillObject}>
               <SvgText
                 fill="none"
                 stroke="#D35100"
@@ -180,6 +188,7 @@ const Crash = () => {
                 y="50%"
                 textAnchor="middle"
                 alignmentBaseline="middle"
+                letterSpacing={2.5}
               >
                 PLACE BET
               </SvgText>
@@ -192,17 +201,21 @@ const Crash = () => {
                 y="50%"
                 textAnchor="middle"
                 alignmentBaseline="middle"
+                letterSpacing={2.5}
+
               >
                 PLACE BET
               </SvgText>
             </Svg>
           </TouchableOpacity>
 
-          {/* === Меню ставок со скроллом === */}
-          <View style={styles.betsContainer}>
+          <View style={[styles.betsContainer, { width: fixedWidth * 0.9 }]}>
             <ScrollView
               showsVerticalScrollIndicator={false}
-              contentContainerStyle={{ paddingBottom: 60 }}
+              contentContainerStyle={{
+                paddingBottom: 80,
+                minHeight: screenHeight * 0.4,
+              }}
               style={styles.betsScroll}
             >
               <BetItem
@@ -212,16 +225,7 @@ const Crash = () => {
                 multiplier={1.24}
                 total={100}
                 state="win"
-                isGift={true}
-              />
-                            <BetItem
-                avatar={ava}
-                username="Crazy Frog"
-                betAmount={4.38}
-                multiplier={1.24}
-                total={100}
-                state="win"
-                isGift={true}
+                isGift
               />
               <BetItem
                 avatar={ava}
@@ -230,44 +234,64 @@ const Crash = () => {
                 multiplier={1.42}
                 total={0.0}
                 state="lose"
-                isGift={false}
-              />
-              <BetItem
-                avatar={ava}
-                username="MegaMan"
-                betAmount={3.42}
-                multiplier={2.21}
-                total={120.5}
-                state="win"
-                isGift={true}
-              />
-              <BetItem
-                avatar={ava}
-                username="GoldMiner"
-                betAmount={1.24}
-                multiplier={1.13}
-                total={0.0}
-                state="lose"
-                isGift={false}
-              />
-              <BetItem
-                avatar={ava}
-                username="Blazer"
-                betAmount={2.88}
-                multiplier={1.56}
-                total={0.0}
-                state="active"
-                isGift={true}
               />
                             <BetItem
                 avatar={ava}
-                username="Blazer"
-                betAmount={2.88}
-                multiplier={1.56}
-                total={5}
-                state="active"
-                isGift={true}
+                username="MoonSun"
+                betAmount={5.12}
+                multiplier={1.42}
+                total={0.0}
+                state="lose"
               />
+                            <BetItem
+                avatar={ava}
+                username="MoonSun"
+                betAmount={5.12}
+                multiplier={1.42}
+                total={0.0}
+                state="lose"
+              />
+                            <BetItem
+                avatar={ava}
+                username="MoonSun"
+                betAmount={5.12}
+                multiplier={1.42}
+                total={0.0}
+                state="lose"
+              />
+                            <BetItem
+                avatar={ava}
+                username="MoonSun"
+                betAmount={5.12}
+                multiplier={1.42}
+                total={0.0}
+                state="lose"
+              />
+                            <BetItem
+                avatar={ava}
+                username="MoonSun"
+                betAmount={5.12}
+                multiplier={1.42}
+                total={0.0}
+                state="lose"
+              />
+                            <BetItem
+                avatar={ava}
+                username="MoonSun"
+                betAmount={5.12}
+                multiplier={1.42}
+                total={0.0}
+                state="lose"
+              />
+                            <BetItem
+                avatar={ava}
+                username="MoonSun"
+                betAmount={5.12}
+                multiplier={1.42}
+                total={0.0}
+                state="lose"
+              />
+
             </ScrollView>
           </View>
         </View>
@@ -276,20 +300,25 @@ const Crash = () => {
   );
 };
 
+// === Стили ===
 const styles = StyleSheet.create({
-
-
   planetBackground: {
-      position: "absolute",
-      top: screenHeight * 0.09,   // 🔹 немного отступа сверху (~3% высоты экрана)
-      left: screenWidth * 0.01,   // 🔹 немного отступа слева (~5% ширины экрана)
-      width: screenWidth * 0.07,  // 🔹 ширина планеты = 18% ширины экрана
-      height: screenWidth * 0.07, // 🔹 чтобы была пропорциональной
-      opacity: 0.6,               // 🔹 лёгкая прозрачность
-      zIndex: 0,                  // 🔹 под всеми элементами
-    },
-  
-
+    position: "absolute",
+    opacity: 0.6,
+    zIndex: 0,
+  },
+  planetMobile: {
+    top: screenHeight * 0.09,
+    left: screenWidth * 0.07,
+    width: screenWidth * 0.13,
+    height: screenWidth * 0.13,
+  },
+  planetDesktop: {
+    top: 100,
+    left: 40,
+    width: 120,
+    height: 120,
+  },
   container: {
     flex: 1,
     backgroundColor: "#1B003B",
@@ -307,7 +336,7 @@ const styles = StyleSheet.create({
     width: "100%",
     alignItems: "center",
     justifyContent: "flex-start",
-    gap: 10, // ⬇️ меньше отступ между кнопкой и списком
+    gap: 10,
     paddingTop: 10,
   },
   countdownText: {
@@ -321,14 +350,11 @@ const styles = StyleSheet.create({
     fontWeight: "800",
   },
   betButton: {
-    width: screenWidth * 0.9,
     height: Platform.OS === "web" ? 80 : screenHeight * 0.065,
     borderRadius: 32,
     overflow: "hidden",
     alignItems: "center",
     justifyContent: "center",
-    position: "relative",
-    flexShrink: 0,
     shadowColor: "rgba(17, 13, 45, 0.68)",
     shadowOffset: { width: 0, height: 12 },
     shadowOpacity: 1,
@@ -337,16 +363,14 @@ const styles = StyleSheet.create({
     alignSelf: "center",
   },
   betsContainer: {
-    width: "90%",
     borderRadius: 16,
     borderColor: "rgba(255,255,255,0.15)",
     backgroundColor: "transparent",
-    borderWidth: 0,
-    flex: 1, // ✅ чтобы растягивалось под скролл
+    flex: 1,
     overflow: "hidden",
   },
   betsScroll: {
-    maxHeight: screenHeight * 0.35, // ✅ ограничение высоты скролла
+    maxHeight: screenHeight * 0.35,
   },
 });
 

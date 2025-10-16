@@ -15,6 +15,8 @@ import BalanceButton from "../components/Buttons/BalanceButton";
 import GiftCard from "../components/Buttons/GiftCard";
 import { useTelegramPlatform } from "@/hooks/useTelegramPlatform";
 
+
+
 import FlagRU from "../components/icons/ru.png";
 import FlagEN from "../components/icons/us.png";
 
