@@ -24,6 +24,7 @@
     "@react-native-masked-view/masked-view": "0.3.1",
     "@react-navigation/native": "^6.0.2",
     "@telegram-apps/sdk": "^3.11.8",
+    "@telegram-apps/sdk-react": "^3.3.9",
     "expo": "~51.0.28",
     "expo-av": "~14.0.7",
     "expo-blur": "~13.0.3",

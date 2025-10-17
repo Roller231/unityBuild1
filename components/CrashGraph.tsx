@@ -201,11 +201,11 @@ const styles = StyleSheet.create({
   },
   catLottieWeb: {
     position: "absolute",
-    top: "48%", // 🔼 Было 58%, теперь выше
-    left: "50%",
+    top: "38%", // 🔼 Было 58%, теперь выше
+    left: "40%",
     transform: "translate(-100px, 0)",
-    width: 200,
-    height: 200,
+    width: 300,
+    height: 300,
     opacity: 0.9,
     zIndex: 10,
     pointerEvents: "none",

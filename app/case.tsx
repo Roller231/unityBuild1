@@ -219,7 +219,7 @@ const Case = () => {
 
           {/* ===== Сетка подарков ===== */}
           <View style={[styles.giftGrid, { width: contentWidth }]}>
-            {Array.from({ length: 6 }).map((_, index) => (
+            {Array.from({ length: 9 }).map((_, index) => (
               <GiftCard
                 key={index}
                 price={activeTab === "paid" ? "0.5" : "0.1"}

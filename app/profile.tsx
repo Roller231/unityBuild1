@@ -29,6 +29,9 @@ import IconCopy from "../components/icons/copy.svg";
 
 import IconArrow from "../components/icons/arrow.svg"; // добавляем стрелку обратно
 
+import { useLaunchParams } from "@telegram-apps/sdk-react";
+
+
 
 const { width: screenWidth, height: screenHeight } = Dimensions.get("window");
 
@@ -45,6 +48,22 @@ const Profile = () => {
   const platform = useTelegramPlatform();
   const isDesktop = platform === "tdesktop" || platform === "macos";
   const fixedWidth = isDesktop ? 470 : screenWidth;
+
+
+
+  const launchParams = (() => {
+    try {
+      return useLaunchParams();
+    } catch {
+      console.warn("⚠️ Telegram SDK not found — running in dev mode (localhost)");
+      return {
+        tgWebAppData: {
+          user: { first_name: "Guest", last_name: "", photo_url: null },
+        },
+      };
+    }
+  })();
+  
 
   // === BottomSheet (панель) ===
   const [openMenu, setOpenMenu] = useState<null | "deposit" | "stars" | "ton">(null);
@@ -73,20 +92,19 @@ useEffect(() => {
 }, []);
 
 
-  // 🟣 Получаем данные Telegram пользователя
-  useEffect(() => {
-    if (typeof window !== "undefined" && window.Telegram?.WebApp) {
-      const tg = window.Telegram.WebApp;
-      const user = tg?.initDataUnsafe?.user;
-  
-      if (user) {
-        setTgName(`${user.first_name || ""} ${user.last_name || ""}`.trim());
-        setTgAvatar(user.photo_url || null); // безопасно
-      } else {
-        console.log("⚠️ Telegram user not found. Try opening Mini App from Telegram.");
-      }
-    }
-  }, []);
+
+// ...
+
+useEffect(() => {
+  const user = launchParams?.tgWebAppData?.user;
+  if (user) {
+    setTgName(`${user.first_name || ""} ${user.last_name || ""}`.trim());
+    setTgAvatar(user.photo_url || null);
+  } else {
+    console.log("⚠️ No user data found in Telegram launchParams");
+  }
+}, [launchParams]);
+
   
 
   // 🇷🇺 Переключение языка
@@ -117,6 +135,14 @@ useEffect(() => {
     return Math.min(size, MAX_ITEM_SIZE);
   }, [fixedWidth]);
 
+   // === Адаптивный шрифт ===
+   const getFontSize = () => {
+    if (screenWidth < 360) return 12; // узкие телефоны
+    if (screenWidth < 420) return 14; // обычные телефоны
+    if (screenWidth < 768) return 16; // планшеты
+    return 18; // desktop
+  };
+
   return (
     <LinearGradient colors={["#340A6F", "#18003A"]} style={styles.background}>
       <StarsBackground />
@@ -124,7 +150,7 @@ useEffect(() => {
       <ScrollView
         contentContainerStyle={[
           styles.wrapper,
-          { width: fixedWidth, paddingBottom: 170, minHeight: screenHeight + 170 },
+          { width: fixedWidth, paddingBottom: 170, minHeight: screenHeight * 1.2},
         ]}
         showsVerticalScrollIndicator={false}
         overScrollMode="always"
@@ -182,6 +208,7 @@ useEffect(() => {
               <Text
                 style={[
                   styles.menuText,
+                  { fontSize: getFontSize(), lineHeight: getFontSize() * 1.3 },
                   activeMenu === "deposit" && styles.menuTextActive,
                 ]}
               >
@@ -203,6 +230,7 @@ useEffect(() => {
               <Text
                 style={[
                   styles.menuText,
+                  { fontSize: getFontSize(), lineHeight: getFontSize() * 0.2 },
                   activeMenu === "stars" && styles.menuTextActive,
                 ]}
               >
@@ -224,7 +252,8 @@ useEffect(() => {
               <Text
                 style={[
                   styles.menuText,
-                  activeMenu === "ton" && styles.menuTextActive,
+                  { fontSize: getFontSize(), lineHeight: getFontSize() * 1.3 },
+                  activeMenu === "stars" && styles.menuTextActive,
                 ]}
               >
                 Deposit
@@ -461,7 +490,14 @@ const styles = StyleSheet.create({
     backgroundColor: "transparent",
   },
   menuButtonActive: { backgroundColor: "#6B3FD8" },
-  menuText: { color: "#fff", fontWeight: "600", fontSize: 16, opacity: 0.85,  fontFamily: "SF-Pro-Semibold", lineHeight: 20.80 , letterSpacing: 1},
+  menuText: {
+    color: "#fff",
+    fontWeight: "600",
+    opacity: 0.85,
+    fontFamily: "SF-Pro-Semibold",
+    letterSpacing: 1,
+  },
+  
   menuTextActive: { opacity: 1, fontWeight: "700" },
   icon: { width: 18, height: 18, marginLeft: 4 },
   inventoryRow: {

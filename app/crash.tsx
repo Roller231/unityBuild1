@@ -21,8 +21,17 @@ import BetItem from "../components/BetItem";
 import StarsBackground from "../components/StarsBackground";
 import { useTelegramPlatform } from "@/hooks/useTelegramPlatform"; // ✅ добавлено
 
+import vzryv from "../components/icons/vzryv.json";
+
+import LottieView from "lottie-react-native";
+import lottieWeb from "lottie-web";
+
 import ava from "../components/icons/AvatarTest.svg";
 import Venus from "../components/icons/Venus.svg";
+
+import { Animated, Easing } from "react-native"; // 👈 добавить импорт
+import bliks from "../components/icons/bliks.svg";
+
 
 const { height: screenHeight, width: screenWidth } = Dimensions.get("window");
 
@@ -37,6 +46,29 @@ const Crash = () => {
   const [engine, setEngine] = useState<CrashEngine | null>(null);
   const [fontLoaded, setFontLoaded] = useState(false);
   const [active, setActive] = useState(true);
+
+
+// === Планета вращается ===
+const rotation = useState(new Animated.Value(0))[0];
+
+useEffect(() => {
+  Animated.loop(
+    Animated.timing(rotation, {
+      toValue: 1,
+      duration: 60000, // один оборот за 60 секунд
+      easing: Easing.linear,
+      useNativeDriver: true,
+    })
+  ).start();
+}, []);
+
+const rotateInterpolate = rotation.interpolate({
+  inputRange: [0, 1],
+  outputRange: ["0deg", "360deg"],
+});
+
+
+
 
   // === Загружаем шрифт ===
   useEffect(() => {
@@ -108,10 +140,30 @@ const Crash = () => {
         setMultiplier(1.0);
         setCount(3);
         setPhase("idle");
-      }, 2000);
+      }, 500);
       return () => clearTimeout(resetTimer);
     }
   }, [phase]);
+
+  useEffect(() => {
+    if (Platform.OS !== "web") return;
+    if (phase !== "crash") return;
+  
+    const container = document.getElementById("vzryv-container");
+    if (!container) return;
+  
+    const anim = lottieWeb.loadAnimation({
+      container,
+      renderer: "svg",
+      loop: false,
+      autoplay: true,
+      animationData: vzryv,
+    });
+  
+    anim.setSpeed(1.4);
+    return () => anim.destroy();
+  }, [phase]);
+  
 
   // === Нажатие кнопки PLACE BET ===
   const handleStart = () => {
@@ -130,38 +182,129 @@ const Crash = () => {
       >
         <StarsBackground />
 
-        {/* 🌍 Планета адаптивная */}
-        <Image
-          source={Venus}
-          style={[
-            styles.planetBackground,
-            isDesktop ? styles.planetDesktop : styles.planetMobile,
-          ]}
-          resizeMode="contain"
-        />
+        <Animated.Image
+  source={Venus}
+  style={[
+    styles.planetBackground,
+    isDesktop
+      ? {
+          top: 30,
+          left: 30,
+          width: 130,
+          height: 130,
+        }
+      : {
+          top: screenHeight * 0.04,
+          left: screenWidth * 0.07,
+          width: screenWidth * 0.25,
+          height: screenWidth * 0.25,
+        },
+    {
+      transform: [{ rotate: rotateInterpolate }],
+    },
+  ]}
+  resizeMode="contain"
+/>
+
+
 
         {/* === Верхняя часть === */}
         <View style={styles.topSection}>
-          {phase === "countdown" && (
-            <Text
-              style={{
-                ...(styles.countdownText as any),
-                background:
-                  "linear-gradient(180deg, #FFAF4D 24.49%, #FFF7A7 57.14%, #FFAF4D 77.55%)",
-                WebkitBackgroundClip: "text",
-                WebkitTextFillColor: "transparent",
-                fontFamily: "SF-Pro-Heavy",
-              }}
-            >
-              {count}
-            </Text>
-          )}
+        {phase === "countdown" && (
+  <View
+    style={{
+      alignItems: "center",
+      justifyContent: "center",
+      width: "100%",
+      height: "100%",
+      overflow: "hidden",
+    }}
+  >
+    {/* === Вращающийся фон с bliks.svg === */}
+    <Animated.Image
+      source={bliks}
+      resizeMode="contain"
+      style={{
+        position: "absolute",
+        opacity: 0.15,
+        transform: [{ rotate: rotateInterpolate }],
+        top: "50%",
+        left: "50%",
+        width: isDesktop ? 650 : screenWidth * 1.3, // 💥 чуть больше экрана
+        height: isDesktop ? 650 : screenWidth * 1.3, // 💥 чтобы сияние выходило за края
+        marginLeft: isDesktop ? -325 : -(screenWidth * 0.65),
+        marginTop: isDesktop ? -325 : -(screenWidth * 0.65),
+      }}
+    />
+
+    {/* === Цифра отсчёта === */}
+    <Text
+      style={{
+        ...(styles.countdownText as any),
+        background:
+          "linear-gradient(180deg, #FFAF4D 24.49%, #FFF7A7 57.14%, #FFAF4D 77.55%)",
+        WebkitBackgroundClip: "text",
+        WebkitTextFillColor: "transparent",
+        fontFamily: "SF-Pro-Heavy",
+        fontSize: isDesktop ? 180 : screenWidth * 0.3, // 🔥 чуть больше цифра
+        zIndex: 5,
+      }}
+    >
+      {count}
+    </Text>
+  </View>
+)}
+
+
+
 
           {phase === "flight" && (
             <CrashGraph engine={engine} active={active && phase === "flight"} />
           )}
 
-          {phase === "crash" && <Text style={styles.crashText}>💥</Text>}
+{phase === "crash" && (
+  <View
+    style={{
+      alignItems: "center",
+      justifyContent: "center",
+      width: "100%",
+      height: "100%",
+      overflow: "hidden",
+    }}
+  >
+    {/* Взрывная анимация */}
+    {Platform.OS === "web" ? (
+      <div
+        id="vzryv-container"
+        style={{
+          position: "absolute",
+          top: "50%",
+          left: "50%",
+          width: isDesktop ? 500 : screenWidth * 1.1,
+          height: isDesktop ? 500 : screenWidth * 1.1,
+          transform: "translate(-50%, -50%)",
+          pointerEvents: "none",
+          zIndex: 10,
+        }}
+      />
+    ) : (
+      <LottieView
+        source={vzryv}
+        autoPlay
+        loop={false}
+        style={{
+          width: isDesktop ? 400 : screenWidth * 1.1,
+          height: isDesktop ? 400 : screenWidth * 1.1,
+          position: "absolute",
+          top: "50%",
+          left: "50%",
+          transform: [{ translateX: -200 }, { translateY: -200 }],
+          zIndex: 10,
+        }}
+      />
+    )}
+  </View>
+)}
         </View>
 
         {/* === Нижняя часть === */}
