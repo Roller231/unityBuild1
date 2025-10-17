@@ -46,24 +46,30 @@ const _layout = () => {
       init();
       console.log("🚀 Telegram SDK initialized");
     } catch (err) {
-      console.warn("⚠️ Telegram SDK init skipped (probably not in Telegram):", err);
+      console.warn("⚠️ Telegram SDK init skipped:", err);
     }
-
+  
+    // Монтируем viewport
     if (viewport.mount.isAvailable()) {
-            viewport.expand();
+      viewport.mount();
+      viewport.expand();
       console.log("🖥️ Viewport expanded");
     }
-
+  
+    // Монтируем и отключаем вертикальный свайп
     if (swipeBehavior.isSupported()) {
+      swipeBehavior.mount();
       swipeBehavior.disableVertical();
       console.log("✅ Vertical swipe disabled");
     }
-
+  
     console.log("🧾 Launch Params:", launchParams);
     console.log("📦 Raw Init Data:", rawInitData);
   }, []);
 
   return (
+
+    
     <View style={styles.wrapper}>
       <View style={[styles.appFrame, isDesktop && styles.desktopFrame]}>
         <Tabs
