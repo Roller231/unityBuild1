@@ -55,6 +55,12 @@ const _layout = () => {
       viewport.expand();
       console.log("🖥️ Viewport expanded");
     }
+
+
+
+    if (viewport.requestFullscreen.isAvailable()) {
+       viewport.requestFullscreen();
+    }
   
     // Монтируем и отключаем вертикальный свайп
     if (swipeBehavior.isSupported()) {
@@ -62,6 +68,7 @@ const _layout = () => {
       swipeBehavior.disableVertical();
       console.log("✅ Vertical swipe disabled");
     }
+
   
     console.log("🧾 Launch Params:", launchParams);
     console.log("📦 Raw Init Data:", rawInitData);

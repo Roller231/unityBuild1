@@ -110,28 +110,35 @@ const rotateInterpolate = rotation.interpolate({
 
   // === Flight phase ===
   useEffect(() => {
-    if (!active || phase !== "flight") return;
-    const e = new CrashEngine();
-    e.onResize(600, 400);
-    e.startTime = Date.now();
-    e.state = CrashEngineState.Active;
-    setEngine(e);
+  if (!active || phase !== "flight") return;
+  const e = new CrashEngine();
+  e.onResize(600, 400);
+  e.startTime = Date.now();
+  e.state = CrashEngineState.Active;
+  setEngine(e);
 
-    const interval = setInterval(() => {
-      e.tick();
-      setMultiplier(e.multiplier);
-      if (e.multiplier >= 3.0) {
-        e.state = CrashEngineState.Over;
-        clearInterval(interval);
-        setPhase("crash");
-      }
-    }, 100);
+  let frameId: number;
 
-    return () => {
-      clearInterval(interval);
+  const tick = () => {
+    e.tick();
+    setMultiplier(e.multiplier);
+    if (e.multiplier >= 3.0) {
       e.state = CrashEngineState.Over;
-    };
-  }, [phase, active]);
+      setPhase("crash");
+      cancelAnimationFrame(frameId);
+    } else {
+      frameId = requestAnimationFrame(tick);
+    }
+  };
+
+  frameId = requestAnimationFrame(tick);
+
+  return () => {
+    cancelAnimationFrame(frameId);
+    e.state = CrashEngineState.Over;
+  };
+}, [phase, active]);
+
 
   // === Reset after crash ===
   useEffect(() => {
@@ -147,7 +154,7 @@ const rotateInterpolate = rotation.interpolate({
 
   useEffect(() => {
     if (Platform.OS !== "web") return;
-    if (phase !== "crash") return;
+    if (phase !== "crash" || !active) return;
   
     const container = document.getElementById("vzryv-container");
     if (!container) return;
@@ -161,8 +168,16 @@ const rotateInterpolate = rotation.interpolate({
     });
   
     anim.setSpeed(1.4);
-    return () => anim.destroy();
-  }, [phase]);
+  
+    anim.addEventListener("complete", () => {
+      anim.destroy(); // 🔥 сразу уничтожаем по завершению
+    });
+  
+    return () => {
+      anim.destroy();
+    };
+  }, [phase, active]);
+  
   
 
   // === Нажатие кнопки PLACE BET ===
