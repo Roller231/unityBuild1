@@ -15,8 +15,6 @@ import BalanceButton from "../components/Buttons/BalanceButton";
 import GiftCard from "../components/Buttons/GiftCard";
 import { useTelegramPlatform } from "@/hooks/useTelegramPlatform";
 
-
-
 import FlagRU from "../components/icons/ru.png";
 import FlagEN from "../components/icons/us.png";
 
@@ -26,15 +24,15 @@ const Case = () => {
   const [activeTab, setActiveTab] = useState<"paid" | "free">("paid");
   const [language, setLanguage] = useState<"ru" | "en">("ru");
   const animation = useState(new Animated.Value(0))[0];
-
   const [flagAnim] = useState(new Animated.Value(0));
   const [currentFlag, setCurrentFlag] = useState(language);
-
+  const [onlineCount, setOnlineCount] = useState(234);
 
   const platform = useTelegramPlatform();
   const isDesktop = platform === "tdesktop" || platform === "macos";
   const fixedWidth = isDesktop ? 470 : screenWidth;
 
+  // === табы Paid/Free ===
   const handleSwitch = (tab: "paid" | "free") => {
     setActiveTab(tab);
     Animated.timing(animation, {
@@ -50,25 +48,22 @@ const Case = () => {
     outputRange: [0, switchWidth / 2],
   });
 
+  // === переключение языка с анимацией флага ===
   const toggleLanguage = () => {
-    // анимация вылета старого флага вверх
     Animated.sequence([
       Animated.timing(flagAnim, {
-        toValue: -50, // поднимаем старый флаг вверх
+        toValue: -50,
         duration: 200,
         useNativeDriver: true,
       }),
       Animated.timing(flagAnim, {
-        toValue: 50, // опускаем "новый" флаг снизу
+        toValue: 50,
         duration: 0,
         useNativeDriver: true,
       }),
     ]).start(() => {
-      // меняем язык после вылета старого флага
       setLanguage((prev) => (prev === "ru" ? "en" : "ru"));
       setCurrentFlag((prev) => (prev === "ru" ? "en" : "ru"));
-  
-      // анимация вылета нового флага вверх (в центр)
       Animated.timing(flagAnim, {
         toValue: 0,
         duration: 200,
@@ -76,15 +71,15 @@ const Case = () => {
       }).start();
     });
   };
-  
+
   const handleBalancePress = () => console.log("Balance clicked!");
 
-  // ✅ вычисляем ширину карточек (2 в ряд)
+  // ✅ ширина карточек (2 в ряд)
   const contentWidth = switchWidth;
   const cardSpacing = 10;
   const cardWidth = (contentWidth - cardSpacing) / 2;
 
-  // 🚫 отключаем масштабирование/ресайз
+  // 🚫 блокировка масштабирования и ресайза
   useEffect(() => {
     const metaTag = document.querySelector('meta[name="viewport"]');
     if (metaTag) {
@@ -100,7 +95,6 @@ const Case = () => {
       document.head.appendChild(newMeta);
     }
 
-    // блокировка ресайза окна (на десктопе)
     const preventResize = (e: Event) => {
       e.preventDefault();
       return false;
@@ -122,31 +116,31 @@ const Case = () => {
         >
           {/* ===== Верхняя панель ===== */}
           <View style={styles.topBar}>
-          <TouchableWithoutFeedback onPress={toggleLanguage}>
-  <View style={styles.langButton}>
-    <Animated.Image
-      source={currentFlag === "ru" ? FlagRU : FlagEN}
-      style={[
-        styles.flagIcon,
-        {
-          transform: [{ translateY: flagAnim }],
-          opacity: flagAnim.interpolate({
-            inputRange: [-50, 0, 50],
-            outputRange: [0, 1, 0], // плавное появление/исчезание
-          }),
-        },
-      ]}
-      resizeMode="contain"
-    />
-  </View>
-</TouchableWithoutFeedback>
-
+            <TouchableWithoutFeedback onPress={toggleLanguage}>
+              <View style={styles.langButton}>
+                <Animated.Image
+                  source={currentFlag === "ru" ? FlagRU : FlagEN}
+                  style={[
+                    styles.flagIcon,
+                    {
+                      transform: [{ translateY: flagAnim }],
+                      opacity: flagAnim.interpolate({
+                        inputRange: [-50, 0, 50],
+                        outputRange: [0, 1, 0],
+                      }),
+                    },
+                  ]}
+                  resizeMode="contain"
+                />
+              </View>
+            </TouchableWithoutFeedback>
 
             <BalanceButton onPress={handleBalancePress} />
           </View>
 
           {/* ===== Средняя панель ===== */}
           <View style={styles.middlePanel}>
+            {/* Кнопка подписки */}
             <View style={styles.subscribeButton}>
               <View style={styles.subscribeContent}>
                 <Image
@@ -158,6 +152,7 @@ const Case = () => {
               </View>
             </View>
 
+            {/* Онлайн и история подарков */}
             <View style={styles.giftHistoryWrapper}>
               <View style={styles.onlineCircle}>
                 <View style={styles.onlineInner}>
@@ -166,7 +161,15 @@ const Case = () => {
                     style={styles.userIcon}
                     resizeMode="contain"
                   />
-                  <Text style={styles.onlineText}>234</Text>
+                  {/* ✅ адаптивный текст онлайн */}
+                  <Text
+                    style={styles.onlineText}
+                    numberOfLines={1}
+                    adjustsFontSizeToFit
+                    minimumFontScale={0.6}
+                  >
+                    {onlineCount}
+                  </Text>
                 </View>
               </View>
 
@@ -267,15 +270,16 @@ const styles = StyleSheet.create({
     borderRadius: 100,
     paddingVertical: 6,
     paddingHorizontal: 14,
-    overflow: "hidden", // ✅ чтобы флаг не вылезал за рамку при анимации
+    overflow: "hidden",
     height: 40,
     width: 60,
     justifyContent: "center",
     alignItems: "center",
   },
-  
   flagIcon: { width: 28, height: 28, borderRadius: 1 },
+
   middlePanel: { alignItems: "center", width: "100%", marginBottom: 20 },
+
   subscribeButton: {
     width: "90%",
     height: 60,
@@ -291,16 +295,16 @@ const styles = StyleSheet.create({
   },
   subscribeText: { color: "#fff", fontWeight: "700", fontSize: 18 },
   subscribeIcon: { width: 26, height: 26, marginRight: 8 },
+
   giftHistoryWrapper: {
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "flex-start",
-    width: "90%", // ✅ вместо 100%
-    alignSelf: "center", // ✅ добавляем
+    width: "90%",
+    alignSelf: "center",
     marginBottom: 20,
     gap: 12,
   },
-  
   giftHistoryMask: {
     flexDirection: "row",
     overflow: "hidden",
@@ -312,6 +316,7 @@ const styles = StyleSheet.create({
     justifyContent: "flex-start",
     gap: 12,
   },
+
   onlineCircle: {
     width: 65,
     height: 65,
@@ -322,7 +327,14 @@ const styles = StyleSheet.create({
   },
   onlineInner: { flexDirection: "row", alignItems: "center", gap: 4 },
   userIcon: { width: 20, height: 20 },
-  onlineText: { color: "#00FF66", fontWeight: "700", fontSize: 14 },
+  onlineText: {
+    color: "#76DA19",
+    fontWeight: "700",
+    fontSize: 14,
+    width: 25, // фиксированная ширина
+    textAlign: "center",
+  },
+
   inactiveCircle: {
     width: 65,
     height: 65,
@@ -332,6 +344,7 @@ const styles = StyleSheet.create({
     alignItems: "center",
   },
   giftIcon: { width: 24, height: 24, opacity: 0.4 },
+
   switchContainer: {
     flexDirection: "row",
     alignItems: "center",
@@ -358,6 +371,7 @@ const styles = StyleSheet.create({
   },
   switchText: { color: "rgba(255,255,255,0.6)", fontSize: 16, fontWeight: "600" },
   switchTextActive: { color: "#fff", fontWeight: "700" },
+
   giftGrid: {
     flexDirection: "row",
     flexWrap: "wrap",

@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useCallback } from "react";
+import React, { useEffect, useState, useCallback, useRef } from "react";
 import {
   View,
   Text,
@@ -7,11 +7,10 @@ import {
   Dimensions,
   Platform,
   ScrollView,
-  Image,
+  Animated,
+  Easing,
 } from "react-native";
-
 import { useFocusEffect } from "@react-navigation/native";
-import MaskedView from "@react-native-masked-view/masked-view";
 import { CrashEngine, CrashEngineState } from "../components/CrashEngine";
 import CrashGraph from "../components/CrashGraph";
 import Svg, { Text as SvgText } from "react-native-svg";
@@ -19,58 +18,54 @@ import OrangeBtn from "../components/OrangeBtn";
 import * as Font from "expo-font";
 import BetItem from "../components/BetItem";
 import StarsBackground from "../components/StarsBackground";
-import { useTelegramPlatform } from "@/hooks/useTelegramPlatform"; // ✅ добавлено
+import { useTelegramPlatform } from "@/hooks/useTelegramPlatform";
+import HistoryBar from "../components/HistoryBar";
 
 import vzryv from "../components/icons/vzryv.json";
-
 import LottieView from "lottie-react-native";
 import lottieWeb from "lottie-web";
 
 import ava from "../components/icons/AvatarTest.svg";
 import Venus from "../components/icons/Venus.svg";
-
-import { Animated, Easing } from "react-native"; // 👈 добавить импорт
 import bliks from "../components/icons/bliks.svg";
-
 
 const { height: screenHeight, width: screenWidth } = Dimensions.get("window");
 
-const Crash = () => {
-  const platform = useTelegramPlatform(); // ✅ определяем платформу
+const Crash: React.FC = () => {
+  const platform = useTelegramPlatform();
   const isDesktop = platform === "tdesktop" || platform === "macos";
-  const fixedWidth = isDesktop ? 470 : screenWidth; // ✅ фикс для desktop
+  const fixedWidth = isDesktop ? 470 : screenWidth;
+
+  // === resetKey для перерисовки ===
+  const [resetKey, setResetKey] = useState(0);
 
   const [phase, setPhase] = useState<"idle" | "countdown" | "flight" | "crash">("idle");
   const [count, setCount] = useState(3);
-  const [multiplier, setMultiplier] = useState(1.0);
-  const [engine, setEngine] = useState<CrashEngine | null>(null);
   const [fontLoaded, setFontLoaded] = useState(false);
   const [active, setActive] = useState(true);
+  const [engine, setEngine] = useState<CrashEngine | null>(null);
+  const [currentMultiplier, setCurrentMultiplier] = useState(1);
+  const [lastMultiplier, setLastMultiplier] = useState(1); // ✅ добавлено
+  const [pastCoeffs, setPastCoeffs] = useState<number[]>([]);
 
+  // === вращение планеты ===
+  const rotation = useRef(new Animated.Value(0)).current;
+  useEffect(() => {
+    Animated.loop(
+      Animated.timing(rotation, {
+        toValue: 1,
+        duration: 60000,
+        easing: Easing.linear,
+        useNativeDriver: true,
+      })
+    ).start();
+  }, []);
+  const rotateInterpolate = rotation.interpolate({
+    inputRange: [0, 1],
+    outputRange: ["0deg", "360deg"],
+  });
 
-// === Планета вращается ===
-const rotation = useState(new Animated.Value(0))[0];
-
-useEffect(() => {
-  Animated.loop(
-    Animated.timing(rotation, {
-      toValue: 1,
-      duration: 60000, // один оборот за 60 секунд
-      easing: Easing.linear,
-      useNativeDriver: true,
-    })
-  ).start();
-}, []);
-
-const rotateInterpolate = rotation.interpolate({
-  inputRange: [0, 1],
-  outputRange: ["0deg", "360deg"],
-});
-
-
-
-
-  // === Загружаем шрифт ===
+  // === загрузка шрифта ===
   useEffect(() => {
     const loadFont = async () => {
       await Font.loadAsync({
@@ -81,23 +76,20 @@ const rotateInterpolate = rotation.interpolate({
     loadFont();
   }, []);
 
-  // === При потере фокуса вырубаем движок ===
+  // === focus ===
   useFocusEffect(
     useCallback(() => {
       setActive(true);
-      console.log("▶️ Crash screen active");
       return () => {
-        console.log("⏸ Crash screen paused");
         setActive(false);
         setPhase("idle");
         setEngine(null);
-        setMultiplier(1.0);
         setCount(3);
       };
     }, [])
   );
 
-  // === Countdown phase ===
+  // === отсчёт ===
   useEffect(() => {
     if (!active || phase !== "countdown") return;
     if (count > 0) {
@@ -108,57 +100,86 @@ const rotateInterpolate = rotation.interpolate({
     }
   }, [count, phase, active]);
 
-  // === Flight phase ===
+  // === сохранение истории в localStorage ===
   useEffect(() => {
-  if (!active || phase !== "flight") return;
-  const e = new CrashEngine();
-  e.onResize(600, 400);
-  e.startTime = Date.now();
-  e.state = CrashEngineState.Active;
-  setEngine(e);
+    if (Platform.OS === "web") {
+      localStorage.setItem("crash_history", JSON.stringify(pastCoeffs));
+    }
+  }, [pastCoeffs]);
 
-  let frameId: number;
+  useEffect(() => {
+    if (Platform.OS === "web") {
+      const saved = localStorage.getItem("crash_history");
+      if (saved) setPastCoeffs(JSON.parse(saved));
+    }
+  }, []);
 
-  const tick = () => {
-    e.tick();
-    setMultiplier(e.multiplier);
-    if (e.multiplier >= 3.0) {
-      e.state = CrashEngineState.Over;
-      setPhase("crash");
+  // === полёт ===
+  useEffect(() => {
+    if (!active || phase !== "flight") return;
+    const e = new CrashEngine();
+    e.onResize(600, 400);
+    e.startTime = Date.now();
+    e.state = CrashEngineState.Active;
+    setEngine(e);
+
+    let frameId: number;
+    const tick = () => {
+      e.tick();
+      if (e.multiplier >= 2.0) {
+        e.state = CrashEngineState.Over;
+        setPhase("crash");
+      } else {
+        frameId = requestAnimationFrame(tick);
+      }
+    };
+    frameId = requestAnimationFrame(tick);
+
+    return () => {
       cancelAnimationFrame(frameId);
-    } else {
-      frameId = requestAnimationFrame(tick);
-    }
-  };
+      e.state = CrashEngineState.Over;
+    };
+  }, [phase, active]);
 
-  frameId = requestAnimationFrame(tick);
-
-  return () => {
-    cancelAnimationFrame(frameId);
-    e.state = CrashEngineState.Over;
-  };
-}, [phase, active]);
-
-
-  // === Reset after crash ===
+  // === взрыв и перезапуск ===
   useEffect(() => {
-    if (phase === "crash") {
-      const resetTimer = setTimeout(() => {
-        setMultiplier(1.0);
-        setCount(3);
-        setPhase("idle");
-      }, 500);
-      return () => clearTimeout(resetTimer);
+    if (phase !== "crash") return;
+
+    const final = Number(lastMultiplier.toFixed(2)); // ✅ фикс: берём последний актуальный множитель
+    if (final > 1) {
+      setPastCoeffs((prev) => {
+        const next = [...prev, final];
+        return next.slice(-12); // последние 12
+      });
     }
+
+    const restartTimer = setTimeout(() => {
+      console.log("♻️ Перезапуск Crash после взрыва...");
+      setResetKey((k) => k + 1);
+    }, 2000);
+
+    if (engine) {
+      cancelAnimationFrame((engine as any)._frameId);
+      engine.state = CrashEngineState.Over;
+      setEngine(null);
+    }
+
+    if (Platform.OS === "web") {
+      const vz = document.getElementById("vzryv-container");
+      if (vz) vz.innerHTML = "";
+    }
+
+    return () => clearTimeout(restartTimer);
   }, [phase]);
 
+  // === web-взрыв ===
   useEffect(() => {
     if (Platform.OS !== "web") return;
     if (phase !== "crash" || !active) return;
-  
+
     const container = document.getElementById("vzryv-container");
     if (!container) return;
-  
+
     const anim = lottieWeb.loadAnimation({
       container,
       renderer: "svg",
@@ -166,21 +187,11 @@ const rotateInterpolate = rotation.interpolate({
       autoplay: true,
       animationData: vzryv,
     });
-  
     anim.setSpeed(1.4);
-  
-    anim.addEventListener("complete", () => {
-      anim.destroy(); // 🔥 сразу уничтожаем по завершению
-    });
-  
-    return () => {
-      anim.destroy();
-    };
+    anim.addEventListener("complete", () => anim.destroy());
+    return () => anim.destroy();
   }, [phase, active]);
-  
-  
 
-  // === Нажатие кнопки PLACE BET ===
   const handleStart = () => {
     if (phase === "idle") setPhase("countdown");
   };
@@ -188,7 +199,7 @@ const rotateInterpolate = rotation.interpolate({
   if (!fontLoaded) return null;
 
   return (
-    <View style={{ flex: 1, backgroundColor: "#1B003B" }}>  {/* 👈 Добавили фон сюда */}
+    <View key={resetKey} style={{ flex: 1, backgroundColor: "#1B003B" }}>
       <View
         style={[
           styles.container,
@@ -197,143 +208,119 @@ const rotateInterpolate = rotation.interpolate({
       >
         <StarsBackground />
 
+        {/* вращающаяся планета */}
         <Animated.Image
-  source={Venus}
-  style={[
-    styles.planetBackground,
-    isDesktop
-      ? {
-          top: 30,
-          left: 30,
-          width: 130,
-          height: 130,
-        }
-      : {
-          top: screenHeight * 0.04,
-          left: screenWidth * 0.07,
-          width: screenWidth * 0.25,
-          height: screenWidth * 0.25,
-        },
-    {
-      transform: [{ rotate: rotateInterpolate }],
-    },
-  ]}
-  resizeMode="contain"
-/>
+          source={Venus}
+          style={[
+            styles.planetBackground,
+            isDesktop
+              ? { top: 30, left: 30, width: 130, height: 130 }
+              : {
+                  top: screenHeight * 0.04,
+                  left: screenWidth * 0.07,
+                  width: screenWidth * 0.25,
+                  height: screenWidth * 0.25,
+                },
+            { transform: [{ rotate: rotateInterpolate }] },
+          ]}
+          resizeMode="contain"
+        />
 
-
-
-        {/* === Верхняя часть === */}
+        {/* верхняя часть */}
         <View style={styles.topSection}>
-        {phase === "countdown" && (
-  <View
-    style={{
-      alignItems: "center",
-      justifyContent: "center",
-      width: "100%",
-      height: "100%",
-      overflow: "hidden",
-    }}
-  >
-    {/* === Вращающийся фон с bliks.svg === */}
-    <Animated.Image
-      source={bliks}
-      resizeMode="contain"
-      style={{
-        position: "absolute",
-        opacity: 0.15,
-        transform: [{ rotate: rotateInterpolate }],
-        top: "50%",
-        left: "50%",
-        width: isDesktop ? 650 : screenWidth * 1.3, // 💥 чуть больше экрана
-        height: isDesktop ? 650 : screenWidth * 1.3, // 💥 чтобы сияние выходило за края
-        marginLeft: isDesktop ? -325 : -(screenWidth * 0.65),
-        marginTop: isDesktop ? -325 : -(screenWidth * 0.65),
-      }}
-    />
-
-    {/* === Цифра отсчёта === */}
-    <Text
-      style={{
-        ...(styles.countdownText as any),
-        background:
-          "linear-gradient(180deg, #FFAF4D 24.49%, #FFF7A7 57.14%, #FFAF4D 77.55%)",
-        WebkitBackgroundClip: "text",
-        WebkitTextFillColor: "transparent",
-        fontFamily: "SF-Pro-Heavy",
-        fontSize: isDesktop ? 180 : screenWidth * 0.3, // 🔥 чуть больше цифра
-        zIndex: 5,
-      }}
-    >
-      {count}
-    </Text>
-  </View>
-)}
-
-
-
-
-          {phase === "flight" && (
-            <CrashGraph engine={engine} active={active && phase === "flight"} />
+          {phase === "countdown" && (
+            <View style={styles.centered}>
+              <Animated.Image
+                source={bliks}
+                resizeMode="contain"
+                style={{
+                  position: "absolute",
+                  opacity: 0.15,
+                  transform: [{ rotate: rotateInterpolate }],
+                  top: "50%",
+                  left: "50%",
+                  width: isDesktop ? 650 : screenWidth * 1.3,
+                  height: isDesktop ? 650 : screenWidth * 1.3,
+                  marginLeft: isDesktop ? -325 : -(screenWidth * 0.65),
+                  marginTop: isDesktop ? -325 : -(screenWidth * 0.65),
+                }}
+              />
+              <Text
+                style={{
+                  ...(styles.countdownText as any),
+                  background:
+                    "linear-gradient(180deg, #FFAF4D 24.49%, #FFF7A7 57.14%, #FFAF4D 77.55%)",
+                  WebkitBackgroundClip: "text",
+                  WebkitTextFillColor: "transparent",
+                  fontFamily: "SF-Pro-Heavy",
+                  fontSize: isDesktop ? 180 : screenWidth * 0.3,
+                  zIndex: 5,
+                }}
+              >
+                {count}
+              </Text>
+            </View>
           )}
 
-{phase === "crash" && (
-  <View
-    style={{
-      alignItems: "center",
-      justifyContent: "center",
-      width: "100%",
-      height: "100%",
-      overflow: "hidden",
-    }}
-  >
-    {/* Взрывная анимация */}
-    {Platform.OS === "web" ? (
-      <div
-        id="vzryv-container"
-        style={{
-          position: "absolute",
-          top: "50%",
-          left: "50%",
-          width: isDesktop ? 500 : screenWidth * 1.1,
-          height: isDesktop ? 500 : screenWidth * 1.1,
-          transform: "translate(-50%, -50%)",
-          pointerEvents: "none",
-          zIndex: 10,
-        }}
-      />
-    ) : (
-      <LottieView
-        source={vzryv}
-        autoPlay
-        loop={false}
-        style={{
-          width: isDesktop ? 400 : screenWidth * 1.1,
-          height: isDesktop ? 400 : screenWidth * 1.1,
-          position: "absolute",
-          top: "50%",
-          left: "50%",
-          transform: [{ translateX: -200 }, { translateY: -200 }],
-          zIndex: 10,
-        }}
-      />
-    )}
-  </View>
-)}
+          {phase === "flight" && (
+            <CrashGraph
+              engine={engine}
+              active={active && phase === "flight"}
+              onMultiplierChange={(m) => {
+                setCurrentMultiplier(m);
+                setLastMultiplier(m); // ✅ сохраняем актуальный множитель
+              }}
+            />
+          )}
+
+          {phase === "crash" && (
+            <View style={styles.centered}>
+              {Platform.OS === "web" ? (
+                <div
+                  id="vzryv-container"
+                  style={{
+                    position: "absolute",
+                    top: "50%",
+                    left: "50%",
+                    width: isDesktop ? 500 : screenWidth * 1.1,
+                    height: isDesktop ? 500 : screenWidth * 1.1,
+                    transform: "translate(-50%, -50%)",
+                    pointerEvents: "none",
+                    zIndex: 9999,
+                    background: "transparent",
+                  }}
+                />
+              ) : (
+                <LottieView
+                  source={vzryv}
+                  autoPlay
+                  loop={false}
+                  style={{
+                    width: isDesktop ? 400 : screenWidth * 1.1,
+                    height: isDesktop ? 400 : screenWidth * 1.1,
+                    position: "absolute",
+                    top: "50%",
+                    left: "50%",
+                    transform: [{ translateX: -200 }, { translateY: -200 }],
+                    backgroundColor: "transparent",
+                    zIndex: 9999,
+                  }}
+                />
+              )}
+            </View>
+          )}
         </View>
 
-        {/* === Нижняя часть === */}
+        {/* нижняя часть */}
         <View style={styles.bottomSection}>
+          <HistoryBar history={[...pastCoeffs, currentMultiplier]} activeIndex={pastCoeffs.length} />
+
           <TouchableOpacity
             activeOpacity={0.9}
             style={[styles.betButton, { width: fixedWidth * 0.9 }]}
             onPress={handleStart}
           >
-            <OrangeBtn
-              width="100%"
-              height="100%"
-              style={StyleSheet.absoluteFillObject as any}
-            />
+            <OrangeBtn width="100%" height="100%" style={StyleSheet.absoluteFillObject as any} />
             <Svg height="100%" width="100%" style={StyleSheet.absoluteFillObject}>
               <SvgText
                 fill="none"
@@ -346,7 +333,7 @@ const rotateInterpolate = rotation.interpolate({
                 y="50%"
                 textAnchor="middle"
                 alignmentBaseline="middle"
-                letterSpacing={2.5}
+                letterSpacing={5}
               >
                 PLACE BET
               </SvgText>
@@ -359,8 +346,7 @@ const rotateInterpolate = rotation.interpolate({
                 y="50%"
                 textAnchor="middle"
                 alignmentBaseline="middle"
-                letterSpacing={2.5}
-
+                letterSpacing={5}
               >
                 PLACE BET
               </SvgText>
@@ -370,86 +356,27 @@ const rotateInterpolate = rotation.interpolate({
           <View style={[styles.betsContainer, { width: fixedWidth * 0.9 }]}>
             <ScrollView
               showsVerticalScrollIndicator={false}
-              contentContainerStyle={{
-                paddingBottom: 80,
-                minHeight: screenHeight * 0.4,
-              }}
-              style={styles.betsScroll}
+              pinchGestureEnabled={false}
+              scrollEventThrottle={16}
+              overScrollMode="always"
+              bounces
+              contentContainerStyle={[
+                styles.betsScrollContainer,
+                { width: fixedWidth * 0.9, minHeight: screenHeight * 0.4 },
+              ]}
             >
-              <BetItem
-                avatar={ava}
-                username="Crazy Frog"
-                betAmount={4.38}
-                multiplier={1.24}
-                total={100}
-                state="win"
-                isGift
-              />
-              <BetItem
-                avatar={ava}
-                username="MoonSun"
-                betAmount={5.12}
-                multiplier={1.42}
-                total={0.0}
-                state="lose"
-              />
-                            <BetItem
-                avatar={ava}
-                username="MoonSun"
-                betAmount={5.12}
-                multiplier={1.42}
-                total={0.0}
-                state="lose"
-              />
-                            <BetItem
-                avatar={ava}
-                username="MoonSun"
-                betAmount={5.12}
-                multiplier={1.42}
-                total={0.0}
-                state="lose"
-              />
-                            <BetItem
-                avatar={ava}
-                username="MoonSun"
-                betAmount={5.12}
-                multiplier={1.42}
-                total={0.0}
-                state="lose"
-              />
-                            <BetItem
-                avatar={ava}
-                username="MoonSun"
-                betAmount={5.12}
-                multiplier={1.42}
-                total={0.0}
-                state="lose"
-              />
-                            <BetItem
-                avatar={ava}
-                username="MoonSun"
-                betAmount={5.12}
-                multiplier={1.42}
-                total={0.0}
-                state="lose"
-              />
-                            <BetItem
-                avatar={ava}
-                username="MoonSun"
-                betAmount={5.12}
-                multiplier={1.42}
-                total={0.0}
-                state="lose"
-              />
-                            <BetItem
-                avatar={ava}
-                username="MoonSun"
-                betAmount={5.12}
-                multiplier={1.42}
-                total={0.0}
-                state="lose"
-              />
-
+              {[...Array(9)].map((_, i) => (
+                <BetItem
+                  key={i}
+                  avatar={ava}
+                  username={i === 0 ? "Crazy Frog" : "MoonSun"}
+                  betAmount={5.12}
+                  multiplier={1.42}
+                  total={i === 0 ? 100 : 0}
+                  state={i === 0 ? "win" : "lose"}
+                  isGift={i === 0}
+                />
+              ))}
             </ScrollView>
           </View>
         </View>
@@ -458,24 +385,19 @@ const rotateInterpolate = rotation.interpolate({
   );
 };
 
-// === Стили ===
+// === стили ===
 const styles = StyleSheet.create({
+  betsScrollContainer: {
+    alignItems: "center",
+    justifyContent: "flex-start",
+    paddingBottom: 120,
+    paddingTop: 0,
+    gap: 0,
+  },
   planetBackground: {
     position: "absolute",
     opacity: 0.6,
     zIndex: 0,
-  },
-  planetMobile: {
-    top: screenHeight * 0.09,
-    left: screenWidth * 0.07,
-    width: screenWidth * 0.13,
-    height: screenWidth * 0.13,
-  },
-  planetDesktop: {
-    top: 100,
-    left: 40,
-    width: 120,
-    height: 120,
   },
   container: {
     flex: 1,
@@ -489,6 +411,13 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
   },
+  centered: {
+    alignItems: "center",
+    justifyContent: "center",
+    width: "100%",
+    height: "100%",
+    overflow: "hidden",
+  },
   bottomSection: {
     height: screenHeight * 0.5,
     width: "100%",
@@ -501,11 +430,6 @@ const styles = StyleSheet.create({
     fontSize: 150,
     fontWeight: "900",
     textAlign: "center",
-  },
-  crashText: {
-    color: "#FF4D4D",
-    fontSize: 72,
-    fontWeight: "800",
   },
   betButton: {
     height: Platform.OS === "web" ? 80 : screenHeight * 0.065,
@@ -526,9 +450,6 @@ const styles = StyleSheet.create({
     backgroundColor: "transparent",
     flex: 1,
     overflow: "hidden",
-  },
-  betsScroll: {
-    maxHeight: screenHeight * 0.35,
   },
 });
 

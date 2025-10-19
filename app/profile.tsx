@@ -148,14 +148,16 @@ useEffect(() => {
       <StarsBackground />
 
       <ScrollView
-        contentContainerStyle={[
-          styles.wrapper,
-          { width: fixedWidth, paddingBottom: 170, minHeight: screenHeight * 1.2},
-        ]}
-        showsVerticalScrollIndicator={false}
-        overScrollMode="always"
-        bounces
-      >
+  contentContainerStyle={[
+    styles.scrollContainer,
+    { width: fixedWidth, minHeight: screenHeight * 1.2 },
+  ]}
+  showsVerticalScrollIndicator={false}
+  pinchGestureEnabled={false}
+  scrollEventThrottle={16}
+  overScrollMode="always"
+  bounces
+>
         {/* ===== Верхняя панель ===== */}
         <View style={styles.topBar}>
           <TouchableOpacity onPress={toggleLanguage} activeOpacity={0.8}>
@@ -386,6 +388,16 @@ useEffect(() => {
 
 // ===== Стили =====
 const styles = StyleSheet.create({
+
+  scrollContainer: {
+    alignItems: "center",
+    justifyContent: "flex-start",
+    paddingTop: 60,        // отступ сверху
+    paddingBottom: 200,    // отступ снизу
+    gap: 2,               // равномерный вертикальный промежуток между всеми секциями
+  },
+  
+
   tonIcon: { width: 24, height: 24 },
   emptyMenuContainer: { flexDirection: "row", justifyContent: "space-between", alignItems: "center", width: "90%", alignSelf: "center", borderRadius: 20, borderWidth: 1, borderColor: "rgba(255,255,255,0.2)", backgroundColor: "#352851", paddingVertical: 16, paddingHorizontal: 12, gap: 20, },
 
@@ -406,7 +418,7 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     justifyContent: "space-between",
     alignItems: "center",
-    marginTop: 100,
+    marginTop: 40,
     alignSelf: "center",
   },
   arrow: {

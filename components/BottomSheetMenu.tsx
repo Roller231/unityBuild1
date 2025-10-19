@@ -47,6 +47,11 @@ const BottomSheetMenu: React.FC<BottomSheetMenuProps> = ({
       backgroundStyle={styles.sheetBackground}
       handleIndicatorStyle={styles.handle}
       animateOnMount
+      handleComponent={() => (
+        <View style={styles.customHandleWrapper}>
+          <View style={styles.customHandleBar} />
+        </View>
+      )}
       // === 🔹 Затемнение фона ===
       backdropComponent={(props) => (
         <BottomSheetBackdrop
@@ -83,6 +88,17 @@ const styles = StyleSheet.create({
     paddingTop: 8,
     flex: 1,
   },
+    // 🔸 Новый handle
+    customHandleWrapper: {
+      alignItems: "center",
+      paddingVertical: 10,
+    },
+    customHandleBar: {
+      width: 70,
+      height: 5,
+      borderRadius: 3,
+      backgroundColor: "#070908", // ← вот этот цвет
+    },
   title: {
     color: "#fff",
     fontSize: 18,

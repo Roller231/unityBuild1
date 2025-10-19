@@ -3,18 +3,24 @@ import { View, StyleSheet, Platform, Dimensions } from "react-native";
 import { CrashEngine } from "../components/CrashEngine";
 import Canvas from "react-native-canvas";
 import LottieView from "lottie-react-native";
-import lottieWeb from "lottie-web"; // 👈 для Web
+import lottieWeb from "lottie-web";
 import catFly from "../components/icons/catFly.json";
 
 interface CrashGraphProps {
   engine: CrashEngine | null;
   active?: boolean;
+  onMultiplierChange?: (multiplier: number) => void;
 }
 
-export default function CrashGraph({ engine, active = true }: CrashGraphProps) {
-  const canvasRef = useRef<any>(null);
+export default function CrashGraph({
+  engine,
+  active = true,
+  onMultiplierChange,
+}: CrashGraphProps) {
+  const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const lottieRef = useRef<LottieView>(null);
   const webLottieContainer = useRef<HTMLDivElement | null>(null);
+  const lastUpdate = useRef(0);
 
   const { width: screenWidth, height: screenHeight } = Dimensions.get("window");
   const graphWidth = screenWidth * 0.95;
@@ -26,7 +32,7 @@ export default function CrashGraph({ engine, active = true }: CrashGraphProps) {
     backgroundColor: "transparent",
   };
 
-  // === Отрисовка графика ===
+  // === Основная отрисовка ===
   const renderFrame = (
     ctx: CanvasRenderingContext2D,
     width: number,
@@ -34,12 +40,23 @@ export default function CrashGraph({ engine, active = true }: CrashGraphProps) {
     offsetY: number
   ) => {
     if (!engine) return;
-
     engine.onResize(width, height);
     engine.tick();
 
-    ctx.clearRect(0, 0, width, height);
+    // ⚡ обновление множителя — не чаще 120мс и не ниже x1.01
+    const now = Date.now();
+    const multiplier = engine.multiplier;
+    if (
+      onMultiplierChange &&
+      now - lastUpdate.current > 120 &&
+      multiplier > 1.01 &&
+      isFinite(multiplier)
+    ) {
+      lastUpdate.current = now;
+      onMultiplierChange(multiplier);
+    }
 
+    ctx.clearRect(0, 0, width, height);
     const startY = engine.plotHeight;
     const mid = engine.getElapsedPosition(engine.elapsedTime * 0.5);
     const end = engine.getElapsedPosition(engine.elapsedTime);
@@ -51,108 +68,101 @@ export default function CrashGraph({ engine, active = true }: CrashGraphProps) {
     ctx.quadraticCurveTo(mid.x, mid.y + offsetY, end.x, end.y);
     ctx.stroke();
 
-    // === Текст множителя (приподнят вверх) ===
-    const text = `x${engine.multiplier.toFixed(2)}`;
+    const text = `x${multiplier.toFixed(2)}`;
     const fontSize = 64;
     ctx.font = `1000 ${fontSize}px "SF Pro", sans-serif`;
     ctx.textAlign = "center";
     ctx.textBaseline = "middle";
 
-    const textGradient = ctx.createLinearGradient(
+    const gradient = ctx.createLinearGradient(
       0,
       height / 2 - fontSize,
       0,
       height / 2 + fontSize
     );
-    textGradient.addColorStop(0, "#FFAF4D");
-    textGradient.addColorStop(0.35, "#FFF7A7");
-    textGradient.addColorStop(0.75, "#FFAF4D");
+    gradient.addColorStop(0, "#FFAF4D");
+    gradient.addColorStop(0.35, "#FFF7A7");
+    gradient.addColorStop(0.75, "#FFAF4D");
 
     ctx.lineWidth = 1.2;
     ctx.strokeStyle = "#070908";
-    // ⬆️ Сдвигаем текст чуть выше центра
     const textY = height / 2 - 60;
     ctx.strokeText(text, width / 2, textY);
-    ctx.fillStyle = textGradient;
+    ctx.fillStyle = gradient;
     ctx.fillText(text, width / 2, textY);
   };
 
-  // ======= Web (Canvas) =======
+  // === Canvas (Web) ===
   useEffect(() => {
     if (Platform.OS !== "web" || !active) return;
-
-    const canvas = canvasRef.current as HTMLCanvasElement;
+    const canvas = canvasRef.current;
     if (!canvas) return;
-
-    const scale = window.devicePixelRatio || 1;
-    canvas.width = graphWidth * scale;
-    canvas.height = graphHeight * scale;
-    canvas.style.width = `${graphWidth}px`;
-    canvas.style.height = `${graphHeight}px`;
 
     const ctx = canvas.getContext("2d");
     if (!ctx) return;
 
-    ctx.setTransform(1, 0, 0, 1, 0, 0);
+    const scale = window.devicePixelRatio || 1;
+    canvas.width = graphWidth * scale;
+    canvas.height = graphHeight * scale;
     ctx.scale(scale, scale);
     ctx.imageSmoothingEnabled = false;
 
-    let animationId: number;
-    const draw = () => {
-      renderFrame(ctx, graphWidth, graphHeight, 25);
-      animationId = requestAnimationFrame(draw);
-    };
-    animationId = requestAnimationFrame(draw);
+    let frameId: number;
+    let lastDraw = 0;
+    const fpsLimit = 30;
+    const frameInterval = 1000 / fpsLimit;
 
-    return () => {
-      cancelAnimationFrame(animationId);
-      ctx.clearRect(0, 0, graphWidth, graphHeight);
+    const draw = (time: number) => {
+      if (time - lastDraw > frameInterval) {
+        lastDraw = time;
+        renderFrame(ctx, graphWidth, graphHeight, 25);
+      }
+      frameId = requestAnimationFrame(draw);
     };
+
+    frameId = requestAnimationFrame(draw);
+    return () => cancelAnimationFrame(frameId);
   }, [engine, active]);
 
-  // ======= Web (Lottie) =======
-  useEffect(() => {
-    if (Platform.OS !== "web") return;
-    if (!webLottieContainer.current) return;
-
-    const anim = lottieWeb.loadAnimation({
-      container: webLottieContainer.current,
-      renderer: "svg",
-      loop: true,
-      autoplay: active,
-      animationData: catFly,
-    });
-
-    if (!active) anim.pause();
-    return () => anim.destroy();
-  }, [active]);
-
-  // ======= Mobile Canvas =======
+  // === Canvas (Mobile) ===
   const handleCanvas = (canvas: any) => {
     if (!canvas || Platform.OS === "web" || !active) return;
     const ctx = canvas.getContext("2d");
-    let animationId: number;
+    let frameId: number;
 
     const draw = () => {
       renderFrame(ctx, graphWidth, graphHeight, 15);
-      animationId = requestAnimationFrame(draw);
+      frameId = requestAnimationFrame(draw);
     };
-    animationId = requestAnimationFrame(draw);
+    frameId = requestAnimationFrame(draw);
 
-    return () => cancelAnimationFrame(animationId);
+    return () => cancelAnimationFrame(frameId);
   };
 
-  // ======= Mobile Lottie =======
+  // === Lottie кот ===
   useEffect(() => {
-    if (Platform.OS === "web") return;
-    if (!lottieRef.current) return;
-    if (active) lottieRef.current.play();
-    else lottieRef.current.pause();
+    if (Platform.OS === "web") {
+      const container = webLottieContainer.current;
+      if (!container) return;
+
+      const anim = lottieWeb.loadAnimation({
+        container,
+        renderer: "svg",
+        loop: true,
+        autoplay: active,
+        animationData: catFly,
+      });
+
+      anim.setSpeed(0.8);
+      if (!active) anim.pause();
+      return () => anim.destroy();
+    } else if (lottieRef.current) {
+      active ? lottieRef.current.play() : lottieRef.current.pause();
+    }
   }, [active]);
 
   return (
     <View style={styles.container}>
-      {/* === Кот под множителем === */}
       {active &&
         (Platform.OS === "web" ? (
           <div ref={webLottieContainer} style={styles.catLottieWeb as any} />
@@ -162,11 +172,11 @@ export default function CrashGraph({ engine, active = true }: CrashGraphProps) {
             source={catFly}
             autoPlay
             loop
+            speed={0.8}
             style={styles.catLottieMobile}
           />
         ))}
 
-      {/* === Сам график === */}
       {Platform.OS === "web" ? (
         <canvas
           ref={canvasRef}
@@ -201,18 +211,18 @@ const styles = StyleSheet.create({
   },
   catLottieWeb: {
     position: "absolute",
-    top: "45%", // 🔼 Было 58%, теперь выше
-    left: "40%",
+    top: "44%",
+    left: "42%",
     transform: "translate(-100px, 0)",
-    width: 300,
-    height: 300,
+    width: 280,
+    height: 280,
     opacity: 0.9,
     zIndex: 10,
     pointerEvents: "none",
   },
   catLottieMobile: {
     position: "absolute",
-    top: "48%", // 🔼 Было 58%
+    top: "47%",
     left: "50%",
     transform: [{ translateX: -100 }],
     width: 200,
