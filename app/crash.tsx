@@ -49,17 +49,32 @@ const Crash: React.FC = () => {
   const [pastCoeffs, setPastCoeffs] = useState<number[]>([]);
 
   // === вращение планеты ===
-  const rotation = useRef(new Animated.Value(0)).current;
-  useEffect(() => {
-    Animated.loop(
+// === вращение планеты ===
+const rotation = useRef(new Animated.Value(0)).current;
+
+useFocusEffect(
+  useCallback(() => {
+    const spin = Animated.loop(
       Animated.timing(rotation, {
         toValue: 1,
         duration: 60000,
         easing: Easing.linear,
         useNativeDriver: true,
       })
-    ).start();
-  }, []);
+    );
+
+    // при входе в экран — запуск
+    spin.start();
+
+    return () => {
+      // при выходе — сброс, чтобы заново запустилось при возвращении
+      rotation.stopAnimation(() => rotation.setValue(0));
+    };
+  }, [rotation])
+);
+
+
+
   const rotateInterpolate = rotation.interpolate({
     inputRange: [0, 1],
     outputRange: ["0deg", "360deg"],
@@ -333,7 +348,7 @@ const Crash: React.FC = () => {
                 y="50%"
                 textAnchor="middle"
                 alignmentBaseline="middle"
-                letterSpacing={5}
+                letterSpacing={3}
               >
                 PLACE BET
               </SvgText>
@@ -346,7 +361,7 @@ const Crash: React.FC = () => {
                 y="50%"
                 textAnchor="middle"
                 alignmentBaseline="middle"
-                letterSpacing={5}
+                letterSpacing={3}
               >
                 PLACE BET
               </SvgText>

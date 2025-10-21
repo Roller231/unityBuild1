@@ -1,5 +1,5 @@
 import React, { useEffect } from "react";
-import { View, StyleSheet } from "react-native";
+import { View, StyleSheet, Platform } from "react-native";
 import { Tabs } from "expo-router";
 import { useTelegramPlatform } from "@/hooks/useTelegramPlatform";
 import CustomTabBar from "@/components/CustomTabBar";
@@ -7,23 +7,37 @@ import CustomTabBar from "@/components/CustomTabBar";
 import {
   init,
   viewport,
-  themeParams,
   swipeBehavior,
   useRawInitData,
   useLaunchParams,
 } from "@telegram-apps/sdk-react";
 
-// 🚫 предотвращаем масштабирование
+// 🚫 предотвращаем масштабирование и выделение текста
 if (typeof window !== "undefined") {
   window.addEventListener("wheel", (e) => e.ctrlKey && e.preventDefault(), { passive: false });
   window.addEventListener("gesturestart", (e) => e.preventDefault(), { passive: false });
+
+  // 🚫 Запрещаем выделение текста глобально
+  const style = document.createElement("style");
+  style.innerHTML = `
+    * {
+      user-select: none !important;
+      -webkit-user-select: none !important;
+      -ms-user-select: none !important;
+      -moz-user-select: none !important;
+    }
+    img, svg {
+      pointer-events: none !important;
+      -webkit-user-drag: none !important;
+    }
+  `;
+  document.head.appendChild(style);
 }
 
 const _layout = () => {
   const platform = useTelegramPlatform();
   const isDesktop = platform === "tdesktop" || platform === "macos";
 
-  // ✅ Безопасно получаем launchParams (с мок-fallback)
   let launchParams: any;
   try {
     launchParams = useLaunchParams();
@@ -40,7 +54,6 @@ const _layout = () => {
     }
   })();
 
-  // === Инициализация SDK ===
   useEffect(() => {
     try {
       init();
@@ -48,35 +61,28 @@ const _layout = () => {
     } catch (err) {
       console.warn("⚠️ Telegram SDK init skipped:", err);
     }
-  
-    // Монтируем viewport
+
     if (viewport.mount.isAvailable()) {
       viewport.mount();
       viewport.expand();
       console.log("🖥️ Viewport expanded");
     }
 
-
-
     if (viewport.requestFullscreen.isAvailable()) {
-       viewport.requestFullscreen();
+      viewport.requestFullscreen();
     }
-  
-    // Монтируем и отключаем вертикальный свайп
+
     if (swipeBehavior.isSupported()) {
       swipeBehavior.mount();
       swipeBehavior.disableVertical();
       console.log("✅ Vertical swipe disabled");
     }
 
-  
     console.log("🧾 Launch Params:", launchParams);
     console.log("📦 Raw Init Data:", rawInitData);
   }, []);
 
   return (
-
-    
     <View style={styles.wrapper}>
       <View style={[styles.appFrame, isDesktop && styles.desktopFrame]}>
         <Tabs

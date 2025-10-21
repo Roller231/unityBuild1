@@ -27,6 +27,10 @@ export default function CrashGraph({
   const graphHeight =
     Platform.OS === "web" ? screenHeight * 0.45 : screenHeight * 0.5;
 
+  // Адаптивный размер кота (в 1.5 раза больше оригинала)
+  const baseSize = screenWidth * 0.45; // раньше примерно 280px → теперь динамически
+  const catSize = Math.min(baseSize * 1.5, 450); // ограничим максимум, чтобы не вылезал за экран
+
   const webCanvasStyle: React.CSSProperties = {
     borderRadius: 12,
     backgroundColor: "transparent",
@@ -43,7 +47,6 @@ export default function CrashGraph({
     engine.onResize(width, height);
     engine.tick();
 
-    // ⚡ обновление множителя — не чаще 120мс и не ниже x1.01
     const now = Date.now();
     const multiplier = engine.multiplier;
     if (
@@ -165,7 +168,17 @@ export default function CrashGraph({
     <View style={styles.container}>
       {active &&
         (Platform.OS === "web" ? (
-          <div ref={webLottieContainer} style={styles.catLottieWeb as any} />
+          <div
+            ref={webLottieContainer}
+            style={{
+              ...styles.catLottieWeb,
+              width: catSize,
+              height: catSize,
+              left: "50%",
+              top: "75%",
+              transform: "translate(-50%, -50%)",
+            }}
+          />
         ) : (
           <LottieView
             ref={lottieRef}
@@ -173,7 +186,15 @@ export default function CrashGraph({
             autoPlay
             loop
             speed={0.8}
-            style={styles.catLottieMobile}
+            style={[
+              styles.catLottieMobile,
+              {
+                width: catSize,
+                height: catSize,
+                transform: [{ translateX: -catSize / 2 }],
+                top: "60%", // ⬇️ было 47%, теперь чуть ниже
+              },
+            ]}
           />
         ))}
 
@@ -211,11 +232,6 @@ const styles = StyleSheet.create({
   },
   catLottieWeb: {
     position: "absolute",
-    top: "44%",
-    left: "42%",
-    transform: "translate(-100px, 0)",
-    width: 280,
-    height: 280,
     opacity: 0.9,
     zIndex: 10,
     pointerEvents: "none",
@@ -224,9 +240,6 @@ const styles = StyleSheet.create({
     position: "absolute",
     top: "47%",
     left: "50%",
-    transform: [{ translateX: -100 }],
-    width: 200,
-    height: 200,
     opacity: 0.9,
     zIndex: 10,
   },

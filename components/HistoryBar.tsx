@@ -102,15 +102,17 @@ const styles = StyleSheet.create({
     paddingHorizontal: 8,
   },
   inactiveBlock: {
-    backgroundColor: "#1F0248",
+    backgroundColor: "rgba(31, 2, 72, 1)", // 💡 тёмно-прозрачный, но виден на фоне
+    borderWidth: 1.5,
+    borderColor: "rgba(82, 40, 140, 1)", // лёгкий контур
   },
   activeBlock: {
-    backgroundColor: "rgba(110, 20, 255, 0.6)",
-    borderWidth: 1.4,
-    borderColor: "#A35BFF",
-    shadowColor: "#A35BFF",
-    shadowOpacity: 0.3,
-    shadowRadius: 8,
+    backgroundColor: "rgba(110, 20, 255, 0.7)", // чуть ярче
+    borderWidth: 1.5,
+    borderColor: "#B174FF",
+    shadowColor: "#B174FF",
+    shadowOpacity: 0.4,
+    shadowRadius: 10,
   },
   text: {
     color: "#FFFFFF",

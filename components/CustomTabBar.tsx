@@ -164,6 +164,8 @@ const styles = StyleSheet.create({
     alignSelf: "center",
     borderRadius: 16,
     overflow: "hidden",
+    zIndex: 10, // ⬅️ было 0, ставим пониже, чтобы BottomSheet мог перекрыть
+    elevation: 10, // для Android
   },
   container: {
     flexDirection: "row",

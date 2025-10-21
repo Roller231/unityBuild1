@@ -10,7 +10,7 @@ import {
   Pressable,
   ScrollView,
 } from "react-native";
-import BottomSheet, { BottomSheetView } from "@gorhom/bottom-sheet";
+import CustomBottomSheet from "../components/CustomBottomSheet";
 import { LinearGradient } from "expo-linear-gradient";
 import StarsBackground from "../components/StarsBackground";
 import BalanceButton from "../components/Buttons/BalanceButton";
@@ -67,7 +67,6 @@ const Profile = () => {
 
   // === BottomSheet (панель) ===
   const [openMenu, setOpenMenu] = useState<null | "deposit" | "stars" | "ton">(null);
-  const bottomSheetRef = useRef<BottomSheet>(null);
 
   const snapPoints = useMemo(() => {
     if (!openMenu) return [];
@@ -353,35 +352,43 @@ useEffect(() => {
       </ScrollView>
 
       {/* === Bottom Sheet Меню === */}
-      {openMenu && snapPoints.length > 0 && (
-        <BottomSheet
-          ref={bottomSheetRef}
-          index={1}
-          snapPoints={snapPoints}
-          enablePanDownToClose
-          onClose={() => setOpenMenu(null)}
-          backgroundStyle={styles.sheetBackground}
-          handleIndicatorStyle={styles.sheetHandle}
-          animateOnMount
-        >
-          <BottomSheetView style={styles.sheetContent}>
-            {openMenu === "deposit" && (
-              <>
-                <Text style={styles.sheetTitle}>Deposit Funds</Text>
-                <Text style={styles.sheetText}>
-                  Choose how to deposit your funds:
-                </Text>
-                <TouchableOpacity style={styles.modalButton}>
-                  <Text style={styles.modalButtonText}>💎 Deposit TON</Text>
-                </TouchableOpacity>
-                <TouchableOpacity style={styles.modalButton}>
-                  <Text style={styles.modalButtonText}>🎁 Deposit Gifts</Text>
-                </TouchableOpacity>
-              </>
-            )}
-          </BottomSheetView>
-        </BottomSheet>
-      )}
+      <CustomBottomSheet
+  visible={!!openMenu}
+  onClose={() => setOpenMenu(null)}
+  heightRatio={0.8}     // ровно 80% экрана
+>
+  {openMenu === "deposit" && (
+    <>
+      <Text style={styles.sheetText}>Choose how to deposit your funds:</Text>
+      <TouchableOpacity style={styles.modalButton}>
+        <Text style={styles.modalButtonText}>💎 Deposit TON</Text>
+      </TouchableOpacity>
+      <TouchableOpacity style={styles.modalButton}>
+        <Text style={styles.modalButtonText}>🎁 Deposit Gifts</Text>
+      </TouchableOpacity>
+    </>
+  )}
+
+  {openMenu === "stars" && (
+    <>
+      <Text style={styles.sheetText}>You can earn stars by completing missions.</Text>
+      <TouchableOpacity style={styles.modalButton}>
+        <Text style={styles.modalButtonText}>⭐ Earn Stars</Text>
+      </TouchableOpacity>
+    </>
+  )}
+
+  {openMenu === "ton" && (
+    <>
+      <Text style={styles.sheetText}>Manage your TON wallet below.</Text>
+      <TouchableOpacity style={styles.modalButton}>
+        <Text style={styles.modalButtonText}>💰 Connect Wallet</Text>
+      </TouchableOpacity>
+    </>
+  )}
+</CustomBottomSheet>
+
+
     </LinearGradient>
   );
 };
