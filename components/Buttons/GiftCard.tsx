@@ -4,20 +4,20 @@ import { LinearGradient } from "expo-linear-gradient";
 import { BlurView } from "expo-blur";
 import TonIcon from "../icons/ton.svg";
 
-// 🎁 Описание одного возможного дропа (будет приходить с бэка)
 export interface DropItem {
   id: string;
   name: string;
-  icon: any; // require() или { uri: string }
+  icon: any;
   rarity: "common" | "rare" | "epic" | "legendary";
-  price: number; // 💰 цена предмета
+  price: number;
 }
 
 interface GiftCardProps {
   price?: string;
   gradientColors?: string[];
   cardWidth?: number;
-  drops?: DropItem[]; // 🎁 список возможных выпадений
+  drops?: DropItem[];
+  mainImage?: any;
   onPress?: (giftData: {
     price: string;
     gradientColors: string[];
@@ -30,6 +30,7 @@ const GiftCard = ({
   gradientColors = ["rgba(0, 0, 0, 0)", "rgba(0, 0, 0, 0.25)", "#FFFFFF"],
   cardWidth = 160,
   drops = [],
+  mainImage = require("../icons/Venus.svg"), // 🔹 дефолтная картинка
   onPress,
 }: GiftCardProps) => {
   return (
@@ -47,32 +48,20 @@ const GiftCard = ({
         </BlurView>
       </View>
 
-      {/* 🔹 Основной фон карточки */}
+      {/* 🖼️ Основная картинка подарка */}
+      <Image
+        source={mainImage}
+        style={styles.mainImage}
+        resizeMode="contain"
+      />
+
+      {/* 🔹 Основной фон карточки (градиент) */}
       <LinearGradient
         colors={gradientColors}
         start={{ x: 0.5, y: 0 }}
         end={{ x: 0.5, y: 1 }}
         style={styles.gradient}
       />
-
-      {/* 🎁 превью 3 случайных предметов */}
-      {drops.length > 0 && (
-        <View style={styles.previewRow}>
-          {drops.slice(0, 3).map((item) => (
-            <Image
-              key={item.id}
-              source={item.icon}
-              style={[
-                styles.previewIcon,
-                item.rarity === "rare" && { tintColor: "#4BC0FF" },
-                item.rarity === "epic" && { tintColor: "#B24CFF" },
-                item.rarity === "legendary" && { tintColor: "#FFD700" },
-              ]}
-              resizeMode="contain"
-            />
-          ))}
-        </View>
-      )}
     </Pressable>
   );
 };
@@ -82,6 +71,14 @@ const styles = StyleSheet.create({
     borderRadius: 18,
     overflow: "hidden",
     backgroundColor: "rgba(255,255,255,0.05)",
+  },
+  mainImage: {
+    position: "absolute",
+    top: "25%", // ⬇️ опустили картинку ниже
+    left: "10%",
+    width: "80%",
+    height: "55%", // чуть меньше, чтобы гармонично смотрелась ниже
+    zIndex: 5,
   },
   gradient: {
     position: "absolute",
@@ -124,21 +121,6 @@ const styles = StyleSheet.create({
     fontWeight: "700",
     fontSize: 15,
     marginLeft: 6,
-  },
-  previewRow: {
-    position: "absolute",
-    bottom: 10,
-    left: 0,
-    right: 0,
-    flexDirection: "row",
-    justifyContent: "center",
-    alignItems: "center",
-    gap: 8,
-  },
-  previewIcon: {
-    width: 26,
-    height: 26,
-    opacity: 0.9,
   },
 });
 

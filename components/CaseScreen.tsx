@@ -1,62 +1,87 @@
 import React, { useState } from "react";
 import { View, Text, StyleSheet, TouchableOpacity, Dimensions } from "react-native";
-import { LinearGradient } from "expo-linear-gradient";
-import StarsBackground from "../components/StarsBackground";
 import OrangeBtn from "../components/OrangeBtn";
 import CaseResultModal from "../components/CaseResultModal";
-import CaseOpenAnimation from "../components/CaseOpenAnimation";
+import CaseRoulette from "../components/CaseRoulette"; // 🔹 рулетка
 
-const { width: screenWidth, height: screenHeight } = Dimensions.get("window");
+const { width: screenWidth } = Dimensions.get("window");
+
+// 🎁 Моковые дропы
+const sampleDrops = [
+  { id: "1", icon: require("../components/icons/cat.png"), price: 0.05 },
+  { id: "2", icon: require("../components/icons/cat.png"), price: 0.1 },
+  { id: "3", icon: require("../components/icons/gift.png"), price: 0.2 },
+  { id: "4", icon: require("../components/icons/Venus.svg"), price: 0.35 },
+  { id: "5", icon: require("../components/icons/cat.png"), price: 0.7 },
+  { id: "6", icon: require("../components/icons/Venus.svg"), price: 0.5 },
+];
 
 const CaseScreen = () => {
   const [opening, setOpening] = useState(false);
-  const [result, setResult] = useState<null | number>(null);
+  const [result, setResult] = useState<null | { id: string; price: number }>(null);
+  const [targetId, setTargetId] = useState<string | null>(null);
 
   const handleOpen = () => {
     if (opening) return;
     setOpening(true);
 
-    // имитация выигрыша
-    const winAmount = parseFloat((Math.random() * 0.3 + 0.05).toFixed(2));
+    // 🎲 Имитируем ответ от бэка — выбираем случайный дроп
+    const randomItem = sampleDrops[Math.floor(Math.random() * sampleDrops.length)];
 
+    // ✅ Добавляем короткую задержку, чтобы активировать рулетку корректно
     setTimeout(() => {
-      setOpening(false);
-      setResult(winAmount);
-    }, 3000);
+      setTargetId(randomItem.id);
+    }, 150);
+  };
+
+  const handleFinish = (item: { id: string; price: number }) => {
+    setOpening(false);
+    setResult(item);
   };
 
   return (
-    <LinearGradient colors={["#340A6F", "#18003A"]} style={styles.background}>
-      <StarsBackground />
+    <View style={styles.container}>
+      <Text style={styles.title}>FREE 2.0</Text>
 
-      <View style={styles.container}>
-        <Text style={styles.title}>FREE 2.0</Text>
+      {/* 🎡 Рулетка */}
+      <CaseRoulette
+        items={sampleDrops}
+        resultId={targetId || undefined}
+        active={opening}
+        onFinish={handleFinish}
+      />
 
-        <CaseOpenAnimation active={opening} />
+      <TouchableOpacity
+        activeOpacity={0.9}
+        style={[styles.openButton, { width: screenWidth * 0.85 }]}
+        onPress={handleOpen}
+        disabled={opening}
+      >
+        <OrangeBtn width="100%" height="100%" style={StyleSheet.absoluteFillObject as any} />
+        <Text style={styles.openText}>{opening ? "SPINNING..." : "OPEN"}</Text>
+      </TouchableOpacity>
 
-        <TouchableOpacity
-          activeOpacity={0.9}
-          style={[styles.openButton, { width: screenWidth * 0.85 }]}
-          onPress={handleOpen}
-          disabled={opening}
-        >
-          <OrangeBtn width="100%" height="100%" style={StyleSheet.absoluteFillObject as any} />
-          <Text style={styles.openText}>{opening ? "Opening..." : "OPEN"}</Text>
-        </TouchableOpacity>
+      <Text style={styles.subtitle}>WHAT’S INSIDE?</Text>
 
-        <Text style={styles.subtitle}>WHAT’S INSIDE?</Text>
-      </View>
-
-      {result !== null && (
-        <CaseResultModal amount={result} onClose={() => setResult(null)} />
+      {/* 🎉 Результат */}
+      {result && (
+        <CaseResultModal
+          amount={result.price}
+          onClose={() => setResult(null)}
+        />
       )}
-    </LinearGradient>
+    </View>
   );
 };
 
 const styles = StyleSheet.create({
-  background: { flex: 1, alignItems: "center", justifyContent: "center" },
-  container: { alignItems: "center", justifyContent: "center", width: "100%" },
+  container: {
+    alignItems: "center",
+    justifyContent: "center",
+    width: "100%",
+    backgroundColor: "transparent",
+    paddingBottom: 40,
+  },
   title: {
     color: "#fff",
     fontSize: 26,
