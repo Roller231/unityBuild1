@@ -31,6 +31,8 @@ interface CaseRouletteProps {
   speed?: number;
   title?: string;
   spinning?: boolean;
+  disableClose?: boolean;
+
 }
 
 export default function CaseRoulette({

@@ -29,6 +29,16 @@ import ava from "../components/icons/AvatarTest.svg";
 import Venus from "../components/icons/Venus.svg";
 import bliks from "../components/icons/bliks.svg";
 
+
+
+import giftIcon from "../components/icons/gift.png";
+import starIcon from "../components/icons/star.svg";
+import tonIcon from "../components/icons/ton.svg";
+
+
+import CustomBottomSheet from "../components/CustomBottomSheet";
+
+
 const { height: screenHeight, width: screenWidth } = Dimensions.get("window");
 
 const Crash: React.FC = () => {
@@ -47,6 +57,10 @@ const Crash: React.FC = () => {
   const [currentMultiplier, setCurrentMultiplier] = useState(1);
   const [lastMultiplier, setLastMultiplier] = useState(1); // ✅ добавлено
   const [pastCoeffs, setPastCoeffs] = useState<number[]>([]);
+  const [showBottomSheet, setShowBottomSheet] = useState(false);
+
+  const [selectedTab, setSelectedTab] = useState<"Gifts" | "Stars" | "TON">("Gifts");
+
 
   // === вращение планеты ===
 // === вращение планеты ===
@@ -85,6 +99,8 @@ useFocusEffect(
     const loadFont = async () => {
       await Font.loadAsync({
         "SF-Pro-Heavy": require("../fonts/SF-Pro-Display-Heavy.otf"),
+        "SF-Pro-Semibold": require("../fonts/SF-Pro-Display-Semibold.otf"),
+
       });
       setFontLoaded(true);
     };
@@ -208,7 +224,7 @@ useFocusEffect(
   }, [phase, active]);
 
   const handleStart = () => {
-    if (phase === "idle") setPhase("countdown");
+    setShowBottomSheet(true); // показать bottom sheet
   };
 
   if (!fontLoaded) return null;
@@ -324,6 +340,61 @@ useFocusEffect(
               )}
             </View>
           )}
+
+
+<CustomBottomSheet
+  visible={showBottomSheet}
+  onClose={() => setShowBottomSheet(false)}
+  heightRatio={0.4}
+>
+  <View style={styles.bottomSheetContainer}>
+    <Text style={styles.sheetTitle}>Deposit funds TON</Text>
+
+    {/* Tabs */}
+    <View style={styles.tabRow}>
+  {[
+    { key: "Gifts", label: "Gifts", icon: giftIcon },
+    { key: "Stars", label: "Stars", icon: starIcon },
+    { key: "TON", label: "TON", icon: tonIcon },
+  ].map(({ key, label, icon }) => {
+    const active = selectedTab === key;
+    return (
+      <TouchableOpacity
+        key={key}
+        style={[styles.tabButton, active && styles.tabButtonActive]}
+        onPress={() => setSelectedTab(key as "Gifts" | "Stars" | "TON")}
+        activeOpacity={0.8}
+      >
+        <View style={styles.tabContent}>
+          <Text style={[styles.tabText, active && styles.tabTextActive]}>
+            {label}
+          </Text>
+          <Animated.Image
+            source={icon}
+            resizeMode="contain"
+            style={styles.tabIcon}
+          />
+        </View>
+      </TouchableOpacity>
+    );
+  })}
+</View>
+
+
+
+
+    {/* Placeholder content */}
+    <View style={{ marginTop: 32 }}>
+      <Text style={{ color: "#aaa" }}>
+        {selectedTab === "Gifts" && "You have no gifts"}
+        {selectedTab === "Stars" && "No stars available"}
+        {selectedTab === "TON" && "Wallet not connected"}
+      </Text>
+    </View>
+  </View>
+</CustomBottomSheet>
+
+
         </View>
 
         {/* нижняя часть */}
@@ -402,6 +473,109 @@ useFocusEffect(
 
 // === стили ===
 const styles = StyleSheet.create({
+
+  tabRow: {
+    flexDirection: "row",
+    justifyContent: "center",
+    gap: 10,
+  },
+  
+  tabButton: {
+    padding: 4,
+    borderRadius: 100,
+    borderWidth: 2,
+    borderColor: "#6B3FD8",
+    backgroundColor: "transparent",
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  
+  tabButtonActive: {
+    backgroundColor: "#6B3FD8",
+    borderColor: "#6B3FD8",
+  },
+  
+  tabContent: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 8,
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+  },
+  
+  tabText: {
+    color: "white",
+    fontSize: 18,
+    fontFamily: "SF-Pro-Semibold",
+    fontWeight: "600",
+    textTransform: "capitalize",
+    lineHeight: 23.4,
+  },
+  
+  tabTextActive: {
+    color: "white",
+  },
+  
+  tabIcon: {
+    width: 22,
+    height: 22,
+  },
+  
+
+  
+  
+  tabIconWrapper: {
+    width: 24,
+    height: 24,
+    position: "relative",
+    overflow: "hidden",
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  
+  iconBg: {
+    width: 22,
+    height: 20,
+    position: "absolute",
+    backgroundColor: "white",
+    borderRadius: 0,
+  },
+  
+  iconBgActive: {
+    width: 24,
+    height: 24,
+    backgroundColor: "#0088CC",
+    borderRadius: 9999,
+  },
+  
+  
+  
+
+  bottomSheetContainer: {
+    flex: 1,
+    padding: 10,
+    alignItems: "center",
+  },
+  sheetTitle: {
+    fontSize: 20,
+    fontWeight: "700",
+    color: "#fff",
+    marginBottom: 20,
+    fontFamily: "SF-Pro-Heavy",
+
+  },
+
+  tabButtonText: {
+    color: "#ccc",
+    fontWeight: "600",
+  },
+  tabButtonTextActive: {
+    color: "#fff",
+  },
+  
+
+
   betsScrollContainer: {
     alignItems: "center",
     justifyContent: "flex-start",

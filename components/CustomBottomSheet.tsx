@@ -25,6 +25,8 @@ interface Props {
   scrollEnabled?: boolean; // ✅ добавлено
 }
 
+
+
 const CustomBottomSheet: React.FC<Props> = ({
   visible,
   onClose,
@@ -59,6 +61,8 @@ const CustomBottomSheet: React.FC<Props> = ({
     })
   ).current;
 
+
+  
   const openSheet = () => {
     translateY.setValue(sheetHeight);
     Animated.sequence([

@@ -7,12 +7,9 @@ import {
   ScrollView,
   Animated,
   Dimensions,
-  TouchableOpacity,
   Image,
-  Platform,
 } from "react-native";
 import { LinearGradient } from "expo-linear-gradient";
-import Svg, { Text as SvgText } from "react-native-svg";
 import StarsBackground from "../components/StarsBackground";
 import BalanceButton from "../components/Buttons/BalanceButton";
 import GiftCard, { DropItem } from "../components/Buttons/GiftCard";
@@ -20,11 +17,11 @@ import CustomBottomSheet from "../components/CustomBottomSheet";
 import { useTelegramPlatform } from "@/hooks/useTelegramPlatform";
 import CaseRoulette from "../components/CaseRoulette";
 import * as Font from "expo-font";
-import { useFocusEffect } from "@react-navigation/native";
+import Confetti from "react-confetti";
 
 import FlagRU from "../components/icons/ru.png";
 import FlagEN from "../components/icons/us.png";
-import OrangePng from "../components/icons/OrangePng.png"; // ✅ новый PNG
+import TonIcon from "../components/icons/ton.svg";
 
 const { width: screenWidth, height: screenHeight } = Dimensions.get("window");
 
@@ -33,55 +30,28 @@ const sampleDrops: DropItem[] = [
   { id: "2", name: "Silver Coin", icon: require("../components/icons/Oran.svg"), rarity: "rare", price: 0.15 },
   { id: "3", name: "Golden Ring", icon: require("../components/icons/VenusP.png"), rarity: "epic", price: 0.35 },
   { id: "4", name: "Diamond Crown", icon: require("../components/icons/cat.png"), rarity: "legendary", price: 0.7 },
-  { id: "5", name: "Bronze Coin", icon: require("../components/icons/cat.png"), rarity: "common", price: 6000.05 },
-  { id: "6", name: "Silver Coin", icon: require("../components/icons/Oran.svg"), rarity: "rare", price: 0.15 },
-  { id: "7", name: "Golden Ring", icon: require("../components/icons/VenusP.png"), rarity: "epic", price: 0.35 },
-  { id: "8", name: "Diamond Crown", icon: require("../components/icons/cat.png"), rarity: "legendary", price: 0.7 },
-  { id: "9", name: "Bronze Coin", icon: require("../components/icons/cat.png"), rarity: "common", price: 6000.05 },
-  { id: "10", name: "Silver Coin", icon: require("../components/icons/Oran.svg"), rarity: "rare", price: 0.15 },
-  { id: "11", name: "Golden Ring", icon: require("../components/icons/VenusP.png"), rarity: "epic", price: 0.35 },
-  { id: "12", name: "Diamond Crown", icon: require("../components/icons/cat.png"), rarity: "legendary", price: 0.7 },
-  { id: "1", name: "Bronze Coin", icon: require("../components/icons/cat.png"), rarity: "common", price: 6000.05 },
-  { id: "2", name: "Silver Coin", icon: require("../components/icons/Oran.svg"), rarity: "rare", price: 0.15 },
-  { id: "3", name: "Golden Ring", icon: require("../components/icons/VenusP.png"), rarity: "epic", price: 0.35 },
-  { id: "4", name: "Diamond Crown", icon: require("../components/icons/cat.png"), rarity: "legendary", price: 0.7 },
-  { id: "5", name: "Bronze Coin", icon: require("../components/icons/cat.png"), rarity: "common", price: 6000.05 },
-  { id: "6", name: "Silver Coin", icon: require("../components/icons/Oran.svg"), rarity: "rare", price: 0.15 },
-  { id: "7", name: "Golden Ring", icon: require("../components/icons/VenusP.png"), rarity: "epic", price: 0.35 },
-  { id: "8", name: "Diamond Crown", icon: require("../components/icons/cat.png"), rarity: "legendary", price: 0.7 },
-  { id: "9", name: "Bronze Coin", icon: require("../components/icons/cat.png"), rarity: "common", price: 6000.05 },
-  { id: "10", name: "Silver Coin", icon: require("../components/icons/Oran.svg"), rarity: "rare", price: 0.15 },
-  { id: "11", name: "Golden Ring", icon: require("../components/icons/VenusP.png"), rarity: "epic", price: 0.35 },
-  { id: "12", name: "Diamond Crown", icon: require("../components/icons/cat.png"), rarity: "legendary", price: 0.7 },
 ];
 
 const Case = () => {
+  const [resetKey, setResetKey] = useState(0);
   const [activeTab, setActiveTab] = useState<"paid" | "free">("paid");
   const [language, setLanguage] = useState<"ru" | "en">("ru");
-  const animation = useState(new Animated.Value(0))[0];
   const [flagAnim] = useState(new Animated.Value(0));
   const [currentFlag, setCurrentFlag] = useState(language);
-  const [openMenu, setOpenMenu] = useState(false);
+  const [animation] = useState(new Animated.Value(0));
 
-  // 🎡 рулетка
+  const [openMenu, setOpenMenu] = useState(false);
+  const [resultSheetVisible, setResultSheetVisible] = useState(false);
   const [spinning, setSpinning] = useState(false);
   const [resultId, setResultId] = useState<string | null>(null);
   const [result, setResult] = useState<DropItem | null>(null);
 
-  // принудительная перерисовка кнопки
-  const [btnKey, setBtnKey] = useState(0);
-  useFocusEffect(
-    useCallback(() => {
-      setBtnKey((k) => k + 1);
-    }, [])
-  );
-
-  // шрифт
   const [fontLoaded, setFontLoaded] = useState(false);
   useEffect(() => {
     const loadFont = async () => {
       await Font.loadAsync({
-        "SF-Pro-Heavy": require("../fonts/SF-Pro-Display-Heavy.otf"),
+        "SF‑Pro‑Heavy": require("../fonts/SF-Pro-Display-Heavy.otf"),
+        "SF‑Pro‑Medium": require("../fonts/SF-Pro-Display-Medium.otf"),
       });
       setFontLoaded(true);
     };
@@ -92,6 +62,7 @@ const Case = () => {
   const isDesktop = platform === "tdesktop" || platform === "macos";
   const fixedWidth = isDesktop ? 470 : screenWidth;
   const switchWidth = fixedWidth * 0.9;
+  const iconSize = Math.min(fixedWidth * 0.45, 200);
 
   const translateX = animation.interpolate({
     inputRange: [0, 1],
@@ -103,8 +74,8 @@ const Case = () => {
       Animated.timing(flagAnim, { toValue: -50, duration: 200, useNativeDriver: true }),
       Animated.timing(flagAnim, { toValue: 50, duration: 0, useNativeDriver: true }),
     ]).start(() => {
-      setLanguage((prev) => (prev === "ru" ? "en" : "ru"));
-      setCurrentFlag((prev) => (prev === "ru" ? "en" : "ru"));
+      setLanguage(prev => (prev === "ru" ? "en" : "ru"));
+      setCurrentFlag(prev => (prev === "ru" ? "en" : "ru"));
       Animated.timing(flagAnim, { toValue: 0, duration: 200, useNativeDriver: true }).start();
     });
   };
@@ -126,65 +97,50 @@ const Case = () => {
   const handleFinish = (item: DropItem) => {
     setSpinning(false);
     setResult(item);
+    setOpenMenu(false);
+    setTimeout(() => setResultSheetVisible(true), 300);
   };
 
   if (!fontLoaded) return null;
 
   return (
-    <LinearGradient colors={["#340A6F", "#18003A"]} style={styles.background}>
+    <LinearGradient key={resetKey} colors={["#340A6F", "#18003A"]} style={styles.background}>
       <StarsBackground />
-
       <View style={[styles.wrapper, { width: fixedWidth }]}>
         <ScrollView
           contentContainerStyle={styles.container}
           showsVerticalScrollIndicator={false}
-          pinchGestureEnabled={false}
         >
-          {/* ===== Верхняя панель ===== */}
+          {/* Верхняя панель */}
           <View style={styles.topBar}>
             <TouchableWithoutFeedback onPress={toggleLanguage}>
               <View style={styles.langButton}>
                 <Animated.Image
                   source={currentFlag === "ru" ? FlagRU : FlagEN}
-                  style={[
-                    styles.flagIcon,
-                    {
-                      transform: [{ translateY: flagAnim }],
-                      opacity: flagAnim.interpolate({
-                        inputRange: [-50, 0, 50],
-                        outputRange: [0, 1, 0],
-                      }),
-                    },
-                  ]}
+                  style={[styles.flagIcon, {
+                    transform: [{ translateY: flagAnim }],
+                    opacity: flagAnim.interpolate({ inputRange: [-50,0,50], outputRange: [0,1,0] }),
+                  }]}
                   resizeMode="contain"
                 />
               </View>
             </TouchableWithoutFeedback>
-
             <BalanceButton onPress={() => console.log("Balance clicked")} />
           </View>
 
-          {/* 💠 Переключатель Paid / Free */}
+          {/* Переключатель Paid / Free */}
           <View style={[styles.switchContainer, { width: switchWidth }]}>
             <Animated.View style={[styles.switchHighlight, { transform: [{ translateX }] }]} />
-            {["paid", "free"].map((tab) => (
+            {["paid","free"].map(tab => (
               <TouchableWithoutFeedback
                 key={tab}
                 onPress={() =>
-                  Animated.timing(animation, {
-                    toValue: tab === "paid" ? 0 : 1,
-                    duration: 250,
-                    useNativeDriver: false,
-                  }).start(() => setActiveTab(tab as any))
+                  Animated.timing(animation, { toValue: tab === "paid" ? 0 : 1, duration: 250, useNativeDriver: false })
+                    .start(() => setActiveTab(tab as any))
                 }
               >
                 <View style={styles.switchButton}>
-                  <Text
-                    style={[
-                      styles.switchText,
-                      activeTab === tab && styles.switchTextActive,
-                    ]}
-                  >
+                  <Text style={[styles.switchText, activeTab === tab && styles.switchTextActive]}>
                     {tab === "paid" ? "Paid" : "Free"}
                   </Text>
                 </View>
@@ -192,18 +148,20 @@ const Case = () => {
             ))}
           </View>
 
-          {/* ===== Сетка подарков ===== */}
+          {/* Сетка подарков */}
           <View style={[styles.giftGrid, { width: switchWidth }]}>
             {Array.from({ length: 6 }).map((_, index) => (
               <GiftCard
                 key={index}
                 price={activeTab === "paid" ? "0.5" : "0.1"}
-                cardWidth={(switchWidth - 10) / 2}
+                cardWidth={(switchWidth - 10)/2}
                 drops={sampleDrops}
                 gradientColors={
                   activeTab === "paid"
                     ? ["rgba(0,0,0,0)", "rgba(0,255,100,0.25)", "rgba(0,255,100,0.85)"]
-                    : ["rgba(0,0,0,0)", "rgba(255,60,60,0.2)", "rgba(255,0,0,0.85)"]
+                    : ["rgba(255, 100, 100, 0.01)", "rgba(255, 0, 0, 0.2)", "rgba(255, 0, 0, 0.85)"]
+
+
                 }
                 onPress={handleGiftPress}
               />
@@ -212,7 +170,7 @@ const Case = () => {
         </ScrollView>
       </View>
 
-      {/* === BottomSheet с рулеткой === */}
+      {/* BottomSheet рулетки */}
       <CustomBottomSheet
         visible={openMenu}
         onClose={() => {
@@ -221,35 +179,61 @@ const Case = () => {
         }}
         heightRatio={0.8}
       >
-        <View style={styles.sheetContainer}>
+        <View style={[styles.sheetContainer, styles.sheetBorder]}>
           <View style={styles.sheetContent}>
-
-          <CaseRoulette
-  title="MEGA CASE OPENING"
-  items={sampleDrops}
-  active={spinning}
-  resultId={resultId}
-  onFinish={handleFinish}
-  onSpin={handleSpin} // 👈 добавили
-  spinning={spinning}
-/>
-
-
-
-            {result && (
-              <View style={styles.resultBox}>
-                <Text style={styles.resultText}>
-                  🎉 You won {result.price.toFixed(2)} 💎
-                </Text>
-              </View>
-            )}
-          </View>
-
-          {/* === Кнопка SPIN === */}
-          <View style={styles.bottomButtonContainer}>
-           
+            <CaseRoulette
+              title="MEGA CASE OPENING"
+              items={sampleDrops}
+              active={spinning}
+              resultId={resultId}
+              onFinish={handleFinish}
+              onSpin={handleSpin}
+              spinning={spinning}
+            />
           </View>
         </View>
+      </CustomBottomSheet>
+
+      {/* BottomSheet выигрыша */}
+      <CustomBottomSheet
+        visible={resultSheetVisible}
+        onClose={() => setResultSheetVisible(false)}
+        heightRatio={0.6}
+      >
+        {resultSheetVisible && (
+          <Confetti
+            width={screenWidth}
+            height={screenHeight}
+            numberOfPieces={100}
+            recycle={false}
+            gravity={0.4}
+            run={resultSheetVisible}
+          />
+        )}
+        {result && (
+          <ScrollView contentContainerStyle={styles.resultModal} bounces={false}>
+            <Text style={styles.resultTitle}>Congratulations!</Text>
+            <View style={[styles.cardOnly, { width: iconSize, height: iconSize }]}>
+              <Image source={result.icon} style={styles.cardIcon} resizeMode="contain" />
+            </View>
+            <View style={styles.prizeRow}>
+              <Text style={styles.prizeText}>+{result.price.toFixed(2)}</Text>
+              <View style={styles.tonIconWrapper}>
+                <Image source={TonIcon} style={styles.tonIcon} resizeMode="contain" />
+              </View>
+            </View>
+            <TouchableWithoutFeedback
+              onPress={() => {
+                setResultSheetVisible(false);
+                setTimeout(() => setResetKey(prev => prev + 1), 300);
+              }}
+            >
+              <View style={styles.okButton}>
+                <Text style={styles.okButtonText}>Ok</Text>
+              </View>
+            </TouchableWithoutFeedback>
+          </ScrollView>
+        )}
       </CustomBottomSheet>
     </LinearGradient>
   );
@@ -302,36 +286,79 @@ const styles = StyleSheet.create({
     justifyContent: "space-between",
     rowGap: 10,
   },
-  sheetContainer: { flex: 1, justifyContent: "space-between" },
+  sheetContainer: { flex: 1, justifyContent: "center" },
   sheetContent: { alignItems: "center", paddingTop: 10 },
-  sheetTitle: { color: "#fff", fontSize: 24, fontWeight: "700", marginBottom: 20 },
-  betButton: {
-    height: Platform.OS === "web" ? 80 : 70,
-    borderRadius: 35,
-    overflow: "hidden",
-    alignItems: "center",
+  sheetBorder: { padding: 10, overflow: "hidden", elevation: 5 },
+  resultModal: {
+    flexGrow: 1,
     justifyContent: "center",
-    shadowColor: "rgba(17, 13, 45, 0.68)",
-    shadowOffset: { width: 0, height: 12 },
-    shadowOpacity: 1,
-    shadowRadius: 24,
-    elevation: 10,
-    alignSelf: "center",
-  },
-  bottomButtonContainer: {
-    width: "100%",
     alignItems: "center",
-    justifyContent: "flex-end",
-    marginBottom: Platform.OS === "ios" ? 20 : 10,
+    gap: 16,
   },
-  resultBox: {
-    marginTop: 30,
-    paddingVertical: 15,
-    paddingHorizontal: 30,
+  resultTitle: {
+    color: "#fff",
+    fontSize: 32,
+    fontFamily: "SF‑Pro‑Medium",
+    fontWeight: "500",
+    textAlign: "center",
+  },
+  cardOnly: {
+    borderRadius: 18,
+    overflow: "hidden",
     backgroundColor: "#1F0248",
-    borderRadius: 20,
+    elevation: 5,
+    justifyContent: "center",
+    alignItems: "center",
   },
-  resultText: { color: "#fff", fontSize: 18, fontWeight: "700" },
+  cardIcon: {
+    width: "80%",
+    height: "55%",
+  },
+  prizeRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    marginTop: 12,
+    marginBottom: 20,
+  },
+  prizeText: {
+    color: "#fff",
+    fontSize: 24,
+    fontFamily: "SF‑Pro‑Medium",
+    fontWeight: "500",
+    textTransform: "uppercase",
+    lineHeight: 31.2,
+  },
+  tonIconWrapper: {
+    marginLeft: 8,
+    width: 24,
+    height: 24,
+  },
+  tonIcon: {
+    width: 24,
+    height: 24,
+  },
+  okButton: {
+    width: "90%",
+    height: 60,
+    marginTop: 24,
+    backgroundColor: "#6B3FD8",
+    borderRadius: 100,
+    justifyContent: "center",
+    alignItems: "center",
+    shadowColor: "rgba(37,2.31,71.87,0.50)",
+    shadowOffset: { width: 8, height: 8 },
+    shadowOpacity: 0.5,
+    shadowRadius: 32,
+    elevation: 8,
+  },
+  okButtonText: {
+    color: "#fff",
+    fontSize: 18,
+    fontFamily: "SF‑Pro‑Medium",
+    fontWeight: "600",
+    textTransform: "capitalize",
+    lineHeight: 23.4,
+  },
 });
 
 export default Case;
