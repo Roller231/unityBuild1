@@ -219,7 +219,7 @@ const Case = () => {
           setOpenMenu(false);
           setSpinning(false);
         }}
-        heightRatio={0.9}
+        heightRatio={0.8}
       >
         <View style={styles.sheetContainer}>
           <View style={styles.sheetContent}>
