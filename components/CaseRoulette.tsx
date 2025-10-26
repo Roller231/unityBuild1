@@ -1,170 +1,330 @@
-import React, { useRef, useEffect } from "react";
+import React, { useRef, useEffect, useState, useLayoutEffect } from "react";
 import {
   View,
-  Image,
-  Text,
   StyleSheet,
-  ScrollView,
-  Dimensions,
   Animated,
+  Dimensions,
   Easing,
+  Text,
+  ScrollView,
+  TouchableOpacity,
+  Image,
+  Platform,
 } from "react-native";
+import Svg, { Text as SvgText } from "react-native-svg";
+import GiftCard, { DropItem } from "../components/Buttons/GiftCard";
 import { useTelegramPlatform } from "@/hooks/useTelegramPlatform";
-import TonIcon from "../components/icons/ton.svg";
+import OrangePng from "../components/icons/OrangePng.png";
 
-const { width: screenWidth } = Dimensions.get("window");
-
-interface DropItem {
-  id: string;
-  icon: any;
-  price: number;
-}
+const { width: screenWidth, height: screenHeight } = Dimensions.get("window");
+const FIXED_WIN_INDEX = 50;
+const ITEM_GAP = 10;
+const SIDE_PADDING = 16;
+const GRID_COLUMNS = 3;
 
 interface CaseRouletteProps {
   items: DropItem[];
-  resultId?: string | null;
   active?: boolean;
+  resultId?: string | null;
   onFinish?: (item: DropItem) => void;
+  onSpin?: () => void;
+  speed?: number;
+  title?: string;
+  spinning?: boolean;
 }
 
-const CaseRoulette: React.FC<CaseRouletteProps> = ({
+export default function CaseRoulette({
   items,
-  resultId,
   active,
+  resultId,
   onFinish,
-}) => {
+  onSpin,
+  speed = 1,
+  title = "CASE OPENING",
+  spinning = false,
+}: CaseRouletteProps) {
+  const anim = useRef(new Animated.Value(0)).current;
+  const [displayItems, setDisplayItems] = useState<DropItem[]>([]);
+  const [isSpinning, setIsSpinning] = useState(false);
+  const [targetOffset, setTargetOffset] = useState(0);
+  const [winningItem, setWinningItem] = useState<DropItem | null>(null);
+  const [btnKey, setBtnKey] = useState(0);
+
   const platform = useTelegramPlatform();
   const isDesktop = platform === "tdesktop" || platform === "macos";
-  const fixedWidth = isDesktop ? 470 : screenWidth;
 
-  // 📐 Размер карточек и параметры
-  const ITEM_WIDTH = isDesktop ? 120 : 100;
-  const ITEM_MARGIN = isDesktop ? 12 : 8;
-  const TOTAL_WIDTH = ITEM_WIDTH + ITEM_MARGIN * 2;
+  const maxWidth = isDesktop ? 470 : screenWidth;
+  const innerWidth = maxWidth - SIDE_PADDING * 2;
 
-  const scrollRef = useRef<ScrollView>(null);
-  const anim = useRef(new Animated.Value(0)).current;
+  const ITEM_WIDTH =
+    (innerWidth - ITEM_GAP * (GRID_COLUMNS - 1)) / GRID_COLUMNS;
+  const TOTAL_WIDTH = ITEM_WIDTH + ITEM_GAP;
+  const CENTER_OFFSET = innerWidth / 2 - TOTAL_WIDTH / 2;
+
+  const getRandomItem = (arr: DropItem[]) =>
+    arr[Math.floor(Math.random() * arr.length)];
+
+  const generateRandomItems = (arr: DropItem[], count: number) =>
+    Array.from({ length: count }, () => getRandomItem(arr));
 
   useEffect(() => {
-    if (!active || !resultId) return;
+    if (items.length > 0) setDisplayItems(generateRandomItems(items, 20));
+    anim.setValue(0);
+  }, [items]);
 
-    const targetIndex = items.findIndex((it) => it.id === resultId);
-    if (targetIndex === -1) return;
+  useEffect(() => {
+    if (!active || !resultId || isSpinning || items.length === 0) return;
+    const winner = items.find((i) => i.id === resultId);
+    if (!winner) return;
 
-    anim.setValue(0); // ✅ сброс перед каждым запуском
+    setIsSpinning(true);
+    anim.stopAnimation();
+    anim.setValue(0);
 
-    // 🎡 Количество оборотов рулетки
-    const loops = isDesktop ? 8 : 6;
-    const totalItems = items.length * loops + targetIndex;
-    const targetOffset =
-      totalItems * TOTAL_WIDTH - fixedWidth / 2 + TOTAL_WIDTH / 2;
+    const itemsBefore = generateRandomItems(items, FIXED_WIN_INDEX);
+    const itemsAfter = generateRandomItems(items, 60);
+    const newDisplay = [...itemsBefore, winner, ...itemsAfter];
+    if (newDisplay.length > 104) newDisplay[104] = winner;
+
+    const offset = FIXED_WIN_INDEX * TOTAL_WIDTH - CENTER_OFFSET;
+    const maxScrollableOffset = newDisplay.length * TOTAL_WIDTH - innerWidth;
+    const safeOffset = Math.min(offset, maxScrollableOffset);
+
+    setDisplayItems(newDisplay);
+    setTargetOffset(safeOffset);
+    setWinningItem(winner);
+  }, [active, resultId, items, isSpinning]);
+
+  useLayoutEffect(() => {
+    if (!isSpinning || !winningItem || targetOffset === 0) return;
 
     Animated.timing(anim, {
       toValue: targetOffset,
-      duration: isDesktop ? 8000 : 6500,
-      easing: Easing.out(Easing.cubic),
+      duration: 5000 / speed,
+      easing: Easing.inOut(Easing.cubic),
       useNativeDriver: false,
-    }).start(() => {
-      onFinish?.(items[targetIndex]);
+    }).start(({ finished }) => {
+      if (!finished) return;
+      onFinish?.(winningItem);
+      setIsSpinning(false);
+      setWinningItem(null);
+      setTargetOffset(0);
     });
-  }, [active, resultId]);
 
-  useEffect(() => {
-    const listener = anim.addListener(({ value }) => {
-      scrollRef.current?.scrollTo({ x: value, animated: false });
-    });
-    return () => anim.removeListener(listener);
-  }, []);
+    return () => anim.stopAnimation();
+  }, [targetOffset, winningItem, isSpinning]);
 
-  // 🔁 Повторяем элементы для плавного эффекта
-  const repeated = Array.from({ length: 10 }).flatMap(() => items);
+  const translateX = Animated.multiply(anim, -1);
 
   return (
-    <View
-      style={[
-        styles.wrapper,
-        {
-          width: fixedWidth,
-          overflow: "hidden", // ✅ обрезаем края рулетки
-        },
-      ]}
-    >
+    <View style={[styles.container, { width: maxWidth }]}>
+      {/* Весь контент меню — прокручиваемый */}
       <ScrollView
-        ref={scrollRef}
-        horizontal
-        showsHorizontalScrollIndicator={false}
-        scrollEnabled={false}
+        style={styles.scrollContainer}
         contentContainerStyle={{
-          paddingHorizontal: fixedWidth / 2 - TOTAL_WIDTH / 2,
+          paddingBottom: 80,
           alignItems: "center",
         }}
+        showsVerticalScrollIndicator={false}
       >
-        {repeated.map((item, i) => (
-          <View
-            key={`${item.id}-${i}`}
-            style={[
-              styles.card,
-              {
-                width: ITEM_WIDTH,
-                marginHorizontal: ITEM_MARGIN,
-              },
-            ]}
-          >
-            <Image source={item.icon} style={styles.icon} resizeMode="contain" />
-            <View style={styles.priceTag}>
-              <Image source={TonIcon} style={styles.ton} />
-              <Text style={styles.priceText}>{item.price.toFixed(2)}</Text>
-            </View>
+        {/* Заголовок */}
+        <Text style={styles.titleText}>{title}</Text>
+
+        {/* 🎡 Рулетка */}
+        <View
+          style={[
+            styles.rouletteContainer,
+            { paddingHorizontal: SIDE_PADDING, width: "100%" },
+          ]}
+        >
+          <View style={{ overflow: "hidden", width: "100%" }}>
+            <Animated.View
+              style={[styles.row, { transform: [{ translateX }] }]}
+            >
+              {displayItems.map((item, index) => (
+                <View
+                  key={`${item.id}-${index}`}
+                  style={[styles.itemWrapper, { marginRight: ITEM_GAP }]}
+                >
+                  <GiftCard
+                    cardWidth={ITEM_WIDTH}
+                    mainImage={item.icon}
+                    price={item.price.toFixed(2)}
+                    gradientColors={["#1F0248", "#1F0248", "#1F0248"]}
+                    drops={[item]}
+                    onPress={() => {}}
+                  />
+                </View>
+              ))}
+            </Animated.View>
           </View>
-        ))}
+          <View style={styles.indicator} />
+        </View>
+
+{/* === Кнопка SPIN закреплена внизу === */}
+<View style={styles.bottomButtonContainer}>
+        <TouchableOpacity
+          activeOpacity={0.9}
+          style={[
+            styles.betButton,
+            { width: maxWidth * 0.9 },
+            spinning && { opacity: 0.6 },
+          ]}
+          onPress={onSpin}
+          disabled={spinning}
+        >
+          <Image
+            key={btnKey}
+            source={OrangePng}
+            style={[
+              StyleSheet.absoluteFillObject,
+              { width: "113%", height: "150%", top: -5, left: -25 },
+            ]}
+            resizeMode="cover"
+          />
+
+          <Svg height="100%" width="100%" style={StyleSheet.absoluteFillObject}>
+            <SvgText
+              fill="none"
+              stroke="#D35100"
+              strokeWidth={5}
+              fontSize={25}
+              fontFamily="SF-Pro-Heavy"
+              fontWeight="900"
+              x="50%"
+              y="50%"
+              textAnchor="middle"
+              alignmentBaseline="middle"
+              letterSpacing={3}
+            >
+              {spinning ? "OPENING..." : "OPEN"}
+            </SvgText>
+            <SvgText
+              fill="#FFF"
+              fontSize={25}
+              fontFamily="SF-Pro-Heavy"
+              fontWeight="900"
+              x="50%"
+              y="50%"
+              textAnchor="middle"
+              alignmentBaseline="middle"
+              letterSpacing={3}
+            >
+              {spinning ? "OPENING..." : "OPEN"}
+            </SvgText>
+          </Svg>
+        </TouchableOpacity>
+      </View>
+
+        {/* What's inside */}
+        <Text style={styles.whatsInsideText}>What's inside?</Text>
+        <View
+          style={[
+            styles.gridContainer,
+            { paddingHorizontal: SIDE_PADDING, marginTop: 10 },
+          ]}
+        >
+          {items.map((drop, idx) => (
+            <View
+              key={drop.id || idx}
+              style={{
+                width: ITEM_WIDTH,
+                marginRight: (idx + 1) % GRID_COLUMNS === 0 ? 0 : ITEM_GAP,
+                marginBottom: ITEM_GAP,
+              }}
+            >
+              <GiftCard
+                cardWidth={ITEM_WIDTH}
+                mainImage={drop.icon}
+                price={drop.price.toFixed(2)}
+                gradientColors={["#1F0248", "#1F0248", "#1F0248"]}
+                drops={[drop]}
+                onPress={() => {}}
+              />
+            </View>
+          ))}
+        </View>
       </ScrollView>
 
-      {/* 🎯 Центровой индикатор */}
-      <View
-        style={[
-          styles.indicator,
-          { height: isDesktop ? 140 : 120, left: fixedWidth / 2 - 1.5 },
-        ]}
-      />
+      
     </View>
   );
-};
+}
 
 const styles = StyleSheet.create({
-  wrapper: {
-    height: 140,
+  container: {
+    flex: 1,
+    alignItems: "center",
+    backgroundColor: "transparent",
+  },
+  scrollContainer: {
+    flexGrow: 0,
+    width: "100%",
+  },
+  titleText: {
+    color: "#fff",
+    fontSize: 22,
+    fontWeight: "700",
+    marginTop: 10,
+    fontFamily:"SF-Pro-Heavy",
+    marginBottom: 8,
+    textAlign: "center",
+    letterSpacing: 1,
+  },
+  rouletteContainer: {
+    height: 190,
     justifyContent: "center",
     alignItems: "center",
-    position: "relative",
+    backgroundColor: "transparent",
+    overflow: "hidden",
   },
-  card: {
-    height: 120,
-    backgroundColor: "#1F0248",
-    borderRadius: 20,
-    justifyContent: "center",
-    alignItems: "center",
-    borderWidth: 1.5,
-    borderColor: "#9028FF",
-  },
-  icon: { width: 50, height: 50 },
-  priceTag: {
-    position: "absolute",
-    bottom: 8,
+  row: {
     flexDirection: "row",
-    alignItems: "center",
-    backgroundColor: "rgba(255,255,255,0.1)",
-    borderRadius: 100,
-    paddingHorizontal: 8,
-    paddingVertical: 3,
+    alignItems: "flex-start",
   },
-  ton: { width: 12, height: 12, tintColor: "#00AEEF" },
-  priceText: { color: "#fff", fontWeight: "700", fontSize: 13, marginLeft: 4 },
+  itemWrapper: {
+    alignItems: "center",
+    justifyContent: "flex-start",
+    borderRadius: 12,
+    overflow: "hidden",
+    backgroundColor: "#1F0248",
+  },
   indicator: {
     position: "absolute",
     width: 3,
-    backgroundColor: "#FF008A",
-    borderRadius: 3,
+    height: 140,
+    backgroundColor: "#9028FF",
+    borderRadius: 2,
+  },
+  whatsInsideText: {
+    color: "#FFFFFF",
+    fontSize: 20,
+    fontWeight: "600",
+    textTransform: "uppercase",
+    fontFamily: "SF-Pro-Semibold",
+    marginTop: 16,
+    marginBottom: 12,
+    textAlign: "center",
+  },
+  gridContainer: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    justifyContent: "flex-start",
+  },
+  bottomButtonContainer: {
+
+  },
+  
+  betButton: {
+    height: Platform.OS === "web" ? 80 : 70,
+    borderRadius: 35,
+    overflow: "hidden",
+    alignItems: "center",
+    justifyContent: "center",
+    shadowColor: "rgba(17, 13, 45, 0.68)",
+    shadowOffset: { width: 0, height: 12 },
+    shadowOpacity: 1,
+    shadowRadius: 24,
+    elevation: 10,
   },
 });
-
-export default CaseRoulette;

@@ -29,7 +29,7 @@ export default function CrashGraph({
 
   // Адаптивный размер кота (в 1.5 раза больше оригинала)
   const baseSize = screenWidth * 0.45; // раньше примерно 280px → теперь динамически
-  const catSize = Math.min(baseSize * 1.5, 450); // ограничим максимум, чтобы не вылезал за экран
+  const catSize = Math.min(baseSize * 2, 450); // ограничим максимум, чтобы не вылезал за экран
 
   const webCanvasStyle: React.CSSProperties = {
     borderRadius: 12,

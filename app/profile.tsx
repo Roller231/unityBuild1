@@ -136,11 +136,13 @@ useEffect(() => {
 
    // === Адаптивный шрифт ===
    const getFontSize = () => {
-    if (screenWidth < 360) return 12; // узкие телефоны
-    if (screenWidth < 420) return 14; // обычные телефоны
-    if (screenWidth < 768) return 16; // планшеты
+    if (screenWidth < 360) return 8; // узкие телефоны
+    if (screenWidth < 420) return 13; // обычные телефоны
+    if (screenWidth < 768) return 18; // планшеты
     return 18; // desktop
   };
+
+  
 
   return (
     <LinearGradient colors={["#340A6F", "#18003A"]} style={styles.background}>
@@ -518,7 +520,7 @@ const styles = StyleSheet.create({
   },
   
   menuTextActive: { opacity: 1, fontWeight: "700" },
-  icon: { width: 18, height: 18, marginLeft: 4 },
+  icon: { width: 18, height: 18, marginLeft: 1 },
   inventoryRow: {
     width: "95%",
     flexDirection: "row",

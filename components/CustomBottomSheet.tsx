@@ -10,6 +10,7 @@ import {
   Platform,
   Easing,
   Modal,
+  ScrollView,
 } from "react-native";
 
 const { height: SCREEN_HEIGHT, width: SCREEN_WIDTH } = Dimensions.get("window");
@@ -20,7 +21,8 @@ interface Props {
   heightRatio?: number;
   children?: React.ReactNode;
   blockBackAndroid?: boolean;
-  maxWidth?: number; // 💡 добавлено — чтобы контролировать ширину на desktop
+  maxWidth?: number;
+  scrollEnabled?: boolean; // ✅ добавлено
 }
 
 const CustomBottomSheet: React.FC<Props> = ({
@@ -29,9 +31,12 @@ const CustomBottomSheet: React.FC<Props> = ({
   heightRatio = 0.8,
   children,
   blockBackAndroid = true,
-  maxWidth = 470, // 💻 Telegram mini-app ширина
+  maxWidth = 470,
+  scrollEnabled = true, // ✅ включаем по умолчанию
 }) => {
-  const sheetHeight = Math.round(SCREEN_HEIGHT * Math.min(Math.max(heightRatio, 0.1), 0.95));
+  const sheetHeight = Math.round(
+    SCREEN_HEIGHT * Math.min(Math.max(heightRatio, 0.1), 0.95)
+  );
   const translateY = useRef(new Animated.Value(SCREEN_HEIGHT)).current;
   const backdropOpacity = useRef(new Animated.Value(0)).current;
 
@@ -44,7 +49,12 @@ const CustomBottomSheet: React.FC<Props> = ({
       },
       onPanResponderRelease: (_, g) => {
         if (g.dy > 100 || g.vy > 1) closeSheet();
-        else Animated.spring(translateY, { toValue: 0, useNativeDriver: true, bounciness: 6 }).start();
+        else
+          Animated.spring(translateY, {
+            toValue: 0,
+            useNativeDriver: true,
+            bounciness: 6,
+          }).start();
       },
     })
   ).current;
@@ -113,7 +123,12 @@ const CustomBottomSheet: React.FC<Props> = ({
   return (
     <Modal visible={visible} transparent animationType="none" onRequestClose={onClose}>
       <View style={styles.centerWrapper}>
-        <View style={[styles.innerWrapper, { maxWidth, width: SCREEN_WIDTH < maxWidth ? "100%" : maxWidth }]}>
+        <View
+          style={[
+            styles.innerWrapper,
+            { maxWidth, width: SCREEN_WIDTH < maxWidth ? "100%" : maxWidth },
+          ]}
+        >
           {/* затемнение */}
           <Pressable style={StyleSheet.absoluteFill} onPress={closeSheet}>
             <Animated.View
@@ -127,7 +142,20 @@ const CustomBottomSheet: React.FC<Props> = ({
             <Animated.View {...panResponder.panHandlers} style={styles.handleWrap}>
               <View style={styles.handle} />
             </Animated.View>
-            <View style={styles.content}>{children}</View>
+
+            {/* ✅ Контент со скроллом */}
+            {scrollEnabled ? (
+              <ScrollView
+                style={styles.scrollArea}
+                contentContainerStyle={styles.scrollContent}
+                showsVerticalScrollIndicator={false}
+                nestedScrollEnabled
+              >
+                {children}
+              </ScrollView>
+            ) : (
+              <View style={styles.content}>{children}</View>
+            )}
           </Animated.View>
         </View>
       </View>
@@ -140,7 +168,7 @@ const styles = StyleSheet.create({
     flex: 1,
     alignItems: "center",
     justifyContent: "flex-end",
-    backgroundColor: "transparent", // чтобы не перекрывать систему
+    backgroundColor: "transparent",
   },
   innerWrapper: {
     alignSelf: "center",
@@ -175,6 +203,14 @@ const styles = StyleSheet.create({
     height: 6,
     borderRadius: 3,
     backgroundColor: "#070908",
+  },
+  scrollArea: {
+    flex: 1,
+  },
+  scrollContent: {
+    paddingHorizontal: 16,
+    paddingTop: 8,
+    paddingBottom: 60,
   },
   content: {
     flex: 1,
