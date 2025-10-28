@@ -8,7 +8,7 @@ export default function Index() {
     const timers: NodeJS.Timeout[] = [];
 
 
-    //timers.push(setTimeout(() => router.replace("/crash"), 0));
+    timers.push(setTimeout(() => router.replace("/crash"), 0));
 
     return () => timers.forEach(clearTimeout);
   }, [router]);
