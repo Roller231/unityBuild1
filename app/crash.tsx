@@ -39,13 +39,13 @@ import CustomBottomSheet from "../components/CustomBottomSheet";
 
 const { height: screenHeight, width: screenWidth } = Dimensions.get("window");
 
-if (Platform.OS === "web" && typeof window !== "undefined") {
-  const alreadyReloaded = sessionStorage.getItem("crash_reloaded");
-  if (!alreadyReloaded) {
-    sessionStorage.setItem("crash_reloaded", "1");
-    window.location.reload();
-  }
-}
+// if (Platform.OS === "web" && typeof window !== "undefined") {
+//   const alreadyReloaded = sessionStorage.getItem("crash_reloaded");
+//   if (!alreadyReloaded) {
+//     sessionStorage.setItem("crash_reloaded", "1");
+//     window.location.reload();
+//   }
+// }
 
 
 
