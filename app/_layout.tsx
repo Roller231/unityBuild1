@@ -142,9 +142,7 @@ const _layout = () => {
     if (!isReady || didWalkthrough) return;
     setDidWalkthrough(true);
     const timers: NodeJS.Timeout[] = [];
-    timers.push(setTimeout(() => router.push("/profile"), 100));
-    timers.push(setTimeout(() => router.push("/case"), 1300));
-    timers.push(setTimeout(() => router.push("/crash"), 100));
+
     return () => timers.forEach(clearTimeout);
   }, [isReady, didWalkthrough]);
 
