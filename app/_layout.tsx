@@ -1,30 +1,55 @@
-import React, { useEffect } from "react";
-import { View, StyleSheet, Platform } from "react-native";
-import { Tabs } from "expo-router";
+import React, { useEffect, useState, useRef } from "react";
+import {
+  View,
+  StyleSheet,
+  ImageBackground,
+  Animated,
+  Easing,
+  Dimensions,
+} from "react-native";
+import { Tabs, useRouter } from "expo-router";
 import { useTelegramPlatform } from "@/hooks/useTelegramPlatform";
 import CustomTabBar from "@/components/CustomTabBar";
+import * as Font from "expo-font";
+import { Asset } from "expo-asset";
+import { init, viewport, swipeBehavior } from "@telegram-apps/sdk-react";
 
-import {
-  init,
-  viewport,
-  swipeBehavior,
-  useRawInitData,
-  useLaunchParams,
-} from "@telegram-apps/sdk-react";
+// === Импорт ассетов ===
+import FlagRU from "../components/icons/ru.png";
+import FlagEN from "../components/icons/us.png";
+import IconGift from "../components/icons/gift.png";
+import IconTon from "../components/icons/ton.svg";
+import IconStar from "../components/icons/star.svg";
+import IconCopy from "../components/icons/copy.svg";
+import IconArrow from "../components/icons/arrow.svg";
+import OrangePng from "../components/icons/OrangePng.png";
+import VenusP from "../components/icons/VenusP.png";
+import CatIcon from "../components/icons/cat.png";
+import Oran from "../components/icons/Oran.svg";
+import Timeline from "../components/icons/Timeline.svg";
 
-// 🚫 предотвращаем масштабирование и выделение текста
+// 🖼 Фон загрузочного экрана
+import BgImage from "../components/icons/12.png";
+
+const { width: screenWidth, height: screenHeight } = Dimensions.get("window");
+
 if (typeof window !== "undefined") {
   window.addEventListener("wheel", (e) => e.ctrlKey && e.preventDefault(), { passive: false });
   window.addEventListener("gesturestart", (e) => e.preventDefault(), { passive: false });
 
-  // 🚫 Запрещаем выделение текста глобально
   const style = document.createElement("style");
   style.innerHTML = `
     * {
       user-select: none !important;
       -webkit-user-select: none !important;
-      -ms-user-select: none !important;
-      -moz-user-select: none !important;
+    }
+    html, body {
+      overflow: hidden !important;
+      margin: 0;
+      padding: 0;
+      height: 100%;
+      width: 100%;
+      background: #000;
     }
     img, svg {
       pointer-events: none !important;
@@ -35,53 +60,126 @@ if (typeof window !== "undefined") {
 }
 
 const _layout = () => {
+  const [isReady, setIsReady] = useState(false);
+  const [didWalkthrough, setDidWalkthrough] = useState(false);
+  const progressAnim = useRef(new Animated.Value(0)).current;
+
+  const router = useRouter();
   const platform = useTelegramPlatform();
   const isDesktop = platform === "tdesktop" || platform === "macos";
 
-  let launchParams: any;
-  try {
-    launchParams = useLaunchParams();
-  } catch {
-    launchParams = { tgWebAppPlatform: "web", tgWebAppData: { user: { first_name: "Guest" } } };
-    console.warn("⚠️ Telegram SDK: using fallback launchParams (not in Telegram)");
-  }
+  // === Анимация прогресса ===
+  const animateProgress = (toValue: number, duration = 500) => {
+    Animated.timing(progressAnim, {
+      toValue,
+      duration,
+      easing: Easing.out(Easing.ease),
+      useNativeDriver: false,
+    }).start();
+  };
 
-  const rawInitData = (() => {
-    try {
-      return useRawInitData();
-    } catch {
-      return null;
-    }
-  })();
-
+  // === Основная инициализация ===
   useEffect(() => {
-    try {
-      init();
-      console.log("🚀 Telegram SDK initialized");
-    } catch (err) {
-      console.warn("⚠️ Telegram SDK init skipped:", err);
-    }
+    const initialize = async () => {
+      try {
+        animateProgress(0);
 
-    if (viewport.mount.isAvailable()) {
-      viewport.mount();
-      viewport.expand();
-      console.log("🖥️ Viewport expanded");
-    }
+        // 1. Шрифты
+        await Font.loadAsync({
+          "SF-Pro-Heavy": require("../fonts/SF-Pro-Display-Heavy.otf"),
+          "SF-Pro-Bold": require("../fonts/SF-Pro-Display-Bold.otf"),
+          "SF-Pro-Semibold": require("../fonts/SF-Pro-Display-Semibold.otf"),
+          "SF-Pro-Medium": require("../fonts/SF-Pro-Display-Medium.otf"),
+          "SF-Pro-Regular": require("../fonts/SF-Pro-Display-Regular.otf"),
+        });
+        animateProgress(30);
 
-    if (viewport.requestFullscreen.isAvailable()) {
-      viewport.requestFullscreen();
-    }
+        // 2. Ассеты
+        await Asset.loadAsync([
+          FlagRU,
+          FlagEN,
+          IconGift,
+          IconTon,
+          IconStar,
+          IconCopy,
+          IconArrow,
+          OrangePng,
+          VenusP,
+          CatIcon,
+          Oran,
+          Timeline,
+          BgImage,
+        ]);
+        animateProgress(70);
 
-    if (swipeBehavior.isSupported()) {
-      swipeBehavior.mount();
-      swipeBehavior.disableVertical();
-      console.log("✅ Vertical swipe disabled");
-    }
+        // 3. Telegram SDK
+        try {
+          init();
+          if (viewport.mount.isAvailable()) viewport.mount();
+          if (viewport.requestFullscreen.isAvailable()) viewport.requestFullscreen();
+          if (swipeBehavior.isSupported()) {
+            swipeBehavior.mount();
+            swipeBehavior.disableVertical();
+          }
+        } catch (sdkError) {
+          console.warn("⚠️ Telegram SDK init skipped:", sdkError);
+        }
 
-    console.log("🧾 Launch Params:", launchParams);
-    console.log("📦 Raw Init Data:", rawInitData);
+        // 4. Завершение
+        animateProgress(100);
+        setTimeout(() => setIsReady(true), 800);
+      } catch (err) {
+        console.error("❌ Initialization failed:", err);
+        setIsReady(true);
+      }
+    };
+
+    initialize();
   }, []);
 
+  // === Автоматический walkthrough ===
+  useEffect(() => {
+    if (!isReady || didWalkthrough) return;
+    setDidWalkthrough(true);
+    const timers: NodeJS.Timeout[] = [];
+    timers.push(setTimeout(() => router.push("/crash"), 100));
+    timers.push(setTimeout(() => router.push("/profile"), 700));
+    timers.push(setTimeout(() => router.push("/case"), 1300));
+    return () => timers.forEach(clearTimeout);
+  }, [isReady, didWalkthrough]);
+
+  // === Прогресс-бар ширина ===
+  const barWidth = progressAnim.interpolate({
+    inputRange: [0, 100],
+    outputRange: ["0%", "100%"],
+  });
+
+  // === Экран загрузки ===
+  if (!isReady) {
+    return (
+      <View style={styles.fullScreen}>
+        <View style={styles.outerContainer}>
+          <View style={styles.innerContainer}>
+            <ImageBackground
+              source={BgImage}
+              resizeMode="contain"
+              style={styles.bgImage}
+              imageStyle={{ width: "100%", height: "100%" }}
+            >
+              <View style={styles.progressWrapper}>
+                <View style={styles.progressContainer}>
+                  <Animated.View style={[styles.progressBar, { width: barWidth }]} />
+                </View>
+              </View>
+            </ImageBackground>
+          </View>
+        </View>
+      </View>
+    );
+  }
+  
+
+  // === Основное приложение ===
   return (
     <View style={styles.wrapper}>
       <View style={[styles.appFrame, isDesktop && styles.desktopFrame]}>
@@ -100,6 +198,63 @@ const _layout = () => {
 };
 
 const styles = StyleSheet.create({
+
+  outerContainer: {
+    flex: 1,
+    width: "100%",
+    backgroundColor: "#000", // Чёрный фон снаружи
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  
+  innerContainer: {
+    width: 475,
+    aspectRatio: 9 / 16, // Или подогнать под твоё изображение
+    backgroundColor: "#6B3FD8", // Фиолетовая подложка
+    overflow: "hidden",
+    borderRadius: 0, // Можно добавить если нужна закруглённость
+  },
+  
+  bgImage: {
+    flex: 1,
+    justifyContent: "flex-end",
+    alignItems: "center",
+  },
+  
+
+  loaderContainer: {
+    flex: 1,
+    backgroundColor: "#6B3FD8", // Фиолетовый фон вокруг
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  
+
+
+  fullScreen: {
+    flex: 1,
+    width: "100%",
+    height: "100%",
+    backgroundColor: "#000",
+  },
+
+  progressWrapper: {
+    width: "100%",
+    alignItems: "center",
+    marginBottom: 80,
+  },
+  progressContainer: {
+    width: "60%",
+    height: 8,
+    borderRadius: 100,
+    backgroundColor: "rgba(255,255,255,0.25)",
+    overflow: "hidden",
+  },
+  progressBar: {
+    height: "100%",
+    borderRadius: 100,
+    backgroundColor: "#6B3FD8",
+  },
   wrapper: {
     flex: 1,
     alignItems: "center",
@@ -111,7 +266,7 @@ const styles = StyleSheet.create({
     height: "100%",
   },
   desktopFrame: {
-    width: 470,
+    width: 475,
     borderRadius: 25,
     overflow: "hidden",
   },

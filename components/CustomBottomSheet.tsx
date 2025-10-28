@@ -134,12 +134,21 @@ const CustomBottomSheet: React.FC<Props> = ({
           ]}
         >
           {/* затемнение */}
-          <Pressable style={StyleSheet.absoluteFill} onPress={closeSheet}>
-            <Animated.View
-              pointerEvents="none"
-              style={[styles.backdrop, { opacity: backdropOpacity }]}
-            />
-          </Pressable>
+          <Pressable
+  style={StyleSheet.absoluteFill}
+  onPress={() => {
+    // ⚡ Мгновенно скрываем без плавной анимации
+    backdropOpacity.setValue(0);
+    translateY.setValue(sheetHeight);
+    onClose();
+  }}
+>
+  <Animated.View
+    pointerEvents="none"
+    style={[styles.backdrop, { opacity: backdropOpacity }]}
+  />
+</Pressable>
+
 
           {/* сам шит */}
           <Animated.View style={containerStyle}>

@@ -147,11 +147,11 @@ function getTabIcon(name: string, active: boolean) {
 function getTabLabel(name: string) {
   switch (name) {
     case "case":
-      return "Кейсы";
+      return "Case";
     case "crash":
-      return "Краш";
+      return "Crash";
     case "profile":
-      return "Профиль";
+      return "Profile";
     default:
       return "";
   }

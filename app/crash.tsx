@@ -1,3 +1,4 @@
+// Crash.tsx
 import React, { useEffect, useState, useCallback, useRef } from "react";
 import {
   View,
@@ -9,6 +10,7 @@ import {
   ScrollView,
   Animated,
   Easing,
+  TextInput,
 } from "react-native";
 import { useFocusEffect } from "@react-navigation/native";
 import { CrashEngine, CrashEngineState } from "../components/CrashEngine";
@@ -29,85 +31,108 @@ import ava from "../components/icons/AvatarTest.svg";
 import Venus from "../components/icons/Venus.svg";
 import bliks from "../components/icons/bliks.svg";
 
-
-
 import giftIcon from "../components/icons/gift.png";
 import starIcon from "../components/icons/star.svg";
 import tonIcon from "../components/icons/ton.svg";
 
-
 import CustomBottomSheet from "../components/CustomBottomSheet";
 
-
 const { height: screenHeight, width: screenWidth } = Dimensions.get("window");
+
+if (Platform.OS === "web" && typeof window !== "undefined") {
+  const alreadyReloaded = sessionStorage.getItem("crash_reloaded");
+  if (!alreadyReloaded) {
+    sessionStorage.setItem("crash_reloaded", "1");
+    window.location.reload();
+  }
+}
+
+
 
 const Crash: React.FC = () => {
   const platform = useTelegramPlatform();
   const isDesktop = platform === "tdesktop" || platform === "macos";
-  const fixedWidth = isDesktop ? 470 : screenWidth;
+  const fixedWidth = isDesktop ? 470 : Math.min(screenWidth, 470);
 
-  // === resetKey для перерисовки ===
+  const styles = createStyles(fixedWidth, screenHeight);
+
   const [resetKey, setResetKey] = useState(0);
-
   const [phase, setPhase] = useState<"idle" | "countdown" | "flight" | "crash">("idle");
   const [count, setCount] = useState(3);
   const [fontLoaded, setFontLoaded] = useState(false);
   const [active, setActive] = useState(true);
   const [engine, setEngine] = useState<CrashEngine | null>(null);
   const [currentMultiplier, setCurrentMultiplier] = useState(1);
-  const [lastMultiplier, setLastMultiplier] = useState(1); // ✅ добавлено
+  const [lastMultiplier, setLastMultiplier] = useState(1);
   const [pastCoeffs, setPastCoeffs] = useState<number[]>([]);
   const [showBottomSheet, setShowBottomSheet] = useState(false);
-
   const [selectedTab, setSelectedTab] = useState<"Gifts" | "Stars" | "TON">("Gifts");
 
-
-  // === вращение планеты ===
-// === вращение планеты ===
-const rotation = useRef(new Animated.Value(0)).current;
-
-useFocusEffect(
-  useCallback(() => {
-    const spin = Animated.loop(
-      Animated.timing(rotation, {
-        toValue: 1,
-        duration: 60000,
-        easing: Easing.linear,
-        useNativeDriver: true,
-      })
-    );
-
-    // при входе в экран — запуск
-    spin.start();
-
-    return () => {
-      // при выходе — сброс, чтобы заново запустилось при возвращении
-      rotation.stopAnimation(() => rotation.setValue(0));
-    };
-  }, [rotation])
-);
+  const [webReady, setWebReady] = useState(Platform.OS !== "web");
 
 
+  // bottom sheet states
+  const [starsAmount, setStarsAmount] = useState("");
+  const [tonAmount, setTonAmount] = useState("");
+  const [autoCashout, setAutoCashout] = useState(false);
+  const [autoValue, setAutoValue] = useState("2.0");
+
+  const rotation = useRef(new Animated.Value(0)).current;
+
+  useFocusEffect(
+    useCallback(() => {
+      const spin = Animated.loop(
+        Animated.timing(rotation, {
+          toValue: 1,
+          duration: 60000,
+          easing: Easing.linear,
+          useNativeDriver: Platform.OS !== "web",
+        })
+      );
+      spin.start();
+      return () => {
+        spin.stop();
+        rotation.setValue(0);
+      };
+    }, [rotation])
+  );
 
   const rotateInterpolate = rotation.interpolate({
     inputRange: [0, 1],
     outputRange: ["0deg", "360deg"],
   });
 
-  // === загрузка шрифта ===
   useEffect(() => {
     const loadFont = async () => {
       await Font.loadAsync({
         "SF-Pro-Heavy": require("../fonts/SF-Pro-Display-Heavy.otf"),
         "SF-Pro-Semibold": require("../fonts/SF-Pro-Display-Semibold.otf"),
-
       });
       setFontLoaded(true);
     };
     loadFont();
   }, []);
 
-  // === focus ===
+  useEffect(() => {
+    if (Platform.OS !== "web") return;
+  
+    const handleReady = () => {
+      requestAnimationFrame(() => {
+        setTimeout(() => {
+          setWebReady(true);
+        }, 120); // можно увеличить до 200–250 мс, если надо
+      });
+    };
+  
+    if (document.readyState === "complete") {
+      handleReady();
+    } else {
+      window.addEventListener("load", handleReady);
+      return () => window.removeEventListener("load", handleReady);
+    }
+  }, []);
+  
+
   useFocusEffect(
     useCallback(() => {
       setActive(true);
@@ -120,7 +145,6 @@ useFocusEffect(
     }, [])
   );
 
-  // === отсчёт ===
   useEffect(() => {
     if (!active || phase !== "countdown") return;
     if (count > 0) {
@@ -131,7 +155,22 @@ useFocusEffect(
     }
   }, [count, phase, active]);
 
-  // === сохранение истории в localStorage ===
+
+  // 🔁 Автоматический цикл краша при загрузке страницы
+useEffect(() => {
+  if (!active) return;
+
+  // Если всё закончилось — сразу новый раунд
+  if (phase === "idle" || phase === "crash") {
+    const restart = setTimeout(() => {
+      setCount(3);
+      setPhase("countdown");
+    }, 5000); // через секунду после краша новый отсчёт
+    return () => clearTimeout(restart);
+  }
+}, [phase, active]);
+
+
   useEffect(() => {
     if (Platform.OS === "web") {
       localStorage.setItem("crash_history", JSON.stringify(pastCoeffs));
@@ -145,7 +184,6 @@ useFocusEffect(
     }
   }, []);
 
-  // === полёт ===
   useEffect(() => {
     if (!active || phase !== "flight") return;
     const e = new CrashEngine();
@@ -153,7 +191,6 @@ useFocusEffect(
     e.startTime = Date.now();
     e.state = CrashEngineState.Active;
     setEngine(e);
-
     let frameId: number;
     const tick = () => {
       e.tick();
@@ -165,52 +202,67 @@ useFocusEffect(
       }
     };
     frameId = requestAnimationFrame(tick);
-
     return () => {
       cancelAnimationFrame(frameId);
       e.state = CrashEngineState.Over;
     };
   }, [phase, active]);
 
-  // === взрыв и перезапуск ===
   useEffect(() => {
     if (phase !== "crash") return;
-
-    const final = Number(lastMultiplier.toFixed(2)); // ✅ фикс: берём последний актуальный множитель
+  
+    const final = Number(lastMultiplier.toFixed(2));
+  
     if (final > 1) {
       setPastCoeffs((prev) => {
         const next = [...prev, final];
-        return next.slice(-12); // последние 12
+        return next.slice(-12);
       });
     }
-
-    const restartTimer = setTimeout(() => {
-      console.log("♻️ Перезапуск Crash после взрыва...");
-      setResetKey((k) => k + 1);
-    }, 2000);
-
+  
+    // Останавливаем текущий движок
     if (engine) {
       cancelAnimationFrame((engine as any)._frameId);
       engine.state = CrashEngineState.Over;
       setEngine(null);
     }
-
+  
     if (Platform.OS === "web") {
       const vz = document.getElementById("vzryv-container");
       if (vz) vz.innerHTML = "";
     }
+  
+    // ⚡ Через 1.5 секунды перезапускаем страницу (или перерисовываем компонент)
+// ⚡ Мягкий сброс без полной перезагрузки страницы
+const reloadTimer = setTimeout(() => {
+  // очистка Lottie и движка
+  if (Platform.OS === "web") {
+    const vz = document.getElementById("vzryv-container");
+    if (vz) vz.innerHTML = "";
+  }
 
-    return () => clearTimeout(restartTimer);
+  if (engine) {
+    engine.destroy();
+    setEngine(null);
+  }
+
+  // просто пересоздать игру с новым key
+  setResetKey((k) => k + 1);
+  setPhase("idle");
+  setCount(3);
+  setPastCoeffs([]); // можно очищать историю
+}, 1200);
+
+  
+    return () => clearTimeout(reloadTimer);
   }, [phase]);
+  
 
-  // === web-взрыв ===
   useEffect(() => {
     if (Platform.OS !== "web") return;
     if (phase !== "crash" || !active) return;
-
     const container = document.getElementById("vzryv-container");
     if (!container) return;
-
     const anim = lottieWeb.loadAnimation({
       container,
       renderer: "svg",
@@ -223,11 +275,14 @@ useFocusEffect(
     return () => anim.destroy();
   }, [phase, active]);
 
+  // Подход: прямой вызов, без requestAnimationFrame
   const handleStart = () => {
-    setShowBottomSheet(true); // показать bottom sheet
+    setShowBottomSheet(true);
   };
 
   if (!fontLoaded) return null;
+
+  const bottomSheetHeightRatio = isDesktop ? 0.5 : 0.6;
 
   return (
     <View key={resetKey} style={{ flex: 1, backgroundColor: "#1B003B" }}>
@@ -257,7 +312,21 @@ useFocusEffect(
           resizeMode="contain"
         />
 
-        {/* верхняя часть */}
+{/* Краш-граф поверх всех слоёв */}
+{phase === "flight" && (
+  <View style={styles.graphOverlay}>
+    <CrashGraph
+      engine={engine}
+      active={active && phase === "flight"}
+      onMultiplierChange={(m) => {
+        setCurrentMultiplier(m);
+        setLastMultiplier(m);
+      }}
+    />
+  </View>
+)}
+
+        {/* === ВЕРХНЯЯ ЧАСТЬ === */}
         <View style={styles.topSection}>
           {phase === "countdown" && (
             <View style={styles.centered}>
@@ -283,7 +352,7 @@ useFocusEffect(
                     "linear-gradient(180deg, #FFAF4D 24.49%, #FFF7A7 57.14%, #FFAF4D 77.55%)",
                   WebkitBackgroundClip: "text",
                   WebkitTextFillColor: "transparent",
-                  fontFamily: "SF-Pro-Heavy",
+                  fontFamily: "SF‑Pro‑Heavy",
                   fontSize: isDesktop ? 180 : screenWidth * 0.3,
                   zIndex: 5,
                 }}
@@ -293,16 +362,7 @@ useFocusEffect(
             </View>
           )}
 
-          {phase === "flight" && (
-            <CrashGraph
-              engine={engine}
-              active={active && phase === "flight"}
-              onMultiplierChange={(m) => {
-                setCurrentMultiplier(m);
-                setLastMultiplier(m); // ✅ сохраняем актуальный множитель
-              }}
-            />
-          )}
+
 
           {phase === "crash" && (
             <View style={styles.centered}>
@@ -340,80 +400,32 @@ useFocusEffect(
               )}
             </View>
           )}
-
-
-<CustomBottomSheet
-  visible={showBottomSheet}
-  onClose={() => setShowBottomSheet(false)}
-  heightRatio={0.4}
->
-  <View style={styles.bottomSheetContainer}>
-    <Text style={styles.sheetTitle}>Deposit funds TON</Text>
-
-    {/* Tabs */}
-    <View style={styles.tabRow}>
-  {[
-    { key: "Gifts", label: "Gifts", icon: giftIcon },
-    { key: "Stars", label: "Stars", icon: starIcon },
-    { key: "TON", label: "TON", icon: tonIcon },
-  ].map(({ key, label, icon }) => {
-    const active = selectedTab === key;
-    return (
-      <TouchableOpacity
-        key={key}
-        style={[styles.tabButton, active && styles.tabButtonActive]}
-        onPress={() => setSelectedTab(key as "Gifts" | "Stars" | "TON")}
-        activeOpacity={0.8}
-      >
-        <View style={styles.tabContent}>
-          <Text style={[styles.tabText, active && styles.tabTextActive]}>
-            {label}
-          </Text>
-          <Animated.Image
-            source={icon}
-            resizeMode="contain"
-            style={styles.tabIcon}
-          />
-        </View>
-      </TouchableOpacity>
-    );
-  })}
-</View>
-
-
-
-
-    {/* Placeholder content */}
-    <View style={{ marginTop: 32 }}>
-      <Text style={{ color: "#aaa" }}>
-        {selectedTab === "Gifts" && "You have no gifts"}
-        {selectedTab === "Stars" && "No stars available"}
-        {selectedTab === "TON" && "Wallet not connected"}
-      </Text>
-    </View>
-  </View>
-</CustomBottomSheet>
-
-
         </View>
 
-        {/* нижняя часть */}
+        {/* === НИЖНЯЯ ЧАСТЬ === */}
         <View style={styles.bottomSection}>
-          <HistoryBar history={[...pastCoeffs, currentMultiplier]} activeIndex={pastCoeffs.length} />
+          <HistoryBar
+            history={[...pastCoeffs, currentMultiplier]}
+            activeIndex={pastCoeffs.length}
+          />
 
           <TouchableOpacity
             activeOpacity={0.9}
             style={[styles.betButton, { width: fixedWidth * 0.9 }]}
             onPress={handleStart}
           >
-            <OrangeBtn width="100%" height="100%" style={StyleSheet.absoluteFillObject as any} />
+            <OrangeBtn
+              width="100%"
+              height="100%"
+              style={StyleSheet.absoluteFillObject as any}
+            />
             <Svg height="100%" width="100%" style={StyleSheet.absoluteFillObject}>
               <SvgText
                 fill="none"
                 stroke="#D35100"
                 strokeWidth={5}
                 fontSize={25}
-                fontFamily="SF-Pro-Heavy"
+                fontFamily="SF‑Pro‑Heavy"
                 fontWeight="900"
                 x="50%"
                 y="50%"
@@ -426,7 +438,7 @@ useFocusEffect(
               <SvgText
                 fill="#FFF"
                 fontSize={25}
-                fontFamily="SF-Pro-Heavy"
+                fontFamily="SF‑Pro‑Heavy"
                 fontWeight="900"
                 x="50%"
                 y="50%"
@@ -442,10 +454,6 @@ useFocusEffect(
           <View style={[styles.betsContainer, { width: fixedWidth * 0.9 }]}>
             <ScrollView
               showsVerticalScrollIndicator={false}
-              pinchGestureEnabled={false}
-              scrollEventThrottle={16}
-              overScrollMode="always"
-              bounces
               contentContainerStyle={[
                 styles.betsScrollContainer,
                 { width: fixedWidth * 0.9, minHeight: screenHeight * 0.4 },
@@ -467,179 +475,356 @@ useFocusEffect(
           </View>
         </View>
       </View>
+
+      <CustomBottomSheet
+        visible={showBottomSheet}
+        onClose={() => setShowBottomSheet(false)}
+        heightRatio={bottomSheetHeightRatio}
+      >
+        <ScrollView
+          contentContainerStyle={styles.bottomSheetContainer}
+          keyboardShouldPersistTaps="handled"
+          showsVerticalScrollIndicator={false}
+          nestedScrollEnabled
+        >
+          <Text style={styles.sheetTitle}>Enter amount</Text>
+
+          {/* Tabs */}
+          <View style={styles.tabRow}>
+            {[
+              { key: "Gifts", label: "Gifts", icon: giftIcon },
+              { key: "Stars", label: "Stars", icon: starIcon },
+              { key: "TON", label: "TON", icon: tonIcon },
+            ].map(({ key, label, icon }) => {
+              const activeTab = selectedTab === key;
+              return (
+                <TouchableOpacity
+                  key={key}
+                  style={[styles.tabButton, activeTab && styles.tabButtonActive, { flex: 1 }]}
+                  onPress={() => setSelectedTab(key as "Gifts" | "Stars" | "TON")}
+                  activeOpacity={0.9}
+                >
+                  <View style={styles.tabContent}>
+                    <Text style={[styles.tabText, activeTab && styles.tabTextActive]}>
+                      {label}
+                    </Text>
+                    <Animated.Image
+                      source={icon}
+                      resizeMode="contain"
+                      style={styles.tabIcon}
+                    />
+                  </View>
+                </TouchableOpacity>
+              );
+            })}
+          </View>
+
+          {/* Content */}
+          {selectedTab === "Gifts" && (
+            <View style={{ marginTop: 32, alignItems: "center" }}>
+              <Text style={{ color: "#aaa" }}>🎁 Inventory is empty (coming soon)</Text>
+            </View>
+          )}
+
+          {(selectedTab === "Stars" || selectedTab === "TON") && (
+            <View style={{ marginTop: 30, width: "100%", alignItems: "center" }}>
+              <Text style={styles.inputLabel}>
+                {selectedTab === "Stars" ? "Amount of Stars" : "Amount of TON"}
+              </Text>
+
+              <View style={styles.inputWrapper}>
+                <TextInput
+                  placeholder="0"
+                  placeholderTextColor="#777"
+                  style={styles.textInput}
+                  keyboardType="numeric"
+                  value={selectedTab === "Stars" ? starsAmount : tonAmount}
+                  onChangeText={(text) =>
+                    selectedTab === "Stars" ? setStarsAmount(text) : setTonAmount(text)
+                  }
+                />
+                <Animated.Image
+                  source={selectedTab === "Stars" ? starIcon : tonIcon}
+                  resizeMode="contain"
+                  style={styles.inputIcon}
+                />
+              </View>
+
+              <View style={styles.autoRow}>
+                <TouchableOpacity
+                  style={[styles.checkbox, autoCashout && styles.checkboxActive]}
+                  onPress={() => setAutoCashout((prev) => !prev)}
+                />
+                <Text style={styles.autoLabel}>Auto cashout</Text>
+
+                <View style={styles.autoValueRow}>
+                  <TouchableOpacity
+                    onPress={() =>
+                      setAutoValue((prev) =>
+                        Math.max(1, parseFloat(prev) - 0.1).toFixed(1)
+                      )
+                    }
+                  >
+                    <Text style={styles.autoControl}>−</Text>
+                  </TouchableOpacity>
+                  <TextInput
+                    style={styles.autoInput}
+                    value={autoValue}
+                    keyboardType="numeric"
+                    onChangeText={setAutoValue}
+                  />
+                  <TouchableOpacity
+                    onPress={() =>
+                      setAutoValue((prev) => (parseFloat(prev) + 0.1).toFixed(1))
+                    }
+                  >
+                    <Text style={styles.autoControl}>＋</Text>
+                  </TouchableOpacity>
+                </View>
+              </View>
+
+              <TouchableOpacity
+                activeOpacity={0.9}
+                style={[styles.placeButton, { width: fixedWidth * 0.85 }]}
+              >
+                <OrangeBtn
+                  width="100%"
+                  height="100%"
+                  style={StyleSheet.absoluteFillObject as any}
+                />
+                <Svg height="100%" width="100%" style={StyleSheet.absoluteFillObject}>
+                  <SvgText
+                    fill="none"
+                    stroke="#D35100"
+                    strokeWidth={5}
+                    fontSize={25}
+                    fontFamily="SF‑Pro‑Heavy"
+                    fontWeight="900"
+                    x="50%"
+                    y="50%"
+                    textAnchor="middle"
+                    alignmentBaseline="middle"
+                    letterSpacing={3}
+                  >
+                    PLACE BET
+                  </SvgText>
+                  <SvgText
+                    fill="#FFF"
+                    fontSize={25}
+                    fontFamily="SF‑Pro‑Heavy"
+                    fontWeight="900"
+                    x="50%"
+                    y="50%"
+                    textAnchor="middle"
+                    alignmentBaseline="middle"
+                    letterSpacing={3}
+                  >
+                    PLACE BET
+                  </SvgText>
+                </Svg>
+              </TouchableOpacity>
+            </View>
+          )}
+        </ScrollView>
+      </CustomBottomSheet>
     </View>
   );
 };
 
-// === стили ===
-const styles = StyleSheet.create({
+const createStyles = (fixedWidth: number, screenHeight: number) =>
+  StyleSheet.create({
+    textInput: {
+      flex: 1,
+      color: "#fff",
+      fontSize: fixedWidth * 0.045,
+      textAlign: "center",
+      ...(Platform.OS === "web" ? { outline: "none" } : {}),
+    } as any,
 
-  tabRow: {
-    flexDirection: "row",
-    justifyContent: "center",
-    gap: 10,
-  },
-  
-  tabButton: {
-    padding: 4,
-    borderRadius: 100,
-    borderWidth: 2,
-    borderColor: "#6B3FD8",
-    backgroundColor: "transparent",
-    justifyContent: "center",
-    alignItems: "center",
-  },
-  
-  tabButtonActive: {
-    backgroundColor: "#6B3FD8",
-    borderColor: "#6B3FD8",
-  },
-  
-  tabContent: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "center",
-    gap: 8,
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-  },
-  
-  tabText: {
-    color: "white",
-    fontSize: 18,
-    fontFamily: "SF-Pro-Semibold",
-    fontWeight: "600",
-    textTransform: "capitalize",
-    lineHeight: 23.4,
-  },
-  
-  tabTextActive: {
-    color: "white",
-  },
-  
-  tabIcon: {
-    width: 22,
-    height: 22,
-  },
-  
+    autoInput: {
+      color: "#fff",
+      fontSize: fixedWidth * 0.04,
+      width: fixedWidth * 0.12,
+      textAlign: "center",
+      ...(Platform.OS === "web" ? { outline: "none" } : {}),
+    } as any,
 
-  
-  
-  tabIconWrapper: {
-    width: 24,
-    height: 24,
-    position: "relative",
-    overflow: "hidden",
-    justifyContent: "center",
-    alignItems: "center",
-  },
-  
-  iconBg: {
-    width: 22,
-    height: 20,
-    position: "absolute",
-    backgroundColor: "white",
-    borderRadius: 0,
-  },
-  
-  iconBgActive: {
-    width: 24,
-    height: 24,
-    backgroundColor: "#0088CC",
-    borderRadius: 9999,
-  },
-  
-  
-  
+    inputWrapper: {
+      flexDirection: "row",
+      alignItems: "center",
+      justifyContent: "center",
+      borderColor: "#6B3FD8",
+      borderWidth: 2,
+      borderRadius: 100,
+      width: fixedWidth * 0.8,
+      height: screenHeight * 0.06,
+      paddingHorizontal: 16,
+      marginBottom: 20,
+    },
 
-  bottomSheetContainer: {
-    flex: 1,
-    padding: 10,
-    alignItems: "center",
-  },
-  sheetTitle: {
-    fontSize: 20,
-    fontWeight: "700",
-    color: "#fff",
-    marginBottom: 20,
-    fontFamily: "SF-Pro-Heavy",
+    tabRow: {
+      flexDirection: "row",
+      justifyContent: "space-around",
+      alignItems: "center",
+      width: "100%",
+      paddingHorizontal: fixedWidth * 0.05,
+      marginBottom: 10,
+    },
 
-  },
+    tabButton: {
+      flex: 1,
+      flexDirection: "row",
+      alignItems: "center",
+      justifyContent: "center",
+      paddingVertical: screenHeight * 0.012,
+      marginHorizontal: 4,
+      borderRadius: 100,
+      borderWidth: 2,
+      borderColor: "#6B3FD8",
+      backgroundColor: "transparent",
+    },
 
-  tabButtonText: {
-    color: "#ccc",
-    fontWeight: "600",
-  },
-  tabButtonTextActive: {
-    color: "#fff",
-  },
-  
+    tabButtonActive: {
+      backgroundColor: "#6B3FD8",
+      borderColor: "#6B3FD8",
+    },
 
+    tabContent: {
+      flexDirection: "row",
+      alignItems: "center",
+      justifyContent: "center",
+    },
 
-  betsScrollContainer: {
-    alignItems: "center",
-    justifyContent: "flex-start",
-    paddingBottom: 120,
-    paddingTop: 0,
-    gap: 0,
-  },
-  planetBackground: {
-    position: "absolute",
-    opacity: 0.6,
-    zIndex: 0,
-  },
-  container: {
-    flex: 1,
-    backgroundColor: "#1B003B",
-    alignItems: "center",
-    justifyContent: "space-between",
-  },
-  topSection: {
-    height: screenHeight * 0.5,
-    width: "100%",
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  centered: {
-    alignItems: "center",
-    justifyContent: "center",
-    width: "100%",
-    height: "100%",
-    overflow: "hidden",
-  },
-  bottomSection: {
-    height: screenHeight * 0.5,
-    width: "100%",
-    alignItems: "center",
-    justifyContent: "flex-start",
-    gap: 10,
-    paddingTop: 10,
-  },
-  countdownText: {
-    fontSize: 150,
-    fontWeight: "900",
-    textAlign: "center",
-  },
-  betButton: {
-    height: Platform.OS === "web" ? 80 : screenHeight * 0.065,
-    borderRadius: 32,
-    overflow: "hidden",
-    alignItems: "center",
-    justifyContent: "center",
-    shadowColor: "rgba(17, 13, 45, 0.68)",
-    shadowOffset: { width: 0, height: 12 },
-    shadowOpacity: 1,
-    shadowRadius: 24,
-    elevation: 10,
-    alignSelf: "center",
-  },
-  betsContainer: {
-    borderRadius: 16,
-    borderColor: "rgba(255,255,255,0.15)",
-    backgroundColor: "transparent",
-    flex: 1,
-    overflow: "hidden",
-  },
-});
+    tabIcon: {
+      width: fixedWidth * 0.05,
+      height: fixedWidth * 0.05,
+      marginLeft: 6,
+    },
+
+    tabText: {
+      color: "white",
+      fontSize: Math.min(fixedWidth * 0.045, 18),
+      fontFamily: "SF‑Pro‑Semibold",
+      fontWeight: "600",
+    },
+
+    tabTextActive: { color: "white" },
+
+    inputIcon: {
+      width: fixedWidth * 0.06,
+      height: fixedWidth * 0.06,
+      marginLeft: 8,
+    },
+
+    inputLabel: { color: "#fff", fontSize: 18, marginBottom: 8 },
+
+    autoRow: {
+      flexDirection: "row",
+      alignItems: "center",
+      justifyContent: "space-between",
+      width: fixedWidth * 0.85,
+      marginTop: 12,
+      marginBottom: 16,
+    },
+
+    checkbox: {
+      width: 24,
+      height: 24,
+      borderRadius: 6,
+      borderWidth: 2,
+      borderColor: "#6B3FD8",
+      marginRight: 8,
+    },
+
+    checkboxActive: { backgroundColor: "#6B3FD8" },
+    autoLabel: { color: "#fff", fontSize: 16, flex: 1 },
+    autoValueRow: {
+      flexDirection: "row",
+      alignItems: "center",
+      backgroundColor: "#2B1B59",
+      borderRadius: 100,
+      paddingHorizontal: 10,
+      height: 36,
+    },
+    autoControl: { color: "#fff", fontSize: 20, paddingHorizontal: 8 },
+
+    placeButton: {
+      height: Platform.OS === "web" ? 80 : screenHeight * 0.065,
+      borderRadius: 32,
+      overflow: "hidden",
+      alignItems: "center",
+      justifyContent: "center",
+      shadowColor: "rgba(17, 13, 45, 0.3)",
+      shadowOffset: { width: 0, height: 2 },
+      shadowOpacity: 1,
+      shadowRadius: 24,
+      elevation: 10,
+      alignSelf: "center",
+      marginTop: 20,
+    },
+
+    sheetTitle: {
+      fontSize: 20,
+      fontWeight: "700",
+      color: "#fff",
+      marginBottom: 20,
+    },
+    bottomSheetContainer: { flex: 1, padding: 10, alignItems: "center" },
+    betsScrollContainer: {
+      alignItems: "center",
+      justifyContent: "flex-start",
+      paddingBottom: 120,
+    },
+    planetBackground: { position: "absolute", opacity: 0.6, zIndex: 0 },
+    container: {
+      flex: 1,
+      backgroundColor: "#1B003B",
+      alignItems: "center",
+      alignSelf: "center",
+      maxWidth: fixedWidth,
+    },
+    graphOverlay: {
+      position: "absolute",
+      top: screenHeight * 0.08, // 🔹 немного ниже, чтобы не залезал на планету
+      left: 0,
+      width: "100%",
+      height: screenHeight * 0.36, // 🔹 уменьшенная высота
+      alignItems: "center",
+      justifyContent: "center",
+      zIndex: 3,
+      pointerEvents: "none", // 🔹 чтобы не блокировал касания
+    },
+    
+    
+    topSection: {
+      height: screenHeight * 0.5,
+      width: "100%",
+      alignItems: "center",
+      justifyContent: "center",
+    },
+    centered: { alignItems: "center", justifyContent: "center", width: "100%" },
+    bottomSection: {
+      height: screenHeight * 0.5,
+      width: "100%",
+      alignItems: "center",
+      justifyContent: "flex-start",
+      gap: 10,
+    },
+    countdownText: { fontSize: 150, fontWeight: "900", textAlign: "center" },
+    betButton: {
+      height: Platform.OS === "web" ? 80 : screenHeight * 0.065,
+      borderRadius: 32,
+      overflow: "hidden",
+      alignItems: "center",
+      justifyContent: "center",
+    },
+    betsContainer: {
+      borderRadius: 16,
+      borderColor: "rgba(255,255,255,0.15)",
+      backgroundColor: "transparent",
+      flex: 1,
+      overflow: "hidden",
+    },
+  });
 
 export default Crash;

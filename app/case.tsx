@@ -8,6 +8,8 @@ import {
   Animated,
   Dimensions,
   Image,
+  TouchableOpacity,
+  TextInput,
 } from "react-native";
 import { LinearGradient } from "expo-linear-gradient";
 import StarsBackground from "../components/StarsBackground";
@@ -22,6 +24,10 @@ import Confetti from "react-confetti";
 import FlagRU from "../components/icons/ru.png";
 import FlagEN from "../components/icons/us.png";
 import TonIcon from "../components/icons/ton.svg";
+import Svg, { Text as SvgText } from "react-native-svg";
+
+
+
 
 const { width: screenWidth, height: screenHeight } = Dimensions.get("window");
 
@@ -33,6 +39,16 @@ const sampleDrops: DropItem[] = [
 ];
 
 const Case = () => {
+
+// === BottomSheet пополнения ===
+const [showDepositSheet, setShowDepositSheet] = useState(false);
+const [selectedTab, setSelectedTab] = useState<"Gifts" | "Stars" | "TON">("TON");
+const [tonAmount, setTonAmount] = useState("");
+const [starsAmount, setStarsAmount] = useState("");
+
+
+
+
   const [resetKey, setResetKey] = useState(0);
   const [activeTab, setActiveTab] = useState<"paid" | "free">("paid");
   const [language, setLanguage] = useState<"ru" | "en">("ru");
@@ -125,7 +141,13 @@ const Case = () => {
                 />
               </View>
             </TouchableWithoutFeedback>
-            <BalanceButton onPress={() => console.log("Balance clicked")} />
+            <BalanceButton
+  onPress={() => {
+    setSelectedTab("TON");
+    setShowDepositSheet(true);
+  }}
+/>
+
           </View>
 
           {/* Переключатель Paid / Free */}
@@ -194,52 +216,208 @@ const Case = () => {
         </View>
       </CustomBottomSheet>
 
-      {/* BottomSheet выигрыша */}
       <CustomBottomSheet
-        visible={resultSheetVisible}
-        onClose={() => setResultSheetVisible(false)}
-        heightRatio={0.6}
-      >
-        {resultSheetVisible && (
-          <Confetti
-            width={screenWidth}
-            height={screenHeight}
-            numberOfPieces={100}
-            recycle={false}
-            gravity={0.4}
-            run={resultSheetVisible}
+  visible={resultSheetVisible}
+  onClose={() => setResultSheetVisible(false)}
+  heightRatio={0.6}
+
+  
+>
+  {resultSheetVisible && (
+    <Confetti
+      width={screenWidth}
+      height={screenHeight * 0.5}
+      numberOfPieces={300}
+      recycle={false}
+      gravity={0.4}
+      run={resultSheetVisible}
+    />
+  )}
+{result && (
+  <View style={styles.resultWrapper}>
+    <View style={styles.resultModal}>
+      <Text style={styles.resultTitle}>Congratulations!</Text>
+      <View style={[styles.cardOnly, { width: iconSize, height: iconSize }]}>
+        <Image source={result.icon} style={styles.cardIcon} resizeMode="contain" />
+      </View>
+      <View style={styles.prizeRow}>
+        <Text style={styles.prizeText}>+{result.price.toFixed(2)}</Text>
+        <View style={styles.tonIconWrapper}>
+          <Image source={TonIcon} style={styles.tonIcon} resizeMode="contain" />
+        </View>
+      </View>
+    </View>
+
+    <TouchableWithoutFeedback
+      onPress={() => {
+        setResultSheetVisible(false);
+        setTimeout(() => setResetKey(prev => prev + 1), 300);
+      }}
+    >
+      <View style={styles.okButton}>
+        <Text style={styles.okButtonText}>Ok</Text>
+      </View>
+    </TouchableWithoutFeedback>
+  </View>
+)}
+
+</CustomBottomSheet>
+
+
+{/* === Bottom Sheet Пополнения (Deposit) === */}
+<CustomBottomSheet
+  visible={showDepositSheet}
+  onClose={() => setShowDepositSheet(false)}
+  heightRatio={0.8}
+>
+  <ScrollView
+    contentContainerStyle={styles.bottomSheetContainer}
+    keyboardShouldPersistTaps="handled"
+    showsVerticalScrollIndicator={false}
+    nestedScrollEnabled
+  >
+    <Text style={styles.sheetTitle}>Enter amount</Text>
+
+    {/* Tabs */}
+    <View style={styles.tabRow}>
+      {[
+        { key: "Gifts", label: "Gifts", icon: require("../components/icons/gift.png") },
+        { key: "Stars", label: "Stars", icon: require("../components/icons/star.svg") },
+        { key: "TON", label: "TON", icon: require("../components/icons/ton.svg") },
+      ].map(({ key, label, icon }) => {
+        const activeTab = selectedTab === key;
+        return (
+          <TouchableOpacity
+            key={key}
+            style={[styles.tabButton, activeTab && styles.tabButtonActive, { flex: 1 }]}
+            onPress={() => setSelectedTab(key as "Gifts" | "Stars" | "TON")}
+            activeOpacity={0.9}
+          >
+            <View style={styles.tabContent}>
+              <Text style={[styles.tabText, activeTab && styles.tabTextActive]}>
+                {label}
+              </Text>
+              <Animated.Image source={icon} resizeMode="contain" style={styles.tabIcon} />
+            </View>
+          </TouchableOpacity>
+        );
+      })}
+    </View>
+
+    {/* Контент */}
+    {selectedTab === "Gifts" && (
+      <View style={{ marginTop: 32, alignItems: "center" }}>
+        <Image
+          source={require("../components/icons/Timeline.svg")}
+          style={styles.timelineIcon}
+          resizeMode="contain"
+        />
+      </View>
+    )}
+
+    {(selectedTab === "Stars" || selectedTab === "TON") && (
+      <View style={{ marginTop: 30, width: "100%", alignItems: "center" }}>
+        <Text style={styles.inputLabel}>
+          {selectedTab === "Stars" ? "Amount of Stars" : "Amount of TON"}
+        </Text>
+
+        <View style={styles.inputWrapper}>
+          <TextInput
+            placeholder="0"
+            placeholderTextColor="#777"
+            style={styles.textInput}
+            keyboardType="numeric"
+            value={selectedTab === "Stars" ? starsAmount : tonAmount}
+            onChangeText={(text) =>
+              selectedTab === "Stars" ? setStarsAmount(text) : setTonAmount(text)
+            }
           />
-        )}
-        {result && (
-          <ScrollView contentContainerStyle={styles.resultModal} bounces={false}>
-            <Text style={styles.resultTitle}>Congratulations!</Text>
-            <View style={[styles.cardOnly, { width: iconSize, height: iconSize }]}>
-              <Image source={result.icon} style={styles.cardIcon} resizeMode="contain" />
-            </View>
-            <View style={styles.prizeRow}>
-              <Text style={styles.prizeText}>+{result.price.toFixed(2)}</Text>
-              <View style={styles.tonIconWrapper}>
-                <Image source={TonIcon} style={styles.tonIcon} resizeMode="contain" />
-              </View>
-            </View>
-            <TouchableWithoutFeedback
-              onPress={() => {
-                setResultSheetVisible(false);
-                setTimeout(() => setResetKey(prev => prev + 1), 300);
-              }}
+          <Animated.Image
+            source={selectedTab === "Stars"
+              ? require("../components/icons/star.svg")
+              : require("../components/icons/ton.svg")}
+            resizeMode="contain"
+            style={styles.inputIcon}
+          />
+        </View>
+
+        {/* Кнопка CONNECT WALLET */}
+        <TouchableOpacity
+          activeOpacity={0.9}
+          style={[styles.placeButton, { width: fixedWidth * 1.4 }]}
+          onPress={() =>
+            console.log(
+              `Depositing ${selectedTab === "TON" ? tonAmount : starsAmount} ${selectedTab}`
+            )
+          }
+        >
+          <Image
+            source={require("../components/icons/OrangePng.png")}
+            style={styles.orangePng}
+            resizeMode="contain"
+          />
+
+          <Svg
+            height="100%"
+            width="100%"
+            style={StyleSheet.absoluteFillObject}
+            viewBox="0 0 400 100"
+            preserveAspectRatio="xMidYMid meet"
+          >
+            <SvgText
+              fill="none"
+              stroke="#D35100"
+              strokeWidth={5}
+              fontSize="16"
+              fontFamily="SF-Pro-Heavy"
+              fontWeight="900"
+              x="50%"
+              y="45%"
+              textAnchor="middle"
+              letterSpacing={3}
             >
-              <View style={styles.okButton}>
-                <Text style={styles.okButtonText}>Ok</Text>
-              </View>
-            </TouchableWithoutFeedback>
-          </ScrollView>
-        )}
-      </CustomBottomSheet>
+              CONNECT WALLET
+            </SvgText>
+            <SvgText
+              fill="#FFF"
+              fontSize="16"
+              fontFamily="SF-Pro-Heavy"
+              fontWeight="900"
+              x="50%"
+              y="45%"
+              textAnchor="middle"
+              letterSpacing={3}
+            >
+              CONNECT WALLET
+            </SvgText>
+          </Svg>
+        </TouchableOpacity>
+      </View>
+    )}
+  </ScrollView>
+</CustomBottomSheet>
+
+
+
+
     </LinearGradient>
   );
 };
 
 const styles = StyleSheet.create({
+
+
+
+  sheetTitle: {
+    color: "#fff",
+    fontSize: 20,
+    fontWeight: "700",
+    marginBottom: 10,
+  },
+  
+
+
+
   background: { flex: 1, alignItems: "center" },
   wrapper: { flex: 1 },
   container: { alignItems: "center", paddingTop: 60, paddingBottom: 150 },
@@ -289,12 +467,7 @@ const styles = StyleSheet.create({
   sheetContainer: { flex: 1, justifyContent: "center" },
   sheetContent: { alignItems: "center", paddingTop: 10 },
   sheetBorder: { padding: 10, overflow: "hidden", elevation: 5 },
-  resultModal: {
-    flexGrow: 1,
-    justifyContent: "center",
-    alignItems: "center",
-    gap: 16,
-  },
+
   resultTitle: {
     color: "#fff",
     fontSize: 32,
@@ -302,6 +475,19 @@ const styles = StyleSheet.create({
     fontWeight: "500",
     textAlign: "center",
   },
+  resultWrapper: {
+    flex: 1,
+    width: "100%",
+    justifyContent: "space-between",
+    alignItems: "center",
+    paddingVertical: 24,
+  },
+  resultModal: {
+    justifyContent: "center",
+    alignItems: "center",
+    gap: 16,
+  },
+  
   cardOnly: {
     borderRadius: 18,
     overflow: "hidden",
@@ -359,6 +545,105 @@ const styles = StyleSheet.create({
     textTransform: "capitalize",
     lineHeight: 23.4,
   },
+
+
+  bottomSheetContainer: {
+    flexGrow: 1,
+    alignItems: "center",
+    justifyContent: "flex-start",
+    paddingVertical: 30,
+    paddingHorizontal: 20,
+  },
+  timelineIcon: {
+    width: "85%",
+    aspectRatio: 1.15,
+    marginBottom: 8,
+    alignSelf: "center",
+  },
+  orangePng: {
+    width: "100%",
+    height: "100%",
+    position: "absolute",
+    top: 0,
+    left: 0,
+    resizeMode: "contain",
+  },
+  tabRow: {
+    flexDirection: "row",
+    justifyContent: "space-around",
+    alignItems: "center",
+    width: "100%",
+    marginTop: 20,
+  },
+  tabButton: {
+    borderRadius: 100,
+    borderWidth: 2,
+    borderColor: "#6B3FD8",
+    paddingVertical: 10,
+    alignItems: "center",
+    justifyContent: "center",
+    flex: 1,
+    marginHorizontal: 4,
+  },
+  tabButtonActive: {
+    backgroundColor: "#6B3FD8",
+  },
+  tabContent: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  tabText: {
+    color: "#fff",
+    fontSize: 16,
+    fontFamily: "SF-Pro-Semibold",
+  },
+  tabTextActive: {
+    color: "#fff",
+    fontWeight: "700",
+  },
+  tabIcon: {
+    width: 18,
+    height: 18,
+    marginLeft: 6,
+  },
+  inputWrapper: {
+    flexDirection: "row",
+    alignItems: "center",
+    borderWidth: 2,
+    borderColor: "#6B3FD8",
+    borderRadius: 100,
+    width: "100%",
+    height: 50,
+    paddingHorizontal: 16,
+    marginBottom: 30,
+  },
+  textInput: {
+    flex: 1,
+    color: "#fff",
+    fontSize: 18,
+    textAlign: "center",
+  },
+  inputIcon: {
+    width: 26,
+    height: 26,
+  },
+  inputLabel: {
+    color: "#fff",
+    fontSize: 18,
+    marginBottom: 10,
+  },
+  placeButton: {
+    width: "85%",
+    aspectRatio: 4.8,
+    borderRadius: 100,
+    alignItems: "center",
+    justifyContent: "center",
+    overflow: "hidden",
+    alignSelf: "center",
+    marginTop: 25,
+  },
+  
 });
 
 export default Case;

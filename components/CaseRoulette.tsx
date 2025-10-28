@@ -314,7 +314,7 @@ const styles = StyleSheet.create({
     justifyContent: "flex-start",
   },
   bottomButtonContainer: {
-
+    
   },
   
   betButton: {
@@ -323,10 +323,7 @@ const styles = StyleSheet.create({
     overflow: "hidden",
     alignItems: "center",
     justifyContent: "center",
-    shadowColor: "rgba(17, 13, 45, 0.68)",
-    shadowOffset: { width: 0, height: 12 },
-    shadowOpacity: 1,
-    shadowRadius: 24,
+
     elevation: 10,
   },
 });

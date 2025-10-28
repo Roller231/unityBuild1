@@ -51,42 +51,39 @@ const HistoryBar: React.FC<HistoryBarProps> = ({ history, activeIndex = 0 }) => 
   if (!fontLoaded) return null;
 
   return (
-    <View style={styles.container}>
-      <FlatList
-        ref={listRef}
-        data={reordered}
-        keyExtractor={(_, index) => index.toString()}
-        horizontal
-        showsHorizontalScrollIndicator={false}
-        contentContainerStyle={styles.list}
-        inverted={false} // важно! не переворачиваем список
-        renderItem={({ item, index }) => (
-          <View
-            style={[
-              styles.block,
-              index === 0 ? styles.activeBlock : styles.inactiveBlock,
-            ]}
-          >
-            <Text style={styles.text}>x{item.toFixed(2)}</Text>
-          </View>
-        )}
-        ItemSeparatorComponent={() => <View style={{ width: SPACING }} />}
-        getItemLayout={(_, index) => ({
-          length: ITEM_WIDTH,
-          offset: ITEM_WIDTH * index,
-          index,
-        })}
-      />
-    </View>
+    <View style={[styles.container, { paddingLeft: 10 }]}>
+  <FlatList
+    ref={listRef}
+    data={reordered}
+    keyExtractor={(_, index) => index.toString()}
+    horizontal
+    showsHorizontalScrollIndicator={false}
+    contentContainerStyle={[
+      styles.list,
+      { paddingLeft: 0, paddingRight: 10 }, // ✅ переносим сюда
+    ]}
+    renderItem={({ item, index }) => (
+      <View
+        style={[
+          styles.block,
+          index === 0 ? styles.activeBlock : styles.inactiveBlock,
+        ]}
+      >
+        <Text style={styles.text}>x{item.toFixed(2)}</Text>
+      </View>
+    )}
+    ItemSeparatorComponent={() => <View style={{ width: SPACING }} />}
+  />
+</View>
+
   );
 };
 
 const styles = StyleSheet.create({
   container: {
-    width: "100%",
+    width: "93%",
     alignItems: "flex-start",
     justifyContent: "center",
-    paddingLeft: 20,
     marginBottom: 12,
   },
   list: {

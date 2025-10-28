@@ -144,25 +144,31 @@ export default function CrashGraph({
 
   // === Lottie кот ===
   useEffect(() => {
+    let anim: any;
     if (Platform.OS === "web") {
       const container = webLottieContainer.current;
       if (!container) return;
-
-      const anim = lottieWeb.loadAnimation({
+  
+      anim = lottieWeb.loadAnimation({
         container,
         renderer: "svg",
         loop: true,
         autoplay: active,
         animationData: catFly,
       });
-
+  
       anim.setSpeed(0.8);
       if (!active) anim.pause();
-      return () => anim.destroy();
     } else if (lottieRef.current) {
       active ? lottieRef.current.play() : lottieRef.current.pause();
     }
+  
+    // 💣 уничтожаем анимацию при размонтировании
+    return () => {
+      if (anim) anim.destroy();
+    };
   }, [active]);
+  
 
   return (
     <View style={styles.container}>
