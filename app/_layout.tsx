@@ -49,16 +49,18 @@ export default function RootLayout() {
     const initialize = async () => {
       try {
         animateProgress(0);
-
+  
+        const start = Date.now();
+  
         await Font.loadAsync({
-          "SF‑Pro‑Heavy": require("../fonts/SF‑Pro-Display-Heavy.otf"),
-          "SF‑Pro‑Bold": require("../fonts/SF‑Pro-Display-Bold.otf"),
-          "SF‑Pro‑Semibold": require("../fonts/SF‑Pro-Display-Semibold.otf"),
-          "SF‑Pro‑Medium": require("../fonts/SF‑Pro-Display-Medium.otf"),
-          "SF‑Pro‑Regular": require("../fonts/SF‑Pro-Display-Regular.otf"),
+          "SF-Pro-Heavy": require("../fonts/SF-Pro-Display-Heavy.otf"),
+          "SF-Pro-Bold": require("../fonts/SF-Pro-Display-Bold.otf"),
+          "SF-Pro-Semibold": require("../fonts/SF-Pro-Display-Semibold.otf"),
+          "SF-Pro-Medium": require("../fonts/SF-Pro-Display-Medium.otf"),
+          "SF-Pro-Regular": require("../fonts/SF-Pro-Display-Regular.otf"),
         });
         animateProgress(30);
-
+  
         await Asset.loadAsync([
           FlagRU,
           FlagEN,
@@ -75,20 +77,26 @@ export default function RootLayout() {
           BgImage,
         ]);
         animateProgress(70);
-
-        // Здесь можно вставить инициализацию SDK и другое
-        // …
-
+  
+        // ... SDK инициализация, если нужно
         animateProgress(100);
+  
+        const elapsed = Date.now() - start;
+        const remaining = 1500 - elapsed; // минимум 1 секунда
+        if (remaining > 0) {
+          await new Promise((res) => setTimeout(res, remaining));
+        }
+  
         setIsReady(true);
       } catch (err) {
         console.warn("Initialization error:", err);
         setIsReady(true);
       }
     };
-
+  
     initialize();
   }, []);
+  
 
   const barWidth = progressAnim.interpolate({
     inputRange: [0, 100],
@@ -97,9 +105,13 @@ export default function RootLayout() {
 
   const onLayoutRootView = useCallback(async () => {
     if (isReady) {
-      await SplashScreen.hideAsync();
+      setTimeout(async () => {
+        await SplashScreen.hideAsync();
+      }, 500);
     }
   }, [isReady]);
+  
+  
 
   if (!isReady) {
     return (
