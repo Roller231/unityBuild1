@@ -1146,14 +1146,18 @@ const styles = StyleSheet.create({
      fontFamily: "SF-Pro-Regular"
   },
   termsButton: {
-    height: 34,
-    width: "18%",
+    paddingVertical: 4,
+    paddingHorizontal: 12, // ✅ как у sellButton
     justifyContent: "center",
     alignItems: "center",
     borderRadius: 100,
     backgroundColor: "#1F0248",
+    alignSelf: "flex-start", // ✅ чтобы кнопка не растягивалась на всю строку
   },
-  termsText: { color: "#B98CFF", fontSize: 15, fontWeight: "600"  
+  termsText: {
+    color: "#B98CFF",
+    fontSize: 15,
+    fontWeight: "600",
   },
   inviteBottomRow: {
     flexDirection: "row",
