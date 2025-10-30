@@ -9,10 +9,13 @@ import {
   Text,
   Pressable,
   ScrollView,
-  TextInput, // ✅ добавлено
+  TextInput,
+  Platform, // ✅ добавлено
 } from "react-native";
 import CustomBottomSheet from "../components/CustomBottomSheet";
 import { LinearGradient } from "expo-linear-gradient";
+import { useFocusEffect } from "@react-navigation/native";
+
 import StarsBackground from "../components/StarsBackground";
 import IconTimeline from "../components/icons/Timeline.svg";
 
@@ -32,10 +35,86 @@ import IconStar from "../components/icons/star.svg";
 import IconTon from "../components/icons/ton.svg";
 import IconCopy from "../components/icons/copy.svg";
 
+
+import { emitLanguageChange } from "@/components/languageEvents";
+
+
 import IconArrow from "../components/icons/arrow.svg"; // добавляем стрелку обратно
 
 import { useLaunchParams } from "@telegram-apps/sdk-react";
 
+
+
+import AsyncStorage from "@react-native-async-storage/async-storage";
+
+// 🌍 Переводы
+// 🌍 Переводы
+const translations = {
+  ru: {
+    deposit: "Внести",
+    stars: "Звёзды",
+    ton: "TON",
+    inventory: "Инвентарь",
+    sellAll: "Продать всё",
+    inviteTitle: "Приглашай друзей и получай 10% от их взносов",
+    terms: "Условия",
+    invite: "Пригласить",
+    copy: "Копировать",
+    balance: "Баланс:",
+    referrals: "Рефералы:",
+    withdraw: "Вывести",
+    yourInventory: "Ваш инвентарь",
+    noGifts: "Подарков нет",
+    withdrawTon: "Вывод TON",
+    withdrawDesc: "Введите количество TON, которое хотите вывести.",
+    gotIt: "Понятно",
+    referralTerms: "📜 Условия реферальной программы",
+    referralText1: "Приглашайте друзей по вашей персональной ссылке и получайте",
+    referralText2: "10% от их депозитов прямо на баланс.",
+    referralText3:
+      "Можно приглашать неограниченное количество друзей. Награды начисляются автоматически после депозита приглашённого.",
+    referralText4:
+      "Мошенничество или мультиаккаунты запрещены и могут привести к аннулированию бонусов.",
+    enterAmount: "Введите сумму",
+    gifts: "Подарки",
+    connectWallet: "ПОДКЛЮЧИТЬ КОШЕЛЁК",
+  },
+  en: {
+    deposit: "Deposit",
+    stars: "Stars",
+    ton: "TON",
+    inventory: "Inventory",
+    sellAll: "Sell All",
+    inviteTitle: "Invite friends and earn 10% of their deposits",
+    terms: "Terms",
+    invite: "Invite",
+    copy: "Copy",
+    balance: "Balance:",
+    referrals: "Referrals:",
+    withdraw: "Withdraw",
+    yourInventory: "Your Inventory",
+    noGifts: "No gift cards available",
+    withdrawTon: "Withdraw TON",
+    withdrawDesc: "Enter the amount of TON you want to withdraw.",
+    gotIt: "Got it",
+    referralTerms: "📜 Referral Terms",
+    referralText1: "Invite your friends using your personal link and earn",
+    referralText2: "10% of their total deposits directly to your balance.",
+    referralText3:
+      "You can invite unlimited friends. Rewards are credited automatically after deposit.",
+    referralText4:
+      "Abuse or multiple accounts may lead to reward removal.",
+    enterAmount: "Enter amount",
+    gifts: "Gifts",
+    connectWallet: "CONNECT WALLET",
+  },
+} as const;
+
+type Lang = keyof typeof translations;
+type TranslationKey = keyof typeof translations["en"];
+
+const useTranslation = (lang: Lang) => (key: TranslationKey) =>
+  translations[lang][key];
 
 
 const { width: screenWidth, height: screenHeight } = Dimensions.get("window");
@@ -76,8 +155,35 @@ const [selectedTab, setSelectedTab] = useState<"Gifts" | "Stars" | "TON">("TON")
 const [tonAmount, setTonAmount] = useState("");
 const [starsAmount, setStarsAmount] = useState("");
 
+const bottomSheetHeightRatio = isDesktop ? 0.5 : 0.6;
+
+
 // === Terms BottomSheet ===
 const [showTermsSheet, setShowTermsSheet] = useState(false);
+
+
+
+
+const t = useTranslation(language);
+
+
+
+
+// ✅ при загрузке читаем язык из AsyncStorage
+  // ✅ при загрузке читаем язык из AsyncStorage
+  useFocusEffect(
+    React.useCallback(() => {
+      const checkLanguage = async () => {
+        const saved = await AsyncStorage.getItem("app_language");
+        if (saved === "ru" || saved === "en") {
+          setLanguage(saved);
+          setCurrentFlag(saved);
+        }
+      };
+  
+      checkLanguage();
+    }, []) // <-- зависимости указываем здесь внутри useCallback
+  );
 
 
   const launchParams = (() => {
@@ -135,17 +241,22 @@ useEffect(() => {
 
   
 
-  // 🇷🇺 Переключение языка
-  const toggleLanguage = () => {
-    Animated.sequence([
-      Animated.timing(flagAnim, { toValue: -50, duration: 200, useNativeDriver: true }),
-      Animated.timing(flagAnim, { toValue: 50, duration: 0, useNativeDriver: true }),
-    ]).start(() => {
-      setLanguage((prev) => (prev === "ru" ? "en" : "ru"));
-      setCurrentFlag((prev) => (prev === "ru" ? "en" : "ru"));
-      Animated.timing(flagAnim, { toValue: 0, duration: 200, useNativeDriver: true }).start();
-    });
-  };
+const toggleLanguage = async () => {
+  const newLang = language === "ru" ? "en" : "ru";
+  setLanguage(newLang);
+  setCurrentFlag(newLang);
+  await AsyncStorage.setItem("app_language", newLang);
+
+  emitLanguageChange(newLang); // 🔹 вот это ключ
+
+  Animated.sequence([
+    Animated.timing(flagAnim, { toValue: -50, duration: 200, useNativeDriver: true }),
+    Animated.timing(flagAnim, { toValue: 50, duration: 0, useNativeDriver: true }),
+    Animated.timing(flagAnim, { toValue: 0, duration: 200, useNativeDriver: true }),
+  ]).start();
+};
+
+
 
   const handleBalancePress = () => console.log("Balance clicked!");
   const handleInvitePress = () => console.log("Invite pressed!");
@@ -253,7 +364,7 @@ useEffect(() => {
         activeMenu === "deposit" && styles.menuTextActive,
       ]}
     >
-      Deposit
+      {t("deposit")}
     </Text>
     <Image source={IconGift} style={styles.icon} resizeMode="contain" />
   </TouchableOpacity>
@@ -280,7 +391,7 @@ useEffect(() => {
         activeMenu === "stars" && styles.menuTextActive,
       ]}
     >
-      Stars
+      {t("stars")}
     </Text>
     <Image source={IconStar} style={styles.icon} resizeMode="contain" />
   </TouchableOpacity>
@@ -307,7 +418,7 @@ useEffect(() => {
         activeMenu === "ton" && styles.menuTextActive,
       ]}
     >
-      TON
+      {t("ton")}
     </Text>
     <Image source={IconTon} style={styles.icon} resizeMode="contain" />
   </TouchableOpacity>
@@ -316,9 +427,9 @@ useEffect(() => {
 
           {/* Инвентарь */}
           <View style={styles.inventoryRow}>
-            <Text style={styles.inventoryText}>Inventory (0)</Text>
+            <Text style={styles.inventoryText}>{t("inventory")} (0)</Text>
             <Pressable style={styles.sellButton} onPress={() => setShowInventorySheet(true)}>
-            <Text style={styles.sellButtonText}>Sell All</Text>
+            <Text style={styles.sellButtonText}>{t("sellAll")}</Text>
             </Pressable>
           </View>
 
@@ -360,17 +471,17 @@ useEffect(() => {
         <View style={[styles.newMenuContainer, styles.sectionGap]}>
           <View style={styles.inviteTopRow}>
             <Text style={styles.inviteText}>
-              Invite friends and earn 10% of their deposits
+            {t("inviteTitle")}
             </Text>
             <Pressable style={styles.termsButton} onPress={() => setShowTermsSheet(true)}>
-  <Text style={styles.termsText}>Terms</Text>
+  <Text style={styles.termsText}>{t("terms")}</Text>
 </Pressable>
 
           </View>
 
           <View style={styles.inviteBottomRow}>
             <Pressable style={styles.inviteButton} onPress={handleInvitePress}>
-              <Text style={styles.inviteButtonText}>Invite</Text>
+              <Text style={styles.inviteButtonText}>{t("invite")}</Text>
             </Pressable>
             <Pressable style={styles.copyButton} onPress={handleCopyPress}>
               <Image source={IconCopy} style={styles.copyIcon} resizeMode="contain" />
@@ -383,7 +494,7 @@ useEffect(() => {
 <View style={[styles.emptyMenuContainer, styles.sectionGap]}>
   <View style={styles.balanceLeft}>
     <View style={styles.balanceRow}>
-      <Text style={styles.balanceLabel}>Balance:</Text>
+      <Text style={styles.balanceLabel}>{t("balance")}</Text>
       <Text style={styles.balanceValue}>0.00</Text>
       <Image
         source={require("../components/icons/ton.svg")}
@@ -393,7 +504,7 @@ useEffect(() => {
     </View>
 
     <View style={styles.balanceRow}>
-      <Text style={styles.balanceLabel}>Referrals:</Text>
+      <Text style={styles.balanceLabel}>{t("referrals")}</Text>
       <Text style={styles.balanceValue}>0.00</Text>
     </View>
   </View>
@@ -402,7 +513,7 @@ useEffect(() => {
   style={styles.withdrawButton}
   onPress={() => setShowWithdrawSheet(true)}
 >
-  <Text style={styles.withdrawText}>Withdraw</Text>
+  <Text style={styles.withdrawText}>{t("withdraw")}</Text>
 </Pressable>
 
 </View>
@@ -413,7 +524,7 @@ useEffect(() => {
       <CustomBottomSheet
   visible={showBottomSheet}
   onClose={() => setShowBottomSheet(false)}
-  heightRatio={0.8}
+  heightRatio={bottomSheetHeightRatio}
 >
   <ScrollView
     contentContainerStyle={styles.bottomSheetContainer}
@@ -421,15 +532,16 @@ useEffect(() => {
     showsVerticalScrollIndicator={false}
     nestedScrollEnabled
   >
-    <Text style={styles.sheetTitle}>Enter amount</Text>
+    <Text style={styles.sheetTitle}>{t("enterAmount")}</Text>
 
     {/* Tabs */}
     <View style={styles.tabRow}>
-      {[
-        { key: "Gifts", label: "Gifts", icon: IconGift },
-        { key: "Stars", label: "Stars", icon: IconStar },
-        { key: "TON", label: "TON", icon: IconTon },
-      ].map(({ key, label, icon }) => {
+    {[
+  { key: "Gifts", label: t("gifts"), icon: IconGift },
+  { key: "Stars", label: t("stars"), icon: IconStar },
+  { key: "TON", label: t("ton"), icon: IconTon },
+].map(({ key, label, icon }) => {
+
         const activeTab = selectedTab === key;
         return (
           <TouchableOpacity
@@ -467,7 +579,7 @@ useEffect(() => {
     {(selectedTab === "Stars" || selectedTab === "TON") && (
       <View style={{ marginTop: 30, width: "100%", alignItems: "center" }}>
         <Text style={styles.inputLabel}>
-          {selectedTab === "Stars" ? "Amount of Stars" : "Amount of TON"}
+        {selectedTab === "Stars" ? `${t("enterAmount")} ${t("stars")}` : `${t("enterAmount")} ${t("ton")}`}
         </Text>
 
         <View style={styles.inputWrapper}>
@@ -524,9 +636,9 @@ useEffect(() => {
     x="50%"
     y="45%"       // ✅ ключ: смещение на 58% центрирует текст идеально
     textAnchor="middle"
-    letterSpacing={3}
+    letterSpacing={1.5}
   >
-    CONNECT WALLET
+    {t("connectWallet")}
   </SvgText>
   <SvgText
     fill="#FFF"
@@ -536,9 +648,9 @@ useEffect(() => {
     x="50%"
     y="45%"
     textAnchor="middle"
-    letterSpacing={3}
+    letterSpacing={1.5}
   >
-    CONNECT WALLET
+    {t("connectWallet")}
   </SvgText>
 </Svg>
 
@@ -561,30 +673,23 @@ useEffect(() => {
     contentContainerStyle={styles.bottomSheetContainer}
     showsVerticalScrollIndicator={false}
   >
-    <Text style={styles.sheetTitle}>📜 Referral Terms</Text>
+<Text style={styles.sheetTitle}>{t("referralTerms")}</Text>
 
-    <Text style={styles.sheetText}>
-      Invite your friends using your personal link and earn{" "}
-      <Text style={{ color: "#B98CFF", fontWeight: "600" }}>10%</Text> of their
-      total deposits directly to your balance.
-    </Text>
+<Text style={styles.sheetText}>
+  {t("referralText1")}{" "}
+  <Text style={{ color: "#B98CFF", fontWeight: "600" }}>10%</Text>{" "}
+  {t("referralText2")}
+</Text>
 
-    <Text style={styles.sheetText}>
-      You can invite an unlimited number of friends. Rewards are credited
-      automatically once your referred user completes a deposit.
-    </Text>
+<Text style={styles.sheetText}>{t("referralText3")}</Text>
+<Text style={styles.sheetText}>{t("referralText4")}</Text>
 
-    <Text style={styles.sheetText}>
-      Abuse or creating multiple accounts is strictly prohibited and may lead
-      to referral reward removal.
-    </Text>
-
-    <Pressable
-      style={[styles.sellButtonSheet, { marginTop: 20, backgroundColor: "#6B3FD8" }]}
-      onPress={() => setShowTermsSheet(false)}
-    >
-      <Text style={[styles.sellButtonText, { color: "#fff" }]}>Got it</Text>
-    </Pressable>
+<Pressable
+  style={[styles.sellButtonSheet, { marginTop: 20, backgroundColor: "#6B3FD8" }]}
+  onPress={() => setShowTermsSheet(false)}
+>
+<Text style={[styles.sellButtonText, { color: "#fff" }]}>{t("gotIt")}</Text>
+</Pressable>
   </ScrollView>
 </CustomBottomSheet>
 
@@ -598,11 +703,11 @@ useEffect(() => {
   heightRatio={0.75}
 >
   <View style={styles.bottomSheetContainer}>
-    <Text style={styles.sheetTitle}>Your Inventory</Text>
+  <Text style={styles.sheetTitle}>{t("yourInventory")}</Text>
 
     {inventory.length === 0 ? (
-      <Text style={{ color: "#aaa", marginTop: 16 }}>No gift cards available</Text>
-    ) : (
+<Text style={{ color: "#aaa", marginTop: 16 }}>{t("noGifts")}</Text>    )
+ : (
       <>
         <ScrollView
           style={{ width: "100%", marginTop: 16 }}
@@ -635,7 +740,7 @@ useEffect(() => {
             setShowInventorySheet(false);
           }}
         >
-          <Text style={[styles.sellButtonText, { color: "#fff" }]}>Sell All</Text>
+<Text style={[styles.sellButtonText, { color: "#fff" }]}>{t("sellAll")}</Text>
         </Pressable>
       </>
     )}
@@ -647,17 +752,14 @@ useEffect(() => {
 <CustomBottomSheet
   visible={showWithdrawSheet}
   onClose={() => setShowWithdrawSheet(false)}
-  heightRatio={0.75}
+  heightRatio={bottomSheetHeightRatio}
 >
   <ScrollView
     contentContainerStyle={styles.bottomSheetContainer}
     showsVerticalScrollIndicator={false}
   >
-    <Text style={styles.sheetTitle}>💸 Withdraw TON</Text>
-
-    <Text style={styles.sheetText}>
-      Enter the amount of TON you want to withdraw from your balance.
-    </Text>
+<Text style={styles.sheetTitle}>{t("withdrawTon")}</Text>
+<Text style={styles.sheetText}>{t("withdrawDesc")}</Text>
 
     {/* Поле ввода TON */}
     <View style={[styles.inputWrapper, { marginTop: 30 }]}>
@@ -706,7 +808,7 @@ useEffect(() => {
           textAnchor="middle"
           letterSpacing={3}
         >
-          WITHDRAW
+          {t("withdraw")}
         </SvgText>
         <SvgText
           fill="#FFF"
@@ -718,7 +820,7 @@ useEffect(() => {
           textAnchor="middle"
           letterSpacing={3}
         >
-          WITHDRAW
+          {t("withdraw")}
         </SvgText>
       </Svg>
     </TouchableOpacity>
@@ -824,7 +926,9 @@ const styles = StyleSheet.create({
     color: "#fff",
     fontSize: 18,
     textAlign: "center",
+    ...(Platform.OS === "web" ? { outline: "none" } : {}), // 🔹 это добавит нужное только на Web
   },
+  
   inputIcon: {
     width: 26,
     height: 26,

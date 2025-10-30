@@ -6,6 +6,10 @@ import LottieView from "lottie-react-native";
 import lottieWeb from "lottie-web";
 import catFly from "../components/icons/catFly.json";
 
+
+
+
+
 interface CrashGraphProps {
   engine: CrashEngine | null;
   active?: boolean;

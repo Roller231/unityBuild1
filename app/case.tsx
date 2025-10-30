@@ -10,6 +10,7 @@ import {
   Image,
   TouchableOpacity,
   TextInput,
+  Platform,
 } from "react-native";
 import { LinearGradient } from "expo-linear-gradient";
 import StarsBackground from "../components/StarsBackground";
@@ -25,7 +26,12 @@ import FlagRU from "../components/icons/ru.png";
 import FlagEN from "../components/icons/us.png";
 import TonIcon from "../components/icons/ton.svg";
 import Svg, { Text as SvgText } from "react-native-svg";
+import { emitLanguageChange, onLanguageChange } from "@/components/languageEvents";
 
+import { useLaunchParams } from "@telegram-apps/sdk-react";
+
+import AsyncStorage from "@react-native-async-storage/async-storage";
+import { useFocusEffect } from "expo-router";
 
 
 
@@ -62,6 +68,45 @@ const [starsAmount, setStarsAmount] = useState("");
   const [resultId, setResultId] = useState<string | null>(null);
   const [result, setResult] = useState<DropItem | null>(null);
 
+
+// ✅ при загрузке читаем язык из AsyncStorage
+  // ✅ при загрузке читаем язык из AsyncStorage
+  useFocusEffect(
+    React.useCallback(() => {
+      const checkLanguage = async () => {
+        const saved = await AsyncStorage.getItem("app_language");
+        if (saved === "ru" || saved === "en") {
+          setLanguage(saved);
+          setCurrentFlag(saved);
+        }
+      };
+  
+      checkLanguage();
+    }, []) // <-- зависимости указываем здесь внутри useCallback
+  );
+  
+  
+
+
+  const launchParams = (() => {
+    try {
+      return useLaunchParams();
+    } catch {
+      console.warn("⚠️ Telegram SDK not found — running in dev mode (localhost)");
+      return {
+        tgWebAppData: {
+          user: { first_name: "Guest", last_name: "", photo_url: null },
+        },
+      };
+    }
+  })();
+  
+  
+  
+
+
+
+
   const [fontLoaded, setFontLoaded] = useState(false);
   useEffect(() => {
     const loadFont = async () => {
@@ -76,6 +121,8 @@ const [starsAmount, setStarsAmount] = useState("");
 
   const platform = useTelegramPlatform();
   const isDesktop = platform === "tdesktop" || platform === "macos";
+  const bottomSheetHeightRatio = isDesktop ? 0.5 : 0.6;
+
   const fixedWidth = isDesktop ? 470 : screenWidth;
   const switchWidth = fixedWidth * 0.9;
   const iconSize = Math.min(fixedWidth * 0.45, 200);
@@ -85,16 +132,21 @@ const [starsAmount, setStarsAmount] = useState("");
     outputRange: [0, switchWidth / 2],
   });
 
-  const toggleLanguage = () => {
+  const toggleLanguage = async () => {
+    const newLang = language === "ru" ? "en" : "ru";
+    setLanguage(newLang);
+    setCurrentFlag(newLang);
+    await AsyncStorage.setItem("app_language", newLang);
+  
+    emitLanguageChange(newLang); // 🔹 вот это ключ
+  
     Animated.sequence([
       Animated.timing(flagAnim, { toValue: -50, duration: 200, useNativeDriver: true }),
       Animated.timing(flagAnim, { toValue: 50, duration: 0, useNativeDriver: true }),
-    ]).start(() => {
-      setLanguage(prev => (prev === "ru" ? "en" : "ru"));
-      setCurrentFlag(prev => (prev === "ru" ? "en" : "ru"));
-      Animated.timing(flagAnim, { toValue: 0, duration: 200, useNativeDriver: true }).start();
-    });
+      Animated.timing(flagAnim, { toValue: 0, duration: 200, useNativeDriver: true }),
+    ]).start();
   };
+  
 
   const handleGiftPress = () => {
     setOpenMenu(true);
@@ -268,7 +320,7 @@ const [starsAmount, setStarsAmount] = useState("");
 <CustomBottomSheet
   visible={showDepositSheet}
   onClose={() => setShowDepositSheet(false)}
-  heightRatio={0.8}
+  heightRatio={bottomSheetHeightRatio}
 >
   <ScrollView
     contentContainerStyle={styles.bottomSheetContainer}
@@ -623,6 +675,7 @@ const styles = StyleSheet.create({
     color: "#fff",
     fontSize: 18,
     textAlign: "center",
+    ...(Platform.OS === "web" ? { outline: "none" } : {}), // 🔹 это добавит нужное только на Web
   },
   inputIcon: {
     width: 26,

@@ -107,6 +107,9 @@ const Crash: React.FC = () => {
       await Font.loadAsync({
         "SF-Pro-Heavy": require("../fonts/SF-Pro-Display-Heavy.otf"),
         "SF-Pro-Semibold": require("../fonts/SF-Pro-Display-Semibold.otf"),
+        "SF-Pro-Medium": require("../fonts/SF-Pro-Display-Medium.otf"),
+        "SF-Pro-Regular": require("../fonts/SF-Pro-Display-Regular.otf"),
+        "SF-Pro-Bold": require("../fonts/SF-Pro-Display-Bold.otf"),
       });
       setFontLoaded(true);
     };
@@ -657,7 +660,7 @@ const createStyles = (fixedWidth: number, screenHeight: number) =>
       borderWidth: 2,
       borderRadius: 100,
       width: fixedWidth * 0.8,
-      height: screenHeight * 0.06,
+      height: 50,
       paddingHorizontal: 16,
       marginBottom: 20,
     },
@@ -667,6 +670,7 @@ const createStyles = (fixedWidth: number, screenHeight: number) =>
       justifyContent: "space-around",
       alignItems: "center",
       width: "100%",
+
       paddingHorizontal: fixedWidth * 0.05,
       marginBottom: 10,
     },
@@ -702,10 +706,9 @@ const createStyles = (fixedWidth: number, screenHeight: number) =>
     },
 
     tabText: {
-      color: "white",
-      fontSize: Math.min(fixedWidth * 0.045, 18),
-      fontFamily: "SF‑Pro‑Semibold",
-      fontWeight: "600",
+      color: "#fff",
+      fontSize: 16,
+      fontFamily: "SF-Pro-Semibold",
     },
 
     tabTextActive: { color: "white" },
