@@ -9,6 +9,8 @@ import * as SplashScreen from "expo-splash-screen";
 import CustomTabBar from "@/components/CustomTabBar";
 import { useTelegramPlatform } from "@/hooks/useTelegramPlatform";
 
+import { init, viewport, swipeBehavior } from "@telegram-apps/sdk-react";
+
 // === Импорт ассетов ===
 import FlagRU from "../components/icons/ru.png";
 import FlagEN from "../components/icons/us.png";
@@ -79,6 +81,20 @@ export default function RootLayout() {
         animateProgress(70);
   
         // ... SDK инициализация, если нужно
+
+          try {
+          init();
+          if (viewport.mount.isAvailable()) viewport.mount();
+          if (viewport.requestFullscreen.isAvailable()) viewport.requestFullscreen();
+          if (swipeBehavior.isSupported()) {
+            swipeBehavior.mount();
+            swipeBehavior.disableVertical();
+          }
+        } catch (sdkError) {
+          console.warn("⚠️ Telegram SDK init skipped:", sdkError);
+        }
+
+
         animateProgress(100);
   
         const elapsed = Date.now() - start;
