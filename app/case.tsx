@@ -52,12 +52,51 @@ const [selectedTab, setSelectedTab] = useState<"Gifts" | "Stars" | "TON">("TON")
 const [tonAmount, setTonAmount] = useState("");
 const [starsAmount, setStarsAmount] = useState("");
 
+// 🌍 Переводы
+const translations = {
+  ru: {
+    paid: "Платные",
+    free: "Бесплатные",
+    enterAmount: "Введите сумму",
+    gifts: "Внести",
+    stars: "Звёзды",
+    ton: "TON",
+    connectWallet: "ПОДКЛЮЧИТЬ КОШЕЛЁК",
+    amountOfStars: "Количество звёзд",
+    amountOfTon: "Количество TON",
+    congratulations: "Поздравляем!",
+    ok: "Понятно",
+    deposit: "Внести",
+  },
+  en: {
+    paid: "Paid",
+    free: "Free",
+    enterAmount: "Enter amount",
+    gifts: "Gifts",
+    stars: "Stars",
+    ton: "TON",
+    connectWallet: "CONNECT WALLET",
+    amountOfStars: "Amount of Stars",
+    amountOfTon: "Amount of TON",
+    congratulations: "Congratulations!",
+    ok: "Ok",
+    deposit: "Deposit",
+  },
+} as const;
+
+type Lang = keyof typeof translations;
+type TranslationKey = keyof typeof translations["en"];
+
+const useTranslation = (lang: Lang) => (key: TranslationKey) =>
+  translations[lang][key];
 
 
 
   const [resetKey, setResetKey] = useState(0);
   const [activeTab, setActiveTab] = useState<"paid" | "free">("paid");
   const [language, setLanguage] = useState<"ru" | "en">("ru");
+  const t = useTranslation(language);
+
   const [flagAnim] = useState(new Animated.Value(0));
   const [currentFlag, setCurrentFlag] = useState(language);
   const [animation] = useState(new Animated.Value(0));
@@ -203,24 +242,25 @@ const [starsAmount, setStarsAmount] = useState("");
           </View>
 
           {/* Переключатель Paid / Free */}
-          <View style={[styles.switchContainer, { width: switchWidth }]}>
-            <Animated.View style={[styles.switchHighlight, { transform: [{ translateX }] }]} />
-            {["paid","free"].map(tab => (
-              <TouchableWithoutFeedback
-                key={tab}
-                onPress={() =>
-                  Animated.timing(animation, { toValue: tab === "paid" ? 0 : 1, duration: 250, useNativeDriver: false })
-                    .start(() => setActiveTab(tab as any))
-                }
-              >
-                <View style={styles.switchButton}>
-                  <Text style={[styles.switchText, activeTab === tab && styles.switchTextActive]}>
-                    {tab === "paid" ? "Paid" : "Free"}
-                  </Text>
-                </View>
-              </TouchableWithoutFeedback>
-            ))}
-          </View>
+<View style={[styles.switchContainer, { width: switchWidth }]}>
+  <Animated.View style={[styles.switchHighlight, { transform: [{ translateX }] }]} />
+  {["paid", "free"].map(tab => (
+    <TouchableWithoutFeedback
+      key={tab}
+      onPress={() =>
+        Animated.timing(animation, { toValue: tab === "paid" ? 0 : 1, duration: 250, useNativeDriver: false })
+          .start(() => setActiveTab(tab as any))
+      }
+    >
+      <View style={styles.switchButton}>
+        <Text style={[styles.switchText, activeTab === tab && styles.switchTextActive]}>
+          {t(tab as "paid" | "free")}
+        </Text>
+      </View>
+    </TouchableWithoutFeedback>
+  ))}
+</View>
+
 
           {/* Сетка подарков */}
           <View style={[styles.giftGrid, { width: switchWidth }]}>
@@ -288,7 +328,7 @@ const [starsAmount, setStarsAmount] = useState("");
 {result && (
   <View style={styles.resultWrapper}>
     <View style={styles.resultModal}>
-      <Text style={styles.resultTitle}>Congratulations!</Text>
+      <Text style={styles.resultTitle}>  {t("congratulations")}</Text>
       <View style={[styles.cardOnly, { width: iconSize, height: iconSize }]}>
         <Image source={result.icon} style={styles.cardIcon} resizeMode="contain" />
       </View>
@@ -317,6 +357,7 @@ const [starsAmount, setStarsAmount] = useState("");
 
 
 {/* === Bottom Sheet Пополнения (Deposit) === */}
+{/* === Bottom Sheet Пополнения (Deposit) === */}
 <CustomBottomSheet
   visible={showDepositSheet}
   onClose={() => setShowDepositSheet(false)}
@@ -328,14 +369,14 @@ const [starsAmount, setStarsAmount] = useState("");
     showsVerticalScrollIndicator={false}
     nestedScrollEnabled
   >
-    <Text style={styles.sheetTitle}>Enter amount</Text>
+    <Text style={styles.sheetTitle}>{t("enterAmount")}</Text>
 
     {/* Tabs */}
     <View style={styles.tabRow}>
       {[
-        { key: "Gifts", label: "Gifts", icon: require("../components/icons/gift.png") },
-        { key: "Stars", label: "Stars", icon: require("../components/icons/star.svg") },
-        { key: "TON", label: "TON", icon: require("../components/icons/ton.svg") },
+        { key: "Gifts", label: t("gifts"), icon: require("../components/icons/gift.png") },
+        { key: "Stars", label: t("stars"), icon: require("../components/icons/star.svg") },
+        { key: "TON", label: t("ton"), icon: require("../components/icons/ton.svg") },
       ].map(({ key, label, icon }) => {
         const activeTab = selectedTab === key;
         return (
@@ -370,7 +411,7 @@ const [starsAmount, setStarsAmount] = useState("");
     {(selectedTab === "Stars" || selectedTab === "TON") && (
       <View style={{ marginTop: 30, width: "100%", alignItems: "center" }}>
         <Text style={styles.inputLabel}>
-          {selectedTab === "Stars" ? "Amount of Stars" : "Amount of TON"}
+          {selectedTab === "Stars" ? t("amountOfStars") : t("amountOfTon")}
         </Text>
 
         <View style={styles.inputWrapper}>
@@ -385,9 +426,11 @@ const [starsAmount, setStarsAmount] = useState("");
             }
           />
           <Animated.Image
-            source={selectedTab === "Stars"
-              ? require("../components/icons/star.svg")
-              : require("../components/icons/ton.svg")}
+            source={
+              selectedTab === "Stars"
+                ? require("../components/icons/star.svg")
+                : require("../components/icons/ton.svg")
+            }
             resizeMode="contain"
             style={styles.inputIcon}
           />
@@ -426,9 +469,9 @@ const [starsAmount, setStarsAmount] = useState("");
               x="50%"
               y="45%"
               textAnchor="middle"
-              letterSpacing={3}
+              letterSpacing={1.5}
             >
-              CONNECT WALLET
+              {t("connectWallet")}
             </SvgText>
             <SvgText
               fill="#FFF"
@@ -438,9 +481,9 @@ const [starsAmount, setStarsAmount] = useState("");
               x="50%"
               y="45%"
               textAnchor="middle"
-              letterSpacing={3}
+              letterSpacing={1.5}
             >
-              CONNECT WALLET
+              {t("connectWallet")}
             </SvgText>
           </Svg>
         </TouchableOpacity>
@@ -448,6 +491,7 @@ const [starsAmount, setStarsAmount] = useState("");
     )}
   </ScrollView>
 </CustomBottomSheet>
+
 
 
 

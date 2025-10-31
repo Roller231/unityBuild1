@@ -211,19 +211,7 @@ const t = useTranslation(language);
 
   const [fontLoaded, setFontLoaded] = useState(false);
 
-useEffect(() => {
-  const loadFont = async () => {
-    await Font.loadAsync({
-      "SF-Pro-Semibold": require("../fonts/SF-Pro-Display-Semibold.otf"),
-      "SF-Pro-Medium": require("../fonts/SF-Pro-Display-Medium.otf"),
-      "SF-Pro-Regular": require("../fonts/SF-Pro-Display-Regular.otf"),
-      "SF-Pro-Bold": require("../fonts/SF-Pro-Display-Bold.otf"),
 
-    });
-    setFontLoaded(true);
-  };
-  loadFont();
-}, []);
 
 
 

@@ -1,6 +1,6 @@
 // app/_layout.tsx
 import React, { useEffect, useState, useRef, useCallback } from "react";
-import { View, StyleSheet, ImageBackground, Animated, Easing, Dimensions } from "react-native";
+import { View, StyleSheet, ImageBackground, Animated, Easing, Dimensions, Platform } from "react-native";
 import { Tabs } from "expo-router";
 import * as Font from "expo-font";
 import { Asset } from "expo-asset";
@@ -46,6 +46,22 @@ export default function RootLayout() {
       useNativeDriver: false,
     }).start();
   };
+
+
+  useEffect(() => {
+  if (Platform.OS === "web") {
+    const style = document.createElement("style");
+    style.innerHTML = `
+      * {
+        -webkit-user-select: none !important;
+        -moz-user-select: none !important;
+        -ms-user-select: none !important;
+        user-select: none !important;
+      }
+    `;
+    document.head.appendChild(style);
+  }
+}, []);
 
   useEffect(() => {
     const initialize = async () => {

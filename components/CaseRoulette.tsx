@@ -15,12 +15,36 @@ import Svg, { Text as SvgText } from "react-native-svg";
 import GiftCard, { DropItem } from "../components/Buttons/GiftCard";
 import { useTelegramPlatform } from "@/hooks/useTelegramPlatform";
 import OrangePng from "../components/icons/OrangePng.png";
+import AsyncStorage from "@react-native-async-storage/async-storage";
+import { onLanguageChange } from "@/components/languageEvents";
 
-const { width: screenWidth, height: screenHeight } = Dimensions.get("window");
+const { width: screenWidth } = Dimensions.get("window");
 const FIXED_WIN_INDEX = 50;
 const ITEM_GAP = 10;
 const SIDE_PADDING = 16;
 const GRID_COLUMNS = 3;
+
+// 🌍 Переводы
+const translations = {
+  ru: {
+    caseOpening: "ОТКРЫТИЕ КЕЙСА",
+    open: "ОТКРЫТЬ",
+    opening: "ОТКРЫВАЕТСЯ...",
+    whatsInside: "Что внутри?",
+  },
+  en: {
+    caseOpening: "CASE OPENING",
+    open: "OPEN",
+    opening: "OPENING...",
+    whatsInside: "What's inside?",
+  },
+} as const;
+
+type Lang = keyof typeof translations;
+type TranslationKey = keyof typeof translations["en"];
+
+const useTranslation = (lang: Lang) => (key: TranslationKey) =>
+  translations[lang][key];
 
 interface CaseRouletteProps {
   items: DropItem[];
@@ -32,7 +56,6 @@ interface CaseRouletteProps {
   title?: string;
   spinning?: boolean;
   disableClose?: boolean;
-
 }
 
 export default function CaseRoulette({
@@ -42,7 +65,7 @@ export default function CaseRoulette({
   onFinish,
   onSpin,
   speed = 1,
-  title = "CASE OPENING",
+  title,
   spinning = false,
 }: CaseRouletteProps) {
   const anim = useRef(new Animated.Value(0)).current;
@@ -50,7 +73,22 @@ export default function CaseRoulette({
   const [isSpinning, setIsSpinning] = useState(false);
   const [targetOffset, setTargetOffset] = useState(0);
   const [winningItem, setWinningItem] = useState<DropItem | null>(null);
-  const [btnKey, setBtnKey] = useState(0);
+  const [language, setLanguage] = useState<"ru" | "en">("ru");
+  const t = useTranslation(language);
+
+  // === Читаем язык из AsyncStorage и подписываемся на изменения ===
+  useEffect(() => {
+    const loadLanguage = async () => {
+      const saved = await AsyncStorage.getItem("app_language");
+      if (saved === "ru" || saved === "en") setLanguage(saved);
+    };
+    loadLanguage();
+
+    const unsub = onLanguageChange((newLang) => {
+      if (newLang === "ru" || newLang === "en") setLanguage(newLang);
+    });
+    return unsub;
+  }, []);
 
   const platform = useTelegramPlatform();
   const isDesktop = platform === "tdesktop" || platform === "macos";
@@ -69,11 +107,13 @@ export default function CaseRoulette({
   const generateRandomItems = (arr: DropItem[], count: number) =>
     Array.from({ length: count }, () => getRandomItem(arr));
 
+  // --- Начальная генерация ---
   useEffect(() => {
     if (items.length > 0) setDisplayItems(generateRandomItems(items, 20));
     anim.setValue(0);
   }, [items]);
 
+  // --- Подготовка к кручению ---
   useEffect(() => {
     if (!active || !resultId || isSpinning || items.length === 0) return;
     const winner = items.find((i) => i.id === resultId);
@@ -97,6 +137,7 @@ export default function CaseRoulette({
     setWinningItem(winner);
   }, [active, resultId, items, isSpinning]);
 
+  // --- Анимация вращения ---
   useLayoutEffect(() => {
     if (!isSpinning || !winningItem || targetOffset === 0) return;
 
@@ -120,7 +161,6 @@ export default function CaseRoulette({
 
   return (
     <View style={[styles.container, { width: maxWidth }]}>
-      {/* Весь контент меню — прокручиваемый */}
       <ScrollView
         style={styles.scrollContainer}
         contentContainerStyle={{
@@ -130,7 +170,7 @@ export default function CaseRoulette({
         showsVerticalScrollIndicator={false}
       >
         {/* Заголовок */}
-        <Text style={styles.titleText}>{title}</Text>
+        <Text style={styles.titleText}>{title || t("caseOpening")}</Text>
 
         {/* 🎡 Рулетка */}
         <View
@@ -163,63 +203,62 @@ export default function CaseRoulette({
           <View style={styles.indicator} />
         </View>
 
-{/* === Кнопка SPIN закреплена внизу === */}
-<View style={styles.bottomButtonContainer}>
-        <TouchableOpacity
-          activeOpacity={0.9}
-          style={[
-            styles.betButton,
-            { width: maxWidth * 0.9 },
-            spinning && { opacity: 0.6 },
-          ]}
-          onPress={onSpin}
-          disabled={spinning}
-        >
-          <Image
-            key={btnKey}
-            source={OrangePng}
+        {/* === Кнопка SPIN === */}
+        <View style={styles.bottomButtonContainer}>
+          <TouchableOpacity
+            activeOpacity={0.9}
             style={[
-              StyleSheet.absoluteFillObject,
-              { width: "113%", height: "150%", top: -5, left: -25 },
+              styles.betButton,
+              { width: maxWidth * 0.9 },
+              spinning && { opacity: 0.6 },
             ]}
-            resizeMode="cover"
-          />
+            onPress={onSpin}
+            disabled={spinning}
+          >
+            <Image
+              source={OrangePng}
+              style={[
+                StyleSheet.absoluteFillObject,
+                { width: "113%", height: "150%", top: -5, left: -25 },
+              ]}
+              resizeMode="cover"
+            />
 
-          <Svg height="100%" width="100%" style={StyleSheet.absoluteFillObject}>
-            <SvgText
-              fill="none"
-              stroke="#D35100"
-              strokeWidth={5}
-              fontSize={25}
-              fontFamily="SF-Pro-Heavy"
-              fontWeight="900"
-              x="50%"
-              y="50%"
-              textAnchor="middle"
-              alignmentBaseline="middle"
-              letterSpacing={3}
-            >
-              {spinning ? "OPENING..." : "OPEN"}
-            </SvgText>
-            <SvgText
-              fill="#FFF"
-              fontSize={25}
-              fontFamily="SF-Pro-Heavy"
-              fontWeight="900"
-              x="50%"
-              y="50%"
-              textAnchor="middle"
-              alignmentBaseline="middle"
-              letterSpacing={3}
-            >
-              {spinning ? "OPENING..." : "OPEN"}
-            </SvgText>
-          </Svg>
-        </TouchableOpacity>
-      </View>
+            <Svg height="100%" width="100%" style={StyleSheet.absoluteFillObject}>
+              <SvgText
+                fill="none"
+                stroke="#D35100"
+                strokeWidth={5}
+                fontSize={25}
+                fontFamily="SF-Pro-Heavy"
+                fontWeight="900"
+                x="50%"
+                y="50%"
+                textAnchor="middle"
+                alignmentBaseline="middle"
+                letterSpacing={3}
+              >
+                {spinning ? t("opening") : t("open")}
+              </SvgText>
+              <SvgText
+                fill="#FFF"
+                fontSize={25}
+                fontFamily="SF-Pro-Heavy"
+                fontWeight="900"
+                x="50%"
+                y="50%"
+                textAnchor="middle"
+                alignmentBaseline="middle"
+                letterSpacing={3}
+              >
+                {spinning ? t("opening") : t("open")}
+              </SvgText>
+            </Svg>
+          </TouchableOpacity>
+        </View>
 
         {/* What's inside */}
-        <Text style={styles.whatsInsideText}>What's inside?</Text>
+        <Text style={styles.whatsInsideText}>{t("whatsInside")}</Text>
         <View
           style={[
             styles.gridContainer,
@@ -247,8 +286,6 @@ export default function CaseRoulette({
           ))}
         </View>
       </ScrollView>
-
-      
     </View>
   );
 }
@@ -268,7 +305,7 @@ const styles = StyleSheet.create({
     fontSize: 22,
     fontWeight: "700",
     marginTop: 10,
-    fontFamily:"SF-Pro-Heavy",
+    fontFamily: "SF-Pro-Heavy",
     marginBottom: 8,
     textAlign: "center",
     letterSpacing: 1,
@@ -313,17 +350,13 @@ const styles = StyleSheet.create({
     flexWrap: "wrap",
     justifyContent: "flex-start",
   },
-  bottomButtonContainer: {
-    
-  },
-  
+  bottomButtonContainer: {},
   betButton: {
     height: Platform.OS === "web" ? 80 : 70,
     borderRadius: 35,
     overflow: "hidden",
     alignItems: "center",
     justifyContent: "center",
-
     elevation: 10,
   },
 });

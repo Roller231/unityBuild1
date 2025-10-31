@@ -27,6 +27,9 @@ import vzryv from "../components/icons/vzryv.json";
 import LottieView from "lottie-react-native";
 import lottieWeb from "lottie-web";
 
+import AsyncStorage from "@react-native-async-storage/async-storage";
+import { onLanguageChange } from "@/components/languageEvents";
+
 import ava from "../components/icons/AvatarTest.svg";
 import Venus from "../components/icons/Venus.svg";
 import bliks from "../components/icons/bliks.svg";
@@ -78,6 +81,60 @@ const Crash: React.FC = () => {
   const [autoValue, setAutoValue] = useState("2.0");
 
   const rotation = useRef(new Animated.Value(0)).current;
+
+  // 🌍 Переводы
+const translations = {
+  ru: {
+    enterAmount: "Введите сумму",
+    gifts: "Внести",
+    stars: "Звёзды",
+    ton: "TON",
+    amountOfStars: "Количество звёзд",
+    amountOfTon: "Количество TON",
+    autoCashout: "Авто-вывод",
+    placeBet: "СДЕЛАТЬ СТАВКУ",
+    inventoryEmpty: "🎁 Инвентарь пуст (скоро будет доступен)",
+  },
+  en: {
+    enterAmount: "Enter amount",
+    gifts: "Gifts",
+    stars: "Stars",
+    ton: "TON",
+    amountOfStars: "Amount of Stars",
+    amountOfTon: "Amount of TON",
+    autoCashout: "Auto cashout",
+    placeBet: "PLACE BET",
+    inventoryEmpty: "🎁 Inventory is empty (coming soon)",
+  },
+} as const;
+
+type Lang = keyof typeof translations;
+type TranslationKey = keyof typeof translations["en"];
+
+const useTranslation = (lang: Lang) => (key: TranslationKey) =>
+  translations[lang][key];
+
+
+
+
+// ...
+
+const [language, setLanguage] = useState<"ru" | "en">("ru");
+const t = useTranslation(language);
+
+useEffect(() => {
+  const loadLang = async () => {
+    const saved = await AsyncStorage.getItem("app_language");
+    if (saved === "ru" || saved === "en") setLanguage(saved);
+  };
+  loadLang();
+
+  const unsub = onLanguageChange((newLang) => {
+    if (newLang === "ru" || newLang === "en") setLanguage(newLang);
+  });
+  return unsub;
+}, []);
+
 
   useFocusEffect(
     useCallback(() => {
@@ -436,7 +493,8 @@ const reloadTimer = setTimeout(() => {
                 alignmentBaseline="middle"
                 letterSpacing={3}
               >
-                PLACE BET
+                                      {t("placeBet")}
+
               </SvgText>
               <SvgText
                 fill="#FFF"
@@ -449,7 +507,8 @@ const reloadTimer = setTimeout(() => {
                 alignmentBaseline="middle"
                 letterSpacing={3}
               >
-                PLACE BET
+                                      {t("placeBet")}
+
               </SvgText>
             </Svg>
           </TouchableOpacity>
@@ -490,15 +549,16 @@ const reloadTimer = setTimeout(() => {
           showsVerticalScrollIndicator={false}
           nestedScrollEnabled
         >
-          <Text style={styles.sheetTitle}>Enter amount</Text>
+<Text style={styles.sheetTitle}>{t("enterAmount")}</Text>
 
           {/* Tabs */}
           <View style={styles.tabRow}>
-            {[
-              { key: "Gifts", label: "Gifts", icon: giftIcon },
-              { key: "Stars", label: "Stars", icon: starIcon },
-              { key: "TON", label: "TON", icon: tonIcon },
-            ].map(({ key, label, icon }) => {
+{[
+  { key: "Gifts", label: t("gifts"), icon: giftIcon },
+  { key: "Stars", label: t("stars"), icon: starIcon },
+  { key: "TON", label: t("ton"), icon: tonIcon },
+].map(({ key, label, icon }) => {
+
               const activeTab = selectedTab === key;
               return (
                 <TouchableOpacity
@@ -525,15 +585,16 @@ const reloadTimer = setTimeout(() => {
           {/* Content */}
           {selectedTab === "Gifts" && (
             <View style={{ marginTop: 32, alignItems: "center" }}>
-              <Text style={{ color: "#aaa" }}>🎁 Inventory is empty (coming soon)</Text>
+<Text style={{ color: "#aaa" }}>{t("inventoryEmpty")}</Text>
             </View>
           )}
 
           {(selectedTab === "Stars" || selectedTab === "TON") && (
             <View style={{ marginTop: 30, width: "100%", alignItems: "center" }}>
-              <Text style={styles.inputLabel}>
-                {selectedTab === "Stars" ? "Amount of Stars" : "Amount of TON"}
-              </Text>
+<Text style={styles.inputLabel}>
+  {selectedTab === "Stars" ? t("amountOfStars") : t("amountOfTon")}
+</Text>
+
 
               <View style={styles.inputWrapper}>
                 <TextInput
@@ -558,7 +619,7 @@ const reloadTimer = setTimeout(() => {
                   style={[styles.checkbox, autoCashout && styles.checkboxActive]}
                   onPress={() => setAutoCashout((prev) => !prev)}
                 />
-                <Text style={styles.autoLabel}>Auto cashout</Text>
+<Text style={styles.autoLabel}>{t("autoCashout")}</Text>
 
                 <View style={styles.autoValueRow}>
                   <TouchableOpacity
@@ -609,7 +670,7 @@ const reloadTimer = setTimeout(() => {
                     alignmentBaseline="middle"
                     letterSpacing={3}
                   >
-                    PLACE BET
+                      {t("placeBet")}
                   </SvgText>
                   <SvgText
                     fill="#FFF"
@@ -622,7 +683,7 @@ const reloadTimer = setTimeout(() => {
                     alignmentBaseline="middle"
                     letterSpacing={3}
                   >
-                    PLACE BET
+                      {t("placeBet")}
                   </SvgText>
                 </Svg>
               </TouchableOpacity>
