@@ -294,6 +294,7 @@ useEffect(() => {
   
     const final = Number(lastMultiplier.toFixed(2));
   
+    // 🟣 сохраняем множитель в историю
     if (final > 1) {
       setPastCoeffs((prev) => {
         const next = [...prev, final];
@@ -301,42 +302,60 @@ useEffect(() => {
       });
     }
   
-    // Останавливаем текущий движок
+    // 💥 Останавливаем движок
     if (engine) {
       cancelAnimationFrame((engine as any)._frameId);
       engine.state = CrashEngineState.Over;
+      engine.destroy?.();
       setEngine(null);
     }
   
+    // 💣 Удаляем Lottie-анимацию (если Web)
     if (Platform.OS === "web") {
       const vz = document.getElementById("vzryv-container");
       if (vz) vz.innerHTML = "";
     }
   
-    // ⚡ Через 1.5 секунды перезапускаем страницу (или перерисовываем компонент)
-// ⚡ Мягкий сброс без полной перезагрузки страницы
-const reloadTimer = setTimeout(() => {
-  // очистка Lottie и движка
-  if (Platform.OS === "web") {
-    const vz = document.getElementById("vzryv-container");
-    if (vz) vz.innerHTML = "";
-  }
-
-  if (engine) {
-    engine.destroy();
-    setEngine(null);
-  }
-
-  // просто пересоздать игру с новым key
-  setResetKey((k) => k + 1);
-  setPhase("idle");
-  setCount(3);
-  setPastCoeffs([]); // можно очищать историю
-}, 1200);
-
+    // ⚡ Через короткую паузу — перезагрузка (чистая)
+    const reloadTimer = setTimeout(() => {
+      if (Platform.OS === "web") {
+        window.location.reload();
+      } else {
+        // На мобильных имитируем reload
+        setPhase("idle");
+        setCount(3);
+        setCurrentMultiplier(1);
+        setLastMultiplier(1);
+        setPastCoeffs([]);
+        setEngine(null);
+      }
+    }, 1200); // немного подождём окончания анимации взрыва
   
     return () => clearTimeout(reloadTimer);
   }, [phase]);
+  
+
+  
+  useFocusEffect(
+    useCallback(() => {
+      // При фокусе — активируем, как сейчас
+      setActive(true);
+  
+      return () => {
+        // 🔁 Когда пользователь УХОДИТ со страницы:
+        // сбрасываем всё как при “перезагрузке”
+        setActive(false);
+        setPhase("idle");
+        setCount(3);
+        setEngine(null);
+        setCurrentMultiplier(1);
+        setLastMultiplier(1);
+        setPastCoeffs([]);
+        setShowBottomSheet(false);
+        setResetKey((k) => k + 1); // 🔥 заставит компонент обновиться полностью
+      };
+    }, [])
+  );
   
 
   useEffect(() => {
@@ -394,8 +413,8 @@ const reloadTimer = setTimeout(() => {
         />
 
 {/* Краш-граф поверх всех слоёв */}
-{phase === "flight" && (
-  <View style={styles.graphOverlay}>
+<View style={styles.graphOverlay}>
+  {phase === "flight" && (
     <CrashGraph
       engine={engine}
       active={active && phase === "flight"}
@@ -404,8 +423,9 @@ const reloadTimer = setTimeout(() => {
         setLastMultiplier(m);
       }}
     />
-  </View>
-)}
+  )}
+</View>
+
 
         {/* === ВЕРХНЯЯ ЧАСТЬ === */}
         <View style={styles.topSection}>
@@ -485,10 +505,12 @@ const reloadTimer = setTimeout(() => {
 
         {/* === НИЖНЯЯ ЧАСТЬ === */}
         <View style={styles.bottomSection}>
-          <HistoryBar
-            history={[...pastCoeffs, currentMultiplier]}
-            activeIndex={pastCoeffs.length}
-          />
+        <HistoryBar
+  history={[...pastCoeffs, currentMultiplier]}
+  activeIndex={pastCoeffs.length}
+  phase={phase}
+/>
+
 
           <TouchableOpacity
             activeOpacity={0.9}
@@ -882,7 +904,7 @@ const createStyles = (fixedWidth: number, screenHeight: number) =>
     
     
     topSection: {
-      height: screenHeight * 0.5,
+      height: screenHeight * 0.45,
       width: "100%",
       alignItems: "center",
       justifyContent: "center",

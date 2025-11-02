@@ -296,7 +296,7 @@ const useTranslation = (lang: Lang) => (key: TranslationKey) =>
         <View style={[styles.sheetContainer, styles.sheetBorder]}>
           <View style={styles.sheetContent}>
             <CaseRoulette
-              title="MEGA CASE OPENING"
+              
               items={sampleDrops}
               active={spinning}
               resultId={resultId}

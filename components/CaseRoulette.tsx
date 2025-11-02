@@ -204,58 +204,55 @@ export default function CaseRoulette({
         </View>
 
         {/* === Кнопка SPIN === */}
-        <View style={styles.bottomButtonContainer}>
-          <TouchableOpacity
-            activeOpacity={0.9}
-            style={[
-              styles.betButton,
-              { width: maxWidth * 0.9 },
-              spinning && { opacity: 0.6 },
-            ]}
-            onPress={onSpin}
-            disabled={spinning}
-          >
-            <Image
-              source={OrangePng}
-              style={[
-                StyleSheet.absoluteFillObject,
-                { width: "113%", height: "150%", top: -5, left: -25 },
-              ]}
-              resizeMode="cover"
-            />
+        {/* === Кнопка SPIN === */}
+<View style={styles.bottomButtonContainer}>
+  <TouchableOpacity
+    activeOpacity={0.9}
+    style={[styles.betButton, { width: maxWidth * 1.4 }]} // ✅ как в Profile
+    onPress={onSpin}
+    disabled={spinning}
+  >
+    {/* 🔸 Оранжевый фон */}
+    <Image source={OrangePng} style={styles.orangePng} resizeMode="contain" />
 
-            <Svg height="100%" width="100%" style={StyleSheet.absoluteFillObject}>
-              <SvgText
-                fill="none"
-                stroke="#D35100"
-                strokeWidth={5}
-                fontSize={25}
-                fontFamily="SF-Pro-Heavy"
-                fontWeight="900"
-                x="50%"
-                y="50%"
-                textAnchor="middle"
-                alignmentBaseline="middle"
-                letterSpacing={3}
-              >
-                {spinning ? t("opening") : t("open")}
-              </SvgText>
-              <SvgText
-                fill="#FFF"
-                fontSize={25}
-                fontFamily="SF-Pro-Heavy"
-                fontWeight="900"
-                x="50%"
-                y="50%"
-                textAnchor="middle"
-                alignmentBaseline="middle"
-                letterSpacing={3}
-              >
-                {spinning ? t("opening") : t("open")}
-              </SvgText>
-            </Svg>
-          </TouchableOpacity>
-        </View>
+    {/* 🔸 SVG-текст, центрированный и масштабируемый */}
+    <Svg
+      height="100%"
+      width="100%"
+      style={StyleSheet.absoluteFillObject}
+      viewBox="0 0 400 100"
+      preserveAspectRatio="xMidYMid meet"
+    >
+      <SvgText
+        fill="none"
+        stroke="#D35100"
+        strokeWidth={5}
+        fontSize="20"
+        fontFamily="SF-Pro-Heavy"
+        fontWeight="900"
+        x="50%"
+        y="45%"
+        textAnchor="middle"
+        letterSpacing={2}
+      >
+        {spinning ? t("opening") : t("open")}
+      </SvgText>
+      <SvgText
+        fill="#FFF"
+        fontSize="20"
+        fontFamily="SF-Pro-Heavy"
+        fontWeight="900"
+        x="50%"
+        y="45%"
+        textAnchor="middle"
+        letterSpacing={2}
+      >
+        {spinning ? t("opening") : t("open")}
+      </SvgText>
+    </Svg>
+  </TouchableOpacity>
+</View>
+
 
         {/* What's inside */}
         <Text style={styles.whatsInsideText}>{t("whatsInside")}</Text>
@@ -291,6 +288,28 @@ export default function CaseRoulette({
 }
 
 const styles = StyleSheet.create({
+
+  orangePng: {
+    width: "100%",
+    height: "100%",
+    position: "absolute",
+    top: 0,
+    left: 0,
+    resizeMode: "contain",
+  },
+  
+  betButton: {
+    width: "85%",
+    aspectRatio: 4.8, // 🔥 как в Profile — сохраняет пропорции
+    borderRadius: 100,
+    alignItems: "center",
+    justifyContent: "center",
+    overflow: "hidden",
+    alignSelf: "center",
+    marginTop: 25,
+  },
+  
+  
   container: {
     flex: 1,
     alignItems: "center",
@@ -351,12 +370,7 @@ const styles = StyleSheet.create({
     justifyContent: "flex-start",
   },
   bottomButtonContainer: {},
-  betButton: {
-    height: Platform.OS === "web" ? 80 : 70,
-    borderRadius: 35,
-    overflow: "hidden",
-    alignItems: "center",
-    justifyContent: "center",
-    elevation: 10,
-  },
+
+  
+  
 });
