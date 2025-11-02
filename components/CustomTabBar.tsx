@@ -155,7 +155,7 @@ function getTabIcon(name: string, active: boolean) {
 const styles = StyleSheet.create({
   wrapper: {
     position: "absolute",
-    bottom: 30,
+    bottom: 10,
     alignSelf: "center",
     borderRadius: 16,
     overflow: "hidden",

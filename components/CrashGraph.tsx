@@ -6,10 +6,6 @@ import LottieView from "lottie-react-native";
 import lottieWeb from "lottie-web";
 import catFly from "../components/icons/catFly.json";
 
-
-
-
-
 interface CrashGraphProps {
   engine: CrashEngine | null;
   active?: boolean;
@@ -27,13 +23,31 @@ export default function CrashGraph({
   const lastUpdate = useRef(0);
 
   const { width: screenWidth, height: screenHeight } = Dimensions.get("window");
-  const graphWidth = screenWidth * 0.95;
-  const graphHeight =
-    Platform.OS === "web" ? screenHeight * 0.45 : screenHeight * 0.5;
 
-  // Адаптивный размер кота (в 1.5 раза больше оригинала)
-  const baseSize = screenWidth * 0.45; // раньше примерно 280px → теперь динамически
-  const catSize = Math.min(baseSize * 2, 450); // ограничим максимум, чтобы не вылезал за экран
+  // ⚙️ Адаптивные размеры в зависимости от экрана
+  const isSmall = screenHeight < 700 || screenWidth < 380;
+  const isLarge = screenWidth > 1000;
+
+  const graphWidth = isLarge
+    ? 600
+    : isSmall
+    ? screenWidth * 0.9
+    : screenWidth * 0.95;
+
+    const graphHeight = isLarge
+    ? 350
+    : isSmall
+    ? screenHeight * 0.42 // ✅ было 0.32 → теперь выше
+    : screenHeight * 0.48;
+  
+
+  // 🐱 Размер кота
+  const baseCatSize = isLarge
+    ? 420
+    : isSmall
+    ? screenWidth * 0.65
+    : screenWidth * 0.45;
+  const catSize = Math.min(baseCatSize * 1.5, 480);
 
   const webCanvasStyle: React.CSSProperties = {
     borderRadius: 12,
@@ -70,13 +84,13 @@ export default function CrashGraph({
 
     ctx.beginPath();
     ctx.strokeStyle = "#A57BFF";
-    ctx.lineWidth = 3;
+    ctx.lineWidth = isLarge ? 4 : isSmall ? 2 : 3;
     ctx.moveTo(0, startY);
     ctx.quadraticCurveTo(mid.x, mid.y + offsetY, end.x, end.y);
     ctx.stroke();
 
     const text = `x${multiplier.toFixed(2)}`;
-    const fontSize = 64;
+    const fontSize = isLarge ? 72 : isSmall ? 44 : 58;
     ctx.font = `1000 ${fontSize}px "SF Pro", sans-serif`;
     ctx.textAlign = "center";
     ctx.textBaseline = "middle";
@@ -93,7 +107,7 @@ export default function CrashGraph({
 
     ctx.lineWidth = 1.2;
     ctx.strokeStyle = "#070908";
-    const textY = height / 2 - 60;
+    const textY = height / 2 - (isLarge ? 137 : isSmall ? 57 : 77);
     ctx.strokeText(text, width / 2, textY);
     ctx.fillStyle = gradient;
     ctx.fillText(text, width / 2, textY);
@@ -129,7 +143,7 @@ export default function CrashGraph({
 
     frameId = requestAnimationFrame(draw);
     return () => cancelAnimationFrame(frameId);
-  }, [engine, active]);
+  }, [engine, active, graphWidth, graphHeight]);
 
   // === Canvas (Mobile) ===
   const handleCanvas = (canvas: any) => {
@@ -152,7 +166,7 @@ export default function CrashGraph({
     if (Platform.OS === "web") {
       const container = webLottieContainer.current;
       if (!container) return;
-  
+
       anim = lottieWeb.loadAnimation({
         container,
         renderer: "svg",
@@ -160,53 +174,52 @@ export default function CrashGraph({
         autoplay: active,
         animationData: catFly,
       });
-  
+
       anim.setSpeed(0.8);
       if (!active) anim.pause();
     } else if (lottieRef.current) {
       active ? lottieRef.current.play() : lottieRef.current.pause();
     }
-  
-    // 💣 уничтожаем анимацию при размонтировании
+
     return () => {
       if (anim) anim.destroy();
     };
   }, [active]);
-  
 
   return (
     <View style={styles.container}>
-      {active &&
-        (Platform.OS === "web" ? (
-          <div
-            ref={webLottieContainer}
-            style={{
-              ...styles.catLottieWeb,
-              width: catSize,
-              height: catSize,
-              left: "50%",
-              top: "75%",
-              transform: "translate(-50%, -50%)",
-            }}
-          />
-        ) : (
-          <LottieView
-            ref={lottieRef}
-            source={catFly}
-            autoPlay
-            loop
-            speed={0.8}
-            style={[
-              styles.catLottieMobile,
-              {
-                width: catSize,
-                height: catSize,
-                transform: [{ translateX: -catSize / 2 }],
-                top: "60%", // ⬇️ было 47%, теперь чуть ниже
-              },
-            ]}
-          />
-        ))}
+     {active &&
+  (Platform.OS === "web" ? (
+    <div
+      ref={webLottieContainer}
+      style={{
+        ...styles.catLottieWeb,
+        width: catSize,
+        height: catSize,
+        left: "50%",
+        top: isLarge ? "58%" : isSmall ? "72%" : "68%",
+        transform: "translate(-50%, -50%)",
+      }}
+    />
+  ) : (
+    <LottieView
+      ref={lottieRef}
+      source={catFly}
+      autoPlay
+      loop
+      speed={0.8}
+      style={[
+        styles.catLottieMobile,
+        {
+          width: catSize,
+          height: catSize,
+          transform: [{ translateX: -catSize / 2 }],
+          top: isLarge ? "52%" : isSmall ? "60%" : "58%",
+        },
+      ]}
+    />
+  ))}
+
 
       {Platform.OS === "web" ? (
         <canvas
@@ -231,10 +244,13 @@ export default function CrashGraph({
 
 const styles = StyleSheet.create({
   container: {
-    flex: 1,
     alignItems: "center",
     justifyContent: "center",
     width: "100%",
+    flexGrow: 0,
+    flexShrink: 0,
+    overflow: "visible",
+    position: "relative",
   },
   canvas: {
     borderRadius: 12,
@@ -248,7 +264,6 @@ const styles = StyleSheet.create({
   },
   catLottieMobile: {
     position: "absolute",
-    top: "47%",
     left: "50%",
     opacity: 0.9,
     zIndex: 10,

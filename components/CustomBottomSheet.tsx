@@ -22,10 +22,8 @@ interface Props {
   children?: React.ReactNode;
   blockBackAndroid?: boolean;
   maxWidth?: number;
-  scrollEnabled?: boolean; // ✅ добавлено
+  scrollEnabled?: boolean;
 }
-
-
 
 const CustomBottomSheet: React.FC<Props> = ({
   visible,
@@ -34,7 +32,7 @@ const CustomBottomSheet: React.FC<Props> = ({
   children,
   blockBackAndroid = true,
   maxWidth = 470,
-  scrollEnabled = true, // ✅ включаем по умолчанию
+  scrollEnabled = true,
 }) => {
   const sheetHeight = Math.round(
     SCREEN_HEIGHT * Math.min(Math.max(heightRatio, 0.1), 0.95)
@@ -42,7 +40,6 @@ const CustomBottomSheet: React.FC<Props> = ({
   const translateY = useRef(new Animated.Value(SCREEN_HEIGHT)).current;
   const backdropOpacity = useRef(new Animated.Value(0)).current;
 
-  // --- PanResponder (drag вниз)
   const panResponder = useRef(
     PanResponder.create({
       onMoveShouldSetPanResponder: (_, g) => g.dy > 6,
@@ -61,8 +58,6 @@ const CustomBottomSheet: React.FC<Props> = ({
     })
   ).current;
 
-
-  
   const openSheet = () => {
     translateY.setValue(sheetHeight);
     Animated.sequence([
@@ -98,12 +93,10 @@ const CustomBottomSheet: React.FC<Props> = ({
     ]).start(onClose);
   };
 
-  // ⬆️ Открытие / закрытие
   useEffect(() => {
     if (visible) openSheet();
   }, [visible]);
 
-  // 🔙 блок кнопки "Назад" на Android
   useEffect(() => {
     if (!blockBackAndroid || !visible || Platform.OS !== "android") return;
     const sub = BackHandler.addEventListener("hardwareBackPress", () => {
@@ -135,20 +128,18 @@ const CustomBottomSheet: React.FC<Props> = ({
         >
           {/* затемнение */}
           <Pressable
-  style={StyleSheet.absoluteFill}
-  onPress={() => {
-    // ⚡ Мгновенно скрываем без плавной анимации
-    backdropOpacity.setValue(0);
-    translateY.setValue(sheetHeight);
-    onClose();
-  }}
->
-  <Animated.View
-    pointerEvents="none"
-    style={[styles.backdrop, { opacity: backdropOpacity }]}
-  />
-</Pressable>
-
+            style={StyleSheet.absoluteFill}
+            onPress={() => {
+              backdropOpacity.setValue(0);
+              translateY.setValue(sheetHeight);
+              onClose();
+            }}
+          >
+            <Animated.View
+              pointerEvents="none"
+              style={[styles.backdrop, { opacity: backdropOpacity }]}
+            />
+          </Pressable>
 
           {/* сам шит */}
           <Animated.View style={containerStyle}>
@@ -156,18 +147,25 @@ const CustomBottomSheet: React.FC<Props> = ({
               <View style={styles.handle} />
             </Animated.View>
 
-            {/* ✅ Контент со скроллом */}
+            {/* Контент */}
             {scrollEnabled ? (
               <ScrollView
                 style={styles.scrollArea}
                 contentContainerStyle={styles.scrollContent}
                 showsVerticalScrollIndicator={false}
-                nestedScrollEnabled
+                bounces={false}
+                overScrollMode="never"
+                nestedScrollEnabled={false}
               >
                 {children}
               </ScrollView>
             ) : (
-              <View style={styles.content}>{children}</View>
+              <View
+                style={[styles.content, { flex: 1, overflow: "hidden" }]}
+                pointerEvents="box-none"
+              >
+                {children}
+              </View>
             )}
           </Animated.View>
         </View>
@@ -226,7 +224,6 @@ const styles = StyleSheet.create({
     paddingBottom: 60,
   },
   content: {
-    flex: 1,
     paddingHorizontal: 16,
     paddingTop: 8,
   },

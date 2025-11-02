@@ -10,6 +10,7 @@ import {
   ScrollView,
   Animated,
   Easing,
+  Image,
   TextInput,
 } from "react-native";
 import { useFocusEffect } from "@react-navigation/native";
@@ -22,6 +23,10 @@ import BetItem from "../components/BetItem";
 import StarsBackground from "../components/StarsBackground";
 import { useTelegramPlatform } from "@/hooks/useTelegramPlatform";
 import HistoryBar from "../components/HistoryBar";
+
+import BalanceButton from "../components/Buttons/BalanceButton";
+
+import userIcon from "../components/icons/user.svg"; // или user.svg — смотри по проекту
 
 import vzryv from "../components/icons/vzryv.json";
 import LottieView from "lottie-react-native";
@@ -63,7 +68,7 @@ const Crash: React.FC = () => {
   const isDesktop = platform === "tdesktop" || platform === "macos";
   const fixedWidth = isDesktop ? 470 : Math.min(screenWidth, 470);
 
-  const styles = createStyles(fixedWidth, screenHeight);
+  const styles = createStyles(fixedWidth, screenHeight, isDesktop);
 
   const [resetKey, setResetKey] = useState(0);
   const [phase, setPhase] = useState<"idle" | "countdown" | "flight" | "crash">("idle");
@@ -406,6 +411,28 @@ const reloadTimer = setTimeout(() => {
         ]}
       >
         <StarsBackground />
+{/* === Верхняя панель: Онлайн + Баланс === */}
+{/* === Верхняя панель: Онлайн + Баланс === */}
+<View style={styles.topBar}>
+  {/* Онлайн капсула */}
+{/* Онлайн кнопка в стиле баланса */}
+<View style={styles.onlineOuterGlow}>
+  <View style={styles.onlineContainer}>
+  <Image
+          source={require("../components/icons/user.svg")}
+          style={styles.userIcon}
+          resizeMode="contain"
+        />
+    <Text style={styles.onlineText}>234</Text>
+  </View>
+</View>
+
+
+
+  {/* Баланс справа */}
+  <BalanceButton onPress={() => setShowBottomSheet(true)} />
+</View>
+
 
         {/* вращающаяся планета */}
         <Animated.Image
@@ -425,11 +452,11 @@ const reloadTimer = setTimeout(() => {
           resizeMode="contain"
         />
 
-{/* Краш-граф поверх всех слоёв */}
-<View style={styles.graphOverlay}>
-  {phase === "flight" && (
+        {/* === Отдельный контейнер для CrashGraph === */}
+<View style={styles.graphContainer}>
+  {phase === "flight" && engine && (
     <CrashGraph
-      key={graphKey}              // 🔥 вот это важно
+      key={graphKey}
       engine={engine}
       active={active && phase === "flight"}
       onMultiplierChange={(m) => {
@@ -441,82 +468,153 @@ const reloadTimer = setTimeout(() => {
 </View>
 
 
+{/* Краш-граф поверх всех слоёв */}
 
-        {/* === ВЕРХНЯЯ ЧАСТЬ === */}
-        <View style={styles.topSection}>
-          {phase === "countdown" && (
-            <View style={styles.centered}>
-              <Animated.Image
-                source={bliks}
-                resizeMode="contain"
-                style={{
-                  position: "absolute",
-                  opacity: 0.15,
-                  transform: [{ rotate: rotateInterpolate }],
-                  top: "50%",
-                  left: "50%",
-                  width: isDesktop ? 650 : screenWidth * 1.3,
-                  height: isDesktop ? 650 : screenWidth * 1.3,
-                  marginLeft: isDesktop ? -325 : -(screenWidth * 0.65),
-                  marginTop: isDesktop ? -325 : -(screenWidth * 0.65),
-                }}
-              />
-              <Text
-                style={{
-                  ...(styles.countdownText as any),
-                  background:
-                    "linear-gradient(180deg, #FFAF4D 24.49%, #FFF7A7 57.14%, #FFAF4D 77.55%)",
-                  WebkitBackgroundClip: "text",
-                  WebkitTextFillColor: "transparent",
-                  fontFamily: "SF‑Pro‑Heavy",
-                  fontSize: isDesktop ? 180 : screenWidth * 0.3,
-                  zIndex: 5,
-                }}
-              >
-                {count}
-              </Text>
-            </View>
-          )}
 
 
 
-          {phase === "crash" && (
-            <View style={styles.centered}>
-              {Platform.OS === "web" ? (
-                <div
-                  id="vzryv-container"
-                  style={{
-                    position: "absolute",
-                    top: "50%",
-                    left: "50%",
-                    width: isDesktop ? 500 : screenWidth * 1.1,
-                    height: isDesktop ? 500 : screenWidth * 1.1,
-                    transform: "translate(-50%, -50%)",
-                    pointerEvents: "none",
-                    zIndex: 9999,
-                    background: "transparent",
-                  }}
-                />
-              ) : (
-                <LottieView
-                  source={vzryv}
-                  autoPlay
-                  loop={false}
-                  style={{
-                    width: isDesktop ? 400 : screenWidth * 1.1,
-                    height: isDesktop ? 400 : screenWidth * 1.1,
-                    position: "absolute",
-                    top: "50%",
-                    left: "50%",
-                    transform: [{ translateX: -200 }, { translateY: -200 }],
-                    backgroundColor: "transparent",
-                    zIndex: 9999,
-                  }}
-                />
-              )}
-            </View>
-          )}
-        </View>
+        {/* === ВЕРХНЯЯ ЧАСТЬ === */}
+<View style={styles.topSection}>
+  {/* === Счётчик перед полётом === */}
+  {phase === "countdown" && (
+    <View style={styles.centered}>
+      <Animated.Image
+        source={bliks}
+        resizeMode="contain"
+        style={{
+          position: "absolute",
+          opacity: 0.15,
+          transform: [{ rotate: rotateInterpolate }],
+          top: "50%",
+          left: "50%",
+          width: isDesktop
+            ? 650
+            : screenHeight < 700
+            ? screenWidth * 1.0
+            : screenWidth * 1.2,
+          height: isDesktop
+            ? 650
+            : screenHeight < 700
+            ? screenWidth * 1.0
+            : screenWidth * 1.2,
+          marginLeft: isDesktop
+            ? -325
+            : screenHeight < 700
+            ? -(screenWidth * 0.5)
+            : -(screenWidth * 0.6),
+          marginTop: isDesktop
+            ? -325
+            : screenHeight < 700
+            ? -(screenWidth * 0.5)
+            : -(screenWidth * 0.6),
+        }}
+      />
+      <Text
+        style={{
+          ...(styles.countdownText as any),
+          background:
+            "linear-gradient(180deg, #FFAF4D 24.49%, #FFF7A7 57.14%, #FFAF4D 77.55%)",
+          WebkitBackgroundClip: "text",
+          WebkitTextFillColor: "transparent",
+          fontFamily: "SF-Pro-Heavy",
+          fontSize: isDesktop
+            ? 180
+            : screenHeight < 700
+            ? screenWidth * 0.22
+            : screenWidth * 0.3,
+          zIndex: 5,
+        }}
+      >
+        {count}
+      </Text>
+    </View>
+  )}
+
+  {/* === Полёт === */}
+  {phase === "flight" && (
+    <View
+      style={{
+        width: "100%",
+        alignItems: "center",
+        justifyContent: "center",
+        transform: [
+          {
+            scale:
+              isDesktop
+                ? 1
+                : screenHeight < 700
+                ? 0.75
+                : screenHeight < 850
+                ? 0.9
+                : 1,
+          },
+        ],
+      }}
+    >
+
+
+
+    </View>
+  )}
+
+  {/* === Взрыв === */}
+  {phase === "crash" && (
+    <View style={styles.centered}>
+      {Platform.OS === "web" ? (
+        <div
+          id="vzryv-container"
+          style={{
+            position: "absolute",
+            top: "50%",
+            left: "50%",
+            width: isDesktop
+              ? 400
+              : screenHeight < 700
+              ? screenWidth * 0.9
+              : screenWidth * 1.1,
+            height: isDesktop
+              ? 400
+              : screenHeight < 700
+              ? screenWidth * 0.9
+              : screenWidth * 1.1,
+            transform: "translate(-50%, -50%)",
+            pointerEvents: "none",
+            zIndex: 9999,
+            background: "transparent",
+          }}
+        />
+      ) : (
+        <LottieView
+          source={vzryv}
+          autoPlay
+          loop={false}
+          style={{
+            width: isDesktop
+              ? 400
+              : screenHeight < 700
+              ? screenWidth * 0.9
+              : screenWidth * 1.1,
+            height: isDesktop
+              ? 400
+              : screenHeight < 700
+              ? screenWidth * 0.9
+              : screenWidth * 1.1,
+            position: "absolute",
+            top: "50%",
+            left: "50%",
+            transform: [
+              { translateX: -200 },
+              { translateY: -200 },
+            ],
+            backgroundColor: "transparent",
+            zIndex: 9999,
+          }}
+        />
+      )}
+    </View>
+  )}
+</View>
+
 
         {/* === НИЖНЯЯ ЧАСТЬ === */}
         <View style={styles.bottomSection}>
@@ -541,8 +639,8 @@ const reloadTimer = setTimeout(() => {
               <SvgText
                 fill="none"
                 stroke="#D35100"
-                strokeWidth={5}
-                fontSize={25}
+                strokeWidth={fixedWidth * 0.014} // адаптивная толщина обводки
+                fontSize={fixedWidth * 0.06}     // 🔹 адаптивный размер текста
                 fontFamily="SF‑Pro‑Heavy"
                 fontWeight="900"
                 x="50%"
@@ -556,8 +654,8 @@ const reloadTimer = setTimeout(() => {
               </SvgText>
               <SvgText
                 fill="#FFF"
-                fontSize={25}
-                fontFamily="SF‑Pro‑Heavy"
+                fontSize={fixedWidth * 0.06}     // 🔹 адаптивный размер текста
+                                fontFamily="SF‑Pro‑Heavy"
                 fontWeight="900"
                 x="50%"
                 y="50%"
@@ -718,8 +816,8 @@ const reloadTimer = setTimeout(() => {
                   <SvgText
                     fill="none"
                     stroke="#D35100"
-                    strokeWidth={5}
-                    fontSize={25}
+                    strokeWidth={fixedWidth * 0.014} // адаптивная толщина обводки
+                    fontSize={fixedWidth * 0.06}     // 🔹 адаптивный размер текста
                     fontFamily="SF‑Pro‑Heavy"
                     fontWeight="900"
                     x="50%"
@@ -732,7 +830,7 @@ const reloadTimer = setTimeout(() => {
                   </SvgText>
                   <SvgText
                     fill="#FFF"
-                    fontSize={25}
+                    fontSize={fixedWidth * 0.06}     // 🔹 адаптивный размер текста
                     fontFamily="SF‑Pro‑Heavy"
                     fontWeight="900"
                     x="50%"
@@ -753,7 +851,7 @@ const reloadTimer = setTimeout(() => {
   );
 };
 
-const createStyles = (fixedWidth: number, screenHeight: number) =>
+const createStyles = (fixedWidth: number, screenHeight: number, isDesktop: boolean) =>
   StyleSheet.create({
     textInput: {
       flex: 1,
@@ -907,30 +1005,37 @@ const createStyles = (fixedWidth: number, screenHeight: number) =>
     },
     graphOverlay: {
       position: "absolute",
-      top: screenHeight * 0.05, // 🔹 немного ниже, чтобы не залезал на планету
+      top: screenHeight * 0.20, // 🔹 граф теперь ниже топ-бара
       left: 0,
       width: "100%",
-      height: screenHeight * 0.36, // 🔹 уменьшенная высота
+      height: screenHeight * 0.35,
       alignItems: "center",
       justifyContent: "center",
       zIndex: 3,
-      pointerEvents: "none", // 🔹 чтобы не блокировал касания
+      pointerEvents: "none",
     },
+    
     
     
     topSection: {
-      height: screenHeight * 0.45,
       width: "100%",
       alignItems: "center",
       justifyContent: "center",
+      // 🔹 адаптация под экран
+      height: isDesktop
+        ? screenHeight * 0.45
+        : screenHeight < 700
+        ? screenHeight * 0.3
+        : screenHeight * 0.4,
     },
+    
     centered: { alignItems: "center", justifyContent: "center", width: "100%" },
     bottomSection: {
       height: screenHeight * 0.5,
       width: "100%",
       alignItems: "center",
       justifyContent: "flex-start",
-      gap: 10,
+      gap: 5,
     },
     countdownText: { fontSize: 150, fontWeight: "900", textAlign: "center" },
     betButton: {
@@ -947,6 +1052,164 @@ const createStyles = (fixedWidth: number, screenHeight: number) =>
       flex: 1,
       overflow: "hidden",
     },
+
+
+
+
+    topBar: {
+      flexDirection: "row",
+      justifyContent: "space-between",
+      alignItems: "center",
+    
+      // 🔹 адаптация отступа сверху по высоте экрана
+      marginTop:
+        isDesktop
+          ? 80
+          : screenHeight < 700
+          ? 60
+          : screenHeight < 850
+          ? 75
+          : 90,
+    
+      marginBottom: screenHeight < 750 ? 8 : 12,
+      paddingHorizontal: isDesktop ? 20 : 10,
+      width: "100%",
+      alignSelf: "center",
+      zIndex: 10,
+    },
+    
+    
+    
+    // 🔸 Онлайн-капсула — как в HTML-примере
+    onlineCapsule: {
+      flexDirection: "row",
+      alignItems: "center",
+      backgroundColor: "#52288C",
+      borderRadius: 100,
+      paddingHorizontal: 12,
+      paddingVertical: 4,
+      justifyContent: "center",
+      gap: 8,
+      height: 32,
+    },
+    
+    onlineIcon: {
+      width: 16,
+      height: 16,
+      position: "relative",
+      overflow: "hidden",
+    },
+    graphContainer: {
+      position: "absolute",
+      top: isDesktop
+        ? screenHeight * 0.19 // ✅ было 0.2 → поднимаем граф выше
+        : screenHeight < 700
+        ? screenHeight * 0.09 // 🔹 на айфонах поднимаем сильнее
+        : screenHeight * 0.12,
+      left: 0,
+      width: "100%",
+      height: isDesktop
+        ? screenHeight * 0.38 // чуть меньше — пропорционально сцене
+        : screenHeight < 700
+        ? screenHeight * 0.36
+        : screenHeight * 0.38,
+      alignItems: "center",
+      justifyContent: "center",
+      overflow: "hidden",
+      zIndex: 4,
+      pointerEvents: "none",
+    },
+    
+    
+    
+
+    onlineOuterGlow: {
+      borderRadius: 100,
+      padding: 0.7,
+      backgroundColor: "rgba(255,255,255,0.25)",
+      shadowColor: "#ffffff",
+      shadowOpacity: 0.6,
+      shadowRadius: 5,
+      shadowOffset: { width: 0, height: 0 },
+    },
+    onlineContainer: {
+      flexDirection: "row",
+      alignItems: "center",
+      justifyContent: "center",
+      paddingHorizontal: 10,
+      height: 38, // 🔹 увеличена высота капсулы
+      borderRadius: 100,
+      backgroundColor: "rgba(120, 60, 200, 0.4)",
+      overflow: "hidden",
+      gap: 6,
+    },
+    iconCircle: {
+      width: 28,
+      height: 28,
+      borderRadius: 14,
+      backgroundColor: "#52288C",
+      justifyContent: "center",
+      alignItems: "center",
+      overflow: "hidden",
+    },
+    icon: {
+      width: "100%",
+      height: "100%",
+    },
+    plusCircle: {
+      width: 28,
+      height: 28,
+      borderRadius: 14,
+      backgroundColor: "#2B174B",
+      justifyContent: "center",
+      alignItems: "center",
+    },
+    onlineDot: {
+      width: 10,
+      height: 10,
+      borderRadius: 5,
+      backgroundColor: "#3AE85C",
+    },
+    onlineText: {
+      color: "#76DA19",
+      fontWeight: "700",
+      fontSize: 18,
+      marginHorizontal: 6,
+      fontFamily: "SF-Pro-Bold",
+    },
+    
+    
+    onlineLineTop: {
+      position: "absolute",
+      width: 5.33,
+      height: 5.33,
+      left: 5.33,
+      top: 1.33,
+      backgroundColor: "#76DA19",
+    },
+    
+    onlineLineBottom: {
+      position: "absolute",
+      width: 10.67,
+      height: 6,
+      left: 2.67,
+      top: 8.67,
+      backgroundColor: "#76DA19",
+    },
+    
+
+    
+    
+    userIcon: {
+      width: 18,
+      height: 18,
+      marginRight: 6,
+    },
+    
+
+    
+
+    
   });
 
 export default Crash;

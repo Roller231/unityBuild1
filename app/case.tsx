@@ -46,6 +46,16 @@ const sampleDrops: DropItem[] = [
 
 const Case = () => {
 
+
+  const BASE_WIDTH = 390;
+  const BASE_HEIGHT = 844; // iPhone 12
+  const scaleW = screenWidth / BASE_WIDTH;
+  const scaleH = screenHeight / BASE_HEIGHT;
+  
+  // Универсальный helper: масштабирует относительно меньшей оси
+  const scale = (size: number) => size * Math.min(scaleW, scaleH);
+  
+
 // === BottomSheet пополнения ===
 const [showDepositSheet, setShowDepositSheet] = useState(false);
 const [selectedTab, setSelectedTab] = useState<"Gifts" | "Stars" | "TON">("TON");
@@ -67,6 +77,7 @@ const translations = {
     congratulations: "Поздравляем!",
     ok: "Понятно",
     deposit: "Внести",
+    subscribeToUs: "Подписаться на нас", // 🔹 ← добавлено
   },
   en: {
     paid: "Paid",
@@ -81,6 +92,7 @@ const translations = {
     congratulations: "Congratulations!",
     ok: "Ok",
     deposit: "Deposit",
+    subscribeToUs: "Subscribe To Us", // 🔹 ← добавлено
   },
 } as const;
 
@@ -220,26 +232,75 @@ const useTranslation = (lang: Lang) => (key: TranslationKey) =>
         >
           {/* Верхняя панель */}
           <View style={styles.topBar}>
-            <TouchableWithoutFeedback onPress={toggleLanguage}>
-              <View style={styles.langButton}>
-                <Animated.Image
-                  source={currentFlag === "ru" ? FlagRU : FlagEN}
-                  style={[styles.flagIcon, {
-                    transform: [{ translateY: flagAnim }],
-                    opacity: flagAnim.interpolate({ inputRange: [-50,0,50], outputRange: [0,1,0] }),
-                  }]}
-                  resizeMode="contain"
-                />
-              </View>
-            </TouchableWithoutFeedback>
-            <BalanceButton
-  onPress={() => {
-    setSelectedTab("TON");
-    setShowDepositSheet(true);
-  }}
-/>
+  <TouchableWithoutFeedback onPress={toggleLanguage}>
+    <View style={styles.langButton}>
+      <Animated.Image
+        source={currentFlag === "ru" ? FlagRU : FlagEN}
+        style={[
+          styles.flagIcon,
+          {
+            transform: [{ translateY: flagAnim }],
+            opacity: flagAnim.interpolate({
+              inputRange: [-50, 0, 50],
+              outputRange: [0, 1, 0],
+            }),
+          },
+        ]}
+        resizeMode="contain"
+      />
+    </View>
+  </TouchableWithoutFeedback>
 
+  <BalanceButton
+    onPress={() => {
+      setSelectedTab("TON");
+      setShowDepositSheet(true);
+    }}
+  />
+</View>
+{/* ===== Средняя панель ===== */}
+<View style={styles.middlePanel}>
+  {/* 🔸 Кнопка подписки */}
+  <TouchableOpacity style={styles.subscribeButton} activeOpacity={0.8}>
+    <View style={styles.subscribeContent}>
+      <Image
+        source={require("../components/icons/cat.png")}
+        style={styles.subscribeIcon}
+        resizeMode="contain"
+      />
+<Text style={styles.subscribeText}>{t("subscribeToUs")}</Text>
+</View>
+  </TouchableOpacity>
+
+  {/* 🔸 История подарков и онлайн */}
+  <View style={styles.giftHistoryWrapper}>
+    <View style={styles.onlineCircle}>
+      <View style={styles.onlineInner}>
+        <Image
+          source={require("../components/icons/user.svg")}
+          style={styles.userIcon}
+          resizeMode="contain"
+        />
+        <Text style={styles.onlineText}>234</Text>
+      </View>
+    </View>
+
+    <View style={styles.giftHistoryMask}>
+      <View style={styles.giftHistoryContainer}>
+        {Array.from({ length: 6 }).map((_, i) => (
+          <View key={i} style={styles.inactiveCircle}>
+            <Image
+              source={require("../components/icons/gift.png")}
+              style={styles.giftIcon}
+              resizeMode="contain"
+            />
           </View>
+        ))}
+      </View>
+    </View>
+  </View>
+</View>
+
 
           {/* Переключатель Paid / Free */}
 <View style={[styles.switchContainer, { width: switchWidth }]}>
@@ -311,9 +372,7 @@ const useTranslation = (lang: Lang) => (key: TranslationKey) =>
       <CustomBottomSheet
   visible={resultSheetVisible}
   onClose={() => setResultSheetVisible(false)}
-  heightRatio={0.6}
-
-  
+  heightRatio={0.7} // ✅ не микроскопическая высота
 >
   {resultSheetVisible && (
     <Confetti
@@ -325,35 +384,98 @@ const useTranslation = (lang: Lang) => (key: TranslationKey) =>
       run={resultSheetVisible}
     />
   )}
-{result && (
-  <View style={styles.resultWrapper}>
-    <View style={styles.resultModal}>
-      <Text style={styles.resultTitle}>  {t("congratulations")}</Text>
-      <View style={[styles.cardOnly, { width: iconSize, height: iconSize }]}>
-        <Image source={result.icon} style={styles.cardIcon} resizeMode="contain" />
-      </View>
-      <View style={styles.prizeRow}>
-        <Text style={styles.prizeText}>+{result.price.toFixed(2)}</Text>
-        <View style={styles.tonIconWrapper}>
-          <Image source={TonIcon} style={styles.tonIcon} resizeMode="contain" />
+
+  {result && (
+    <View style={styles.resultWrapper}>
+      {/* 🧩 Масштабируем всё меню пропорционально */}
+      <View
+        style={{
+          transform: [{ scale: Math.min(screenWidth / 390, screenHeight / 844) }],
+          alignItems: "center",
+          justifyContent: "center",
+          width: "100%",
+        }}
+      >
+        <Text
+          style={{
+            color: "#fff",
+            fontFamily: "SF-Pro-Medium",
+            fontSize: 28,
+            fontWeight: "600",
+            marginBottom: 20,
+            textAlign: "center",
+          }}
+        >
+          {t("congratulations")}
+        </Text>
+
+        <View
+          style={{
+            width: 180,
+            height: 180,
+            borderRadius: 18,
+            backgroundColor: "#1F0248",
+            justifyContent: "center",
+            alignItems: "center",
+            marginBottom: 20,
+          }}
+        >
+          <Image
+            source={result.icon}
+            style={{ width: "80%", height: "55%" }}
+            resizeMode="contain"
+          />
         </View>
+
+        <View
+          style={{
+            flexDirection: "row",
+            alignItems: "center",
+            marginBottom: 20,
+          }}
+        >
+          <Text
+            style={{
+              color: "#fff",
+              fontSize: 24,
+              fontWeight: "500",
+              marginRight: 10,
+            }}
+          >
+            +{result.price.toFixed(2)}
+          </Text>
+          <Image
+            source={TonIcon}
+            style={{ width: 26, height: 26 }}
+            resizeMode="contain"
+          />
+        </View>
+
+        <TouchableOpacity
+          activeOpacity={0.8}
+          onPress={() => {
+            setResultSheetVisible(false);
+            setTimeout(() => setResetKey((prev) => prev + 1), 300);
+          }}
+          style={{
+            width: 330,
+            height: 60,
+            backgroundColor: "#6B3FD8",
+            borderRadius: 100,
+            justifyContent: "center",
+            alignItems: "center",
+          }}
+        >
+          <Text style={{ color: "#fff", fontSize: 18, fontWeight: "600" }}>
+            {t("ok")}
+          </Text>
+        </TouchableOpacity>
       </View>
     </View>
-
-    <TouchableWithoutFeedback
-      onPress={() => {
-        setResultSheetVisible(false);
-        setTimeout(() => setResetKey(prev => prev + 1), 300);
-      }}
-    >
-      <View style={styles.okButton}>
-        <Text style={styles.okButtonText}>Ok</Text>
-      </View>
-    </TouchableWithoutFeedback>
-  </View>
-)}
-
+  )}
 </CustomBottomSheet>
+
+
 
 
 {/* === Bottom Sheet Пополнения (Deposit) === */}
@@ -503,6 +625,110 @@ const useTranslation = (lang: Lang) => (key: TranslationKey) =>
 const styles = StyleSheet.create({
 
 
+  middlePanel: {
+    alignItems: "center",
+    width: "100%",
+    marginBottom: 0,
+    marginTop: 0, // 🔹 отступ сверху под верхними кнопками
+  },
+  
+  subscribeButton: {
+    width: "90%",
+    height: 60,
+    borderRadius: 100,
+    backgroundColor: "#6B3FD8",
+    justifyContent: "center",
+    marginBottom: 20,
+  },
+  subscribeContent: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  subscribeText: { color: "#fff", fontWeight: "700", fontSize: 18 },
+  subscribeIcon: { width: 26, height: 26, marginRight: 8 },
+  
+  giftHistoryWrapper: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "flex-start",
+    width: "90%",
+    alignSelf: "center",
+    marginBottom: 20,
+    gap: 12,
+  },
+  giftHistoryMask: {
+    flexDirection: "row",
+    overflow: "hidden",
+    flexShrink: 1,
+  },
+  giftHistoryContainer: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "flex-start",
+    gap: 12,
+  },
+  onlineCircle: {
+    width: 65,
+    height: 65,
+    borderRadius: 35,
+    backgroundColor: "#1F0248",
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  onlineInner: { flexDirection: "row", alignItems: "center", gap: 4 },
+  userIcon: { width: 20, height: 20 },
+  onlineText: { color: "#76da19", fontWeight: "700", fontSize: 14 },
+  inactiveCircle: {
+    width: 65,
+    height: 65,
+    borderRadius: 35,
+    backgroundColor: "#1F0248",
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  giftIcon: { width: 24, height: 24, opacity: 0.4 },
+  
+
+  resultContainer: {
+    flex: 1,
+    justifyContent: "space-between",
+    alignItems: "center",
+    width: "100%",
+    overflow: "hidden",
+  },
+  
+  resultContent: {
+    alignItems: "center",
+    justifyContent: "center",
+    flexGrow: 1,
+  },
+  
+  resultTitle: {
+    color: "#fff",
+    fontFamily: "SF-Pro-Medium",
+    fontWeight: "600",
+    textAlign: "center",
+  },
+  
+  prizeRow: {
+    flexDirection: "row",
+    alignItems: "center",
+  },
+  
+  okButton: {
+    backgroundColor: "#6B3FD8",
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  
+  okButtonText: {
+    color: "#fff",
+    fontWeight: "600",
+    textTransform: "capitalize",
+  },
+  
+  
 
   sheetTitle: {
     color: "#fff",
@@ -518,12 +744,16 @@ const styles = StyleSheet.create({
   wrapper: { flex: 1 },
   container: { alignItems: "center", paddingTop: 60, paddingBottom: 150 },
   topBar: {
-    width: "90%",
+    width: "94%", // 🔹 чуть шире, чтобы визуально сократить боковые отступы
     flexDirection: "row",
     justifyContent: "space-between",
     alignItems: "center",
-    marginVertical: 40,
+    marginTop: 40,      // 🔹 отступ сверху как в Case.tsx
+    marginBottom: 25,   // 🔹 отступ снизу как в Case.tsx
+    alignSelf: "center",
   },
+  
+  
   langButton: {
     backgroundColor: "#1F0248",
     borderRadius: 100,
@@ -564,13 +794,7 @@ const styles = StyleSheet.create({
   sheetContent: { alignItems: "center", paddingTop: 10 },
   sheetBorder: { padding: 10, overflow: "hidden", elevation: 5 },
 
-  resultTitle: {
-    color: "#fff",
-    fontSize: 32,
-    fontFamily: "SF‑Pro‑Medium",
-    fontWeight: "500",
-    textAlign: "center",
-  },
+
   resultWrapper: {
     flex: 1,
     width: "100%",
@@ -596,12 +820,7 @@ const styles = StyleSheet.create({
     width: "80%",
     height: "55%",
   },
-  prizeRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    marginTop: 12,
-    marginBottom: 20,
-  },
+
   prizeText: {
     color: "#fff",
     fontSize: 24,
@@ -609,9 +828,10 @@ const styles = StyleSheet.create({
     fontWeight: "500",
     textTransform: "uppercase",
     lineHeight: 31.2,
+    paddingRight: 10
   },
   tonIconWrapper: {
-    marginLeft: 8,
+    marginLeft: 20,
     width: 24,
     height: 24,
   },
@@ -619,28 +839,7 @@ const styles = StyleSheet.create({
     width: 24,
     height: 24,
   },
-  okButton: {
-    width: "90%",
-    height: 60,
-    marginTop: 24,
-    backgroundColor: "#6B3FD8",
-    borderRadius: 100,
-    justifyContent: "center",
-    alignItems: "center",
-    shadowColor: "rgba(37,2.31,71.87,0.50)",
-    shadowOffset: { width: 8, height: 8 },
-    shadowOpacity: 0.5,
-    shadowRadius: 32,
-    elevation: 8,
-  },
-  okButtonText: {
-    color: "#fff",
-    fontSize: 18,
-    fontFamily: "SF‑Pro‑Medium",
-    fontWeight: "600",
-    textTransform: "capitalize",
-    lineHeight: 23.4,
-  },
+
 
 
   bottomSheetContainer: {

@@ -167,12 +167,25 @@ export default function RootLayout() {
   if (!isReady) {
     return (
       <View style={styles.fullScreen} onLayout={onLayoutRootView}>
-        <View style={styles.outerContainer}>
-          <View style={styles.innerContainer}>
+        <View
+          style={[
+            styles.outerContainer,
+            !isDesktop && { width: "100%", height: "100%" }, // 🔹 мобильный вариант
+          ]}
+        >
+          <View
+            style={[
+              styles.innerContainer,
+              !isDesktop && styles.innerContainerMobile, // 🔹 мобильный вариант
+            ]}
+          >
             <ImageBackground
               source={BgImage}
-              resizeMode={resizeMode}
-              style={styles.bgImage}
+              resizeMode={isDesktop ? "cover" : "stretch"} // ✅ cover для десктопа, stretch/cover для мобил
+              style={[
+                styles.bgImage,
+                !isDesktop && { width: "100%", height: "100%" }, // мобильный — тянем
+              ]}
               imageStyle={{ width: "100%", height: "100%" }}
             >
               <View style={styles.progressWrapper}>
@@ -186,6 +199,7 @@ export default function RootLayout() {
       </View>
     );
   }
+  
 
   return (
     <View style={styles.wrapper} onLayout={onLayoutRootView}>
@@ -213,22 +227,34 @@ const styles = StyleSheet.create({
   },
   outerContainer: {
     flex: 1,
-    width: "100%",
     backgroundColor: "#000",
     justifyContent: "center",
     alignItems: "center",
   },
+
+  // 💻 десктоп — фиксированный фрейм
   innerContainer: {
     width: 475,
     aspectRatio: 9 / 16,
     backgroundColor: "#000",
     overflow: "hidden",
+    borderRadius: 25,
   },
+
+  // 📱 мобильный — тянем по экрану
+  innerContainerMobile: {
+    flex: 1,
+    width: "100%",
+    height: "100%",
+    borderRadius: 0,
+  },
+
   bgImage: {
     flex: 1,
     justifyContent: "flex-end",
     alignItems: "center",
   },
+
   progressWrapper: {
     width: "100%",
     alignItems: "center",
@@ -246,6 +272,7 @@ const styles = StyleSheet.create({
     borderRadius: 100,
     backgroundColor: "#6B3FD8",
   },
+
   wrapper: {
     flex: 1,
     backgroundColor: "#000",
@@ -262,4 +289,5 @@ const styles = StyleSheet.create({
     overflow: "hidden",
   },
 });
+
 
