@@ -25,6 +25,8 @@ import HistoryBar from "../components/HistoryBar";
 
 import vzryv from "../components/icons/vzryv.json";
 import LottieView from "lottie-react-native";
+import { init, viewport, swipeBehavior, isTMA } from "@telegram-apps/sdk-react";
+
 import lottieWeb from "lottie-web";
 
 import AsyncStorage from "@react-native-async-storage/async-storage";
@@ -121,6 +123,25 @@ const useTranslation = (lang: Lang) => (key: TranslationKey) =>
 
 const [language, setLanguage] = useState<"ru" | "en">("ru");
 const t = useTranslation(language);
+
+useEffect(() => {
+  async function initTg() {
+    if (await isTMA()) {
+      init();
+
+      if (viewport.mount.isAvailable()) {
+        await viewport.mount();
+        viewport.expand();
+      }
+
+      if (viewport.requestFullscreen.isAvailable()) {
+        await viewport.requestFullscreen();
+      }
+    }
+  }
+  initTg();
+
+}, []);
 
 useEffect(() => {
   const loadLang = async () => {

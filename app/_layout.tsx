@@ -9,7 +9,7 @@ import * as SplashScreen from "expo-splash-screen";
 import CustomTabBar from "@/components/CustomTabBar";
 import { useTelegramPlatform } from "@/hooks/useTelegramPlatform";
 
-import { init, viewport, swipeBehavior } from "@telegram-apps/sdk-react";
+import { init, viewport, swipeBehavior, isTMA } from "@telegram-apps/sdk-react";
 
 // === Импорт ассетов ===
 import FlagRU from "../components/icons/ru.png";
@@ -47,6 +47,25 @@ export default function RootLayout() {
     }).start();
   };
 
+
+  useEffect(() => {
+    async function initTg() {
+      if (await isTMA()) {
+        init();
+
+        if (viewport.mount.isAvailable()) {
+          await viewport.mount();
+          viewport.expand();
+        }
+
+        if (viewport.requestFullscreen.isAvailable()) {
+          await viewport.requestFullscreen();
+        }
+      }
+    }
+    initTg();
+
+  }, []);
 
   useEffect(() => {
   if (Platform.OS === "web") {

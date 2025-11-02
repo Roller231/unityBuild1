@@ -14,6 +14,9 @@ import {
 } from "react-native";
 import CustomBottomSheet from "../components/CustomBottomSheet";
 import { LinearGradient } from "expo-linear-gradient";
+
+import { init, viewport, swipeBehavior, isTMA } from "@telegram-apps/sdk-react";
+
 import { useFocusEffect } from "@react-navigation/native";
 
 import StarsBackground from "../components/StarsBackground";
@@ -166,7 +169,24 @@ const [showTermsSheet, setShowTermsSheet] = useState(false);
 
 const t = useTranslation(language);
 
+useEffect(() => {
+  async function initTg() {
+    if (await isTMA()) {
+      init();
 
+      if (viewport.mount.isAvailable()) {
+        await viewport.mount();
+        viewport.expand();
+      }
+
+      if (viewport.requestFullscreen.isAvailable()) {
+        await viewport.requestFullscreen();
+      }
+    }
+  }
+  initTg();
+
+}, []);
 
 
 // ✅ при загрузке читаем язык из AsyncStorage
