@@ -55,6 +55,10 @@ const { height: screenHeight, width: screenWidth } = Dimensions.get("window");
 
 
 const Crash: React.FC = () => {
+
+
+  const [graphKey, setGraphKey] = useState(0);
+
   const platform = useTelegramPlatform();
   const isDesktop = platform === "tdesktop" || platform === "macos";
   const fixedWidth = isDesktop ? 470 : Math.min(screenWidth, 470);
@@ -289,50 +293,59 @@ useEffect(() => {
     };
   }, [phase, active]);
 
-  useEffect(() => {
-    if (phase !== "crash") return;
-  
-    const final = Number(lastMultiplier.toFixed(2));
-  
-    // 🟣 сохраняем множитель в историю
-    if (final > 1) {
-      setPastCoeffs((prev) => {
-        const next = [...prev, final];
-        return next.slice(-12);
-      });
-    }
-  
-    // 💥 Останавливаем движок
-    if (engine) {
-      cancelAnimationFrame((engine as any)._frameId);
-      engine.state = CrashEngineState.Over;
-      engine.destroy?.();
-      setEngine(null);
-    }
-  
-    // 💣 Удаляем Lottie-анимацию (если Web)
-    if (Platform.OS === "web") {
-      const vz = document.getElementById("vzryv-container");
-      if (vz) vz.innerHTML = "";
-    }
-  
-    // ⚡ Через короткую паузу — перезагрузка (чистая)
-    const reloadTimer = setTimeout(() => {
-      if (Platform.OS === "web") {
-        window.location.reload();
-      } else {
-        // На мобильных имитируем reload
-        setPhase("idle");
-        setCount(3);
-        setCurrentMultiplier(1);
-        setLastMultiplier(1);
-        setPastCoeffs([]);
-        setEngine(null);
-      }
-    }, 1200); // немного подождём окончания анимации взрыва
-  
-    return () => clearTimeout(reloadTimer);
-  }, [phase]);
+// === взрыв и перезапуск ===
+// === взрыв и перезапуск ===
+useEffect(() => {
+  if (phase !== "crash") return;
+
+  const final = Number(lastMultiplier.toFixed(2));
+
+  // 🟣 сохраняем множитель в историю
+  if (final > 1) {
+    setPastCoeffs((prev) => {
+      const next = [...prev, final];
+      return next.slice(-12);
+    });
+  }
+
+  // 💥 Останавливаем движок
+  if (engine) {
+    cancelAnimationFrame((engine as any)._frameId);
+    engine.state = CrashEngineState.Over;
+    engine.destroy?.();
+    setEngine(null);
+  }
+
+  // 💣 Очищаем анимацию взрыва
+  if (Platform.OS === "web") {
+    const vz = document.getElementById("vzryv-container");
+    if (vz) vz.innerHTML = "";
+  }
+
+  // ⚡ Перезапуск после короткой паузы
+// ⚡ Мягкий перезапуск без пересоздания компонентов
+const reloadTimer = setTimeout(() => {
+  // 1. Останавливаем текущий движок
+  if (engine) {
+    engine.destroy?.();
+    setEngine(null);
+  }
+
+  // 2. Сбрасываем только игровые параметры
+  setCurrentMultiplier(1);
+  setLastMultiplier(1);
+
+  // 3. Запускаем новый отсчёт
+  setPhase("countdown");
+  setCount(3);
+}, 2000);
+
+
+
+  return () => clearTimeout(reloadTimer);
+}, [phase]);
+
+
   
 
   
@@ -416,6 +429,7 @@ useEffect(() => {
 <View style={styles.graphOverlay}>
   {phase === "flight" && (
     <CrashGraph
+      key={graphKey}              // 🔥 вот это важно
       engine={engine}
       active={active && phase === "flight"}
       onMultiplierChange={(m) => {
@@ -425,6 +439,7 @@ useEffect(() => {
     />
   )}
 </View>
+
 
 
         {/* === ВЕРХНЯЯ ЧАСТЬ === */}
@@ -892,7 +907,7 @@ const createStyles = (fixedWidth: number, screenHeight: number) =>
     },
     graphOverlay: {
       position: "absolute",
-      top: screenHeight * 0.08, // 🔹 немного ниже, чтобы не залезал на планету
+      top: screenHeight * 0.05, // 🔹 немного ниже, чтобы не залезал на планету
       left: 0,
       width: "100%",
       height: screenHeight * 0.36, // 🔹 уменьшенная высота
