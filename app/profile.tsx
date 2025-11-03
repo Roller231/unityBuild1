@@ -38,6 +38,12 @@ import IconStar from "../components/icons/star.svg";
 import IconTon from "../components/icons/ton.svg";
 import IconCopy from "../components/icons/copy.svg";
 
+export const vibrate = (pattern: number | number[] = 50) => {
+  if (typeof navigator !== "undefined" && "vibrate" in navigator) {
+    navigator.vibrate(pattern);
+  }
+};
+
 
 import { emitLanguageChange } from "@/components/languageEvents";
 
@@ -65,7 +71,8 @@ const translations = {
     copy: "Копировать",
     balance: "Баланс:",
     referrals: "Рефералы:",
-    withdraw: "Вывести",
+    withdrawBtn: "Вывести",
+    withdraw: "ВЫВЕСТИ",
     yourInventory: "Ваш инвентарь",
     noGifts: "Подарков нет",
     withdrawTon: "Вывод TON",
@@ -81,6 +88,14 @@ const translations = {
     enterAmount: "Введите сумму",
     gifts: "Подарки",
     connectWallet: "ПОДКЛЮЧИТЬ КОШЕЛЁК",
+
+    giftStep1: "Перейдите в ",
+    giftStep2: "Отправьте любой подарок",
+    giftStep3: "Подарок появится в вашем инвентаре",
+    giftStep4: "Убедитесь, что подарок отправлен с того же аккаунта Telegram",
+
+    amountOfStars: "Количество звёзд",
+    amountOfTon: "Количество TON",
   },
   en: {
     deposit: "Deposit",
@@ -94,7 +109,9 @@ const translations = {
     copy: "Copy",
     balance: "Balance:",
     referrals: "Referrals:",
-    withdraw: "Withdraw",
+    withdrawBtn: "Withdraw",
+
+    withdraw: "WITHDRAW",
     yourInventory: "Your Inventory",
     noGifts: "No gift cards available",
     withdrawTon: "Withdraw TON",
@@ -110,6 +127,14 @@ const translations = {
     enterAmount: "Enter amount",
     gifts: "Gifts",
     connectWallet: "CONNECT WALLET",
+
+    giftStep1: "Go to your profile",
+    giftStep2: "Send any gift",
+    giftStep3: "The gift will appear in your inventory",
+    giftStep4: "Make sure you send the gift from the same Telegram account",
+
+    amountOfStars: "Amount of Stars",
+    amountOfTon: "Amount of TON",
   },
 } as const;
 
@@ -121,6 +146,13 @@ const useTranslation = (lang: Lang) => (key: TranslationKey) =>
 
 
 const { width: screenWidth, height: screenHeight } = Dimensions.get("window");
+
+const BASE_WIDTH = 390;
+const BASE_HEIGHT = 844;
+const scaleW = screenWidth / BASE_WIDTH;
+const scaleH = screenHeight / BASE_HEIGHT;
+const scale = (size: number) => size * Math.min(scaleW, scaleH);
+
 
 const Profile = () => {
   
@@ -158,7 +190,7 @@ const [selectedTab, setSelectedTab] = useState<"Gifts" | "Stars" | "TON">("TON")
 const [tonAmount, setTonAmount] = useState("");
 const [starsAmount, setStarsAmount] = useState("");
 
-const bottomSheetHeightRatio = isDesktop ? 0.5 : 0.6;
+const bottomSheetHeightRatio = isDesktop ? 0.8 : 0.8;
 
 
 // === Terms BottomSheet ===
@@ -265,6 +297,20 @@ const toggleLanguage = async () => {
 };
 
 
+// 🔹 Универсальная функция для адаптивного текста по языку и экрану
+const getAdaptiveTextSize = (baseSize: number) => {
+  let size = baseSize;
+
+  // уменьшаем для узких экранов
+  if (screenWidth < 360) size *= 0.86;
+  else if (screenWidth < 390) size *= 0.9;
+  else if (screenWidth > 768) size *= 1.1;
+
+  // уменьшаем немного для русского (слова длиннее)
+  if (language === "ru") size *= 0.9;
+
+  return Math.round(size);
+};
 
   const handleBalancePress = () => console.log("Balance clicked!");
   const handleInvitePress = () => console.log("Invite pressed!");
@@ -357,6 +403,7 @@ const toggleLanguage = async () => {
       setActiveMenu("deposit");
       setSelectedTab("Gifts");
       setShowBottomSheet(true);
+      vibrate(); // ← вибрация при нажатии
     }}
     style={[
       styles.menuButton,
@@ -384,6 +431,7 @@ const toggleLanguage = async () => {
       setActiveMenu("stars");
       setSelectedTab("Stars");
       setShowBottomSheet(true);
+      vibrate(); // ← вибрация при нажатии
     }}
     style={[
       styles.menuButton,
@@ -411,6 +459,7 @@ const toggleLanguage = async () => {
       setActiveMenu("ton");
       setSelectedTab("TON");
       setShowBottomSheet(true);
+      vibrate(); // ← вибрация при нажатии
     }}
     style={[
       styles.menuButton,
@@ -435,8 +484,14 @@ const toggleLanguage = async () => {
 
           {/* Инвентарь */}
           <View style={styles.inventoryRow}>
-            <Text style={styles.inventoryText}>{t("inventory")} (0)</Text>
-            <Pressable style={styles.sellButton} onPress={() => setShowInventorySheet(true)}>
+          <Text
+  style={[
+    styles.inventoryText,
+    { fontSize: getAdaptiveTextSize(20) }, // адаптивно
+  ]}
+>
+  {t("inventory")} (0)
+</Text>            <Pressable style={styles.sellButton} onPress={() => setShowInventorySheet(true)}>
             <Text style={styles.sellButtonText}>{t("sellAll")}</Text>
             </Pressable>
           </View>
@@ -478,9 +533,15 @@ const toggleLanguage = async () => {
         {/* Invite friends */}
         <View style={[styles.newMenuContainer, styles.sectionGap]}>
           <View style={styles.inviteTopRow}>
-            <Text style={styles.inviteText}>
-            {t("inviteTitle")}
-            </Text>
+          <Text
+  style={[
+    styles.inviteText,
+    { fontSize: getAdaptiveTextSize(18), lineHeight: getAdaptiveTextSize(23.4) },
+  ]}
+>
+  {t("inviteTitle")}
+</Text>
+
             <Pressable style={styles.termsButton} onPress={() => setShowTermsSheet(true)}>
   <Text style={styles.termsText}>{t("terms")}</Text>
 </Pressable>
@@ -519,9 +580,9 @@ const toggleLanguage = async () => {
 
   <Pressable
   style={styles.withdrawButton}
-  onPress={() => setShowWithdrawSheet(true)}
+  onPress={() => {setShowWithdrawSheet(true), vibrate()}}
 >
-  <Text style={styles.withdrawText}>{t("withdraw")}</Text>
+  <Text style={styles.withdrawText}>{t("withdrawBtn")}</Text>
 </Pressable>
 
 </View>
@@ -529,7 +590,8 @@ const toggleLanguage = async () => {
       </ScrollView>
 
       {/* === Bottom Sheet Меню === */}
-      <CustomBottomSheet
+    {/* === Bottom Sheet Пополнения (Deposit) === */}
+    <CustomBottomSheet
   visible={showBottomSheet}
   onClose={() => setShowBottomSheet(false)}
   heightRatio={bottomSheetHeightRatio}
@@ -542,132 +604,284 @@ const toggleLanguage = async () => {
   >
     <Text style={styles.sheetTitle}>{t("enterAmount")}</Text>
 
-    {/* Tabs */}
-    <View style={styles.tabRow}>
-    {[
-  { key: "Gifts", label: t("gifts"), icon: IconGift },
-  { key: "Stars", label: t("stars"), icon: IconStar },
-  { key: "TON", label: t("ton"), icon: IconTon },
-].map(({ key, label, icon }) => {
-
+    {/* === Адаптивные Tabs (Gifts / Stars / TON) === */}
+    <View
+      style={{
+        flexDirection: "row",
+        justifyContent: "center",
+        alignItems: "center",
+        marginTop: scale(20),
+        flexWrap: "nowrap",
+      }}
+    >
+      {[
+        { key: "Gifts", label: t("gifts"), icon: IconGift },
+        { key: "Stars", label: t("stars"), icon: IconStar },
+        { key: "TON", label: t("ton"), icon: IconTon },
+      ].map(({ key, label, icon }) => {
         const activeTab = selectedTab === key;
         return (
           <TouchableOpacity
             key={key}
-            style={[styles.tabButton, activeTab && styles.tabButtonActive, { flex: 1 }]}
-            onPress={() => setSelectedTab(key as "Gifts" | "Stars" | "TON")}
             activeOpacity={0.9}
+            onPress={() => setSelectedTab(key as "Gifts" | "Stars" | "TON")}
+            style={{
+              flexDirection: "row",
+              alignItems: "center",
+              justifyContent: "center",
+              borderWidth: scale(2),
+              borderColor: "#6B3FD8",
+              borderRadius: 100,
+              backgroundColor: activeTab ? "#6B3FD8" : "transparent",
+              paddingVertical: scale(10),
+              paddingHorizontal: scale(16),
+              marginHorizontal: scale(6),
+              minWidth: scale(90),
+            }}
           >
-            <View style={styles.tabContent}>
-              <Text style={[styles.tabText, activeTab && styles.tabTextActive]}>
-                {label}
-              </Text>
-              <Animated.Image source={icon} resizeMode="contain" style={styles.tabIcon} />
-            </View>
+            <Text
+              style={{
+                color: "#fff",
+                fontSize: scale(14),
+                fontFamily: "SF-Pro-Semibold",
+                letterSpacing: 0.2,
+                fontWeight: activeTab ? "700" : "500",
+                marginRight: scale(5),
+              }}
+            >
+              {label}
+            </Text>
+            <Image
+              source={icon}
+              resizeMode="contain"
+              style={{ width: scale(18), height: scale(18) }}
+            />
           </TouchableOpacity>
         );
       })}
     </View>
 
-    {/* Контент */}
+    {/* === Контент вкладок === */}
     {selectedTab === "Gifts" && (
-  <View style={{ marginTop: 32, alignItems: "center" }}>
-    {/* ✅ Иконка Timeline */}
-    <Image
-      source={IconTimeline}
-      style={styles.timelineIcon}
-      resizeMode="contain" // ✅ сохраняет пропорции
-    />
-    
-    
+      <View style={styles.giftStepsWrapper}>
+        <LinearGradient
+          colors={["#59AACC", "rgba(89, 170, 204, 0)"]}
+          style={styles.verticalLine}
+        />
 
-  </View>
-)}
+        <View style={styles.giftStepsContainer}>
+          {/* === Шаги Gifts === */}
+          {[1, 2, 3, 4].map((step) => (
+            <View key={step} style={styles.stepRow}>
+              <View
+                style={[
+                  styles.stepCircle,
+                  step === 3 && styles.stepCirclePurple,
+                ]}
+              >
+                {step === 3 ? (
+                  <Image
+                    source={IconGift}
+                    style={styles.stepGiftIcon}
+                    resizeMode="contain"
+                  />
+                ) : step === 4 ? (
+                  <Text style={styles.stepAlert}>!</Text>
+                ) : (
+                  <Text style={styles.stepNumber}>{step}</Text>
+                )}
+              </View>
+              <Text
+                style={[
+                  styles.stepText,
+                  {
+                    fontSize:
+                      language === "ru"
+                        ? screenWidth < 360
+                          ? 15
+                          : screenWidth < 390
+                          ? 16
+                          : 18
+                        : 18,
+                    lineHeight:
+                      language === "ru"
+                        ? screenWidth < 360
+                          ? 20
+                          : screenWidth < 390
+                          ? 21
+                          : 22
+                        : 22,
+                    maxWidth: "80%",
+                    flexShrink: 1,
+                    flexWrap: "wrap",
+                  },
+                ]}
+                adjustsFontSizeToFit
+                minimumFontScale={0.9}
+              >
+                {step === 1
+                  ? `${t("giftStep1")} `
+                  : step === 2
+                  ? t("giftStep2")
+                  : step === 3
+                  ? t("giftStep3")
+                  : t("giftStep4")}
+                {step === 1 && (
+                  <Text style={styles.stepHighlight}>@GiftUpRelayer</Text>
+                )}
+              </Text>
+            </View>
+          ))}
 
+          {/* === Кнопка CONNECT WALLET === */}
+          <View style={{ width: "100%", alignItems: "center", marginTop: 0 }}>
+            <TouchableOpacity
+              activeOpacity={0.9}
+              style={[styles.placeButton, { width: fixedWidth * 1.4 }]}
+              onPress={() => console.log("Connecting wallet for Gifts")}
+            >
+              <Image
+                source={OrangePng}
+                style={styles.orangePng}
+                resizeMode="contain"
+              />
+              <Svg
+                height="100%"
+                width="100%"
+                style={StyleSheet.absoluteFillObject}
+                viewBox="0 0 400 100"
+                preserveAspectRatio="xMidYMid meet"
+              >
+                <SvgText
+                  fill="none"
+                  stroke="#D35100"
+                  strokeWidth={5}
+                  fontSize="16"
+                  fontFamily="SF-Pro-Heavy"
+                  fontWeight="900"
+                  x="50%"
+                  y="45%"
+                  textAnchor="middle"
+                  letterSpacing={1.5}
+                >
+                  {t("connectWallet")}
+                </SvgText>
+                <SvgText
+                  fill="#FFF"
+                  fontSize="16"
+                  fontFamily="SF-Pro-Heavy"
+                  fontWeight="900"
+                  x="50%"
+                  y="45%"
+                  textAnchor="middle"
+                  letterSpacing={1.5}
+                >
+                  {t("connectWallet")}
+                </SvgText>
+              </Svg>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </View>
+    )}
+
+    {/* === Stars / TON вкладки === */}
     {(selectedTab === "Stars" || selectedTab === "TON") && (
       <View style={{ marginTop: 30, width: "100%", alignItems: "center" }}>
         <Text style={styles.inputLabel}>
-        {selectedTab === "Stars" ? `${t("enterAmount")} ${t("stars")}` : `${t("enterAmount")} ${t("ton")}`}
+          {selectedTab === "Stars"
+            ? t("amountOfStars")
+            : t("amountOfTon")}
         </Text>
 
         <View style={styles.inputWrapper}>
-          <TextInput
-            placeholder="0"
-            placeholderTextColor="#777"
-            style={styles.textInput}
-            keyboardType="numeric"
-            value={selectedTab === "Stars" ? starsAmount : tonAmount}
-            onChangeText={(text) =>
-              selectedTab === "Stars" ? setStarsAmount(text) : setTonAmount(text)
-            }
-          />
-          <Animated.Image
-            source={selectedTab === "Stars" ? IconStar : IconTon}
-            resizeMode="contain"
-            style={styles.inputIcon}
-          />
+          <View style={{ flex: 1, position: "relative" }}>
+            <TextInput
+              placeholder="0"
+              placeholderTextColor="#777"
+              style={[styles.textInput, { paddingRight: scale(40) }]}
+              keyboardType="numeric"
+              value={selectedTab === "Stars" ? starsAmount : tonAmount}
+              onChangeText={(text) =>
+                selectedTab === "Stars"
+                  ? setStarsAmount(text)
+                  : setTonAmount(text)
+              }
+            />
+            <Animated.Image
+              source={selectedTab === "Stars" ? IconStar : IconTon}
+              resizeMode="contain"
+              style={[
+                styles.inputIcon,
+                {
+                  position: "absolute",
+                  right: scale(-7),
+                  top: "50%",
+                  transform: [{ translateY: -13 }],
+                },
+              ]}
+            />
+          </View>
         </View>
 
-{/* Кнопка DEPOSIT (через OrangeBtn) */}
-<TouchableOpacity
-  activeOpacity={0.9}
-  style={[styles.placeButton, { width: fixedWidth * 1.4 }]}
-  onPress={() =>
-    console.log(
-      `Depositing ${selectedTab === "TON" ? tonAmount : starsAmount} ${selectedTab}`
-    )
-  }
->
-  {/* ✅ Градиентный фон из твоего OrangeBtn */}
-  <Image
-    source={OrangePng}
-    style={styles.orangePng}
-    resizeMode="contain"
-  />
-
-  {/* ✅ Объёмный SVG-текст как в Crash */}
- {/* ✅ Объёмный SVG-текст с идеальным выравниванием */}
-<Svg
-  height="100%"
-  width="100%"
-  style={StyleSheet.absoluteFillObject}
-  viewBox="0 0 400 100" // 🔹 управляем координатами вручную
-  preserveAspectRatio="xMidYMid meet"
->
-  <SvgText
-    fill="none"
-    stroke="#D35100"
-    strokeWidth={5}
-    fontSize="16"
-    fontFamily="SF-Pro-Heavy"
-    fontWeight="900"
-    x="50%"
-    y="45%"       // ✅ ключ: смещение на 58% центрирует текст идеально
-    textAnchor="middle"
-    letterSpacing={1.5}
-  >
-    {t("connectWallet")}
-  </SvgText>
-  <SvgText
-    fill="#FFF"
-    fontSize="16"
-    fontFamily="SF-Pro-Heavy"
-    fontWeight="900"
-    x="50%"
-    y="45%"
-    textAnchor="middle"
-    letterSpacing={1.5}
-  >
-    {t("connectWallet")}
-  </SvgText>
-</Svg>
-
-</TouchableOpacity>
-
+        {/* === Кнопка CONNECT WALLET === */}
+        <TouchableOpacity
+          activeOpacity={0.9}
+          style={[styles.placeButton, { width: fixedWidth * 1.4 }]}
+          onPress={() =>
+            console.log(
+              `Depositing ${
+                selectedTab === "TON" ? tonAmount : starsAmount
+              } ${selectedTab}`
+            )
+          }
+        >
+          <Image
+            source={OrangePng}
+            style={styles.orangePng}
+            resizeMode="contain"
+          />
+          <Svg
+            height="100%"
+            width="100%"
+            style={StyleSheet.absoluteFillObject}
+            viewBox="0 0 400 100"
+            preserveAspectRatio="xMidYMid meet"
+          >
+            <SvgText
+              fill="none"
+              stroke="#D35100"
+              strokeWidth={5}
+              fontSize="16"
+              fontFamily="SF-Pro-Heavy"
+              fontWeight="900"
+              x="50%"
+              y="45%"
+              textAnchor="middle"
+              letterSpacing={1.5}
+            >
+              {t("connectWallet")}
+            </SvgText>
+            <SvgText
+              fill="#FFF"
+              fontSize="16"
+              fontFamily="SF-Pro-Heavy"
+              fontWeight="900"
+              x="50%"
+              y="45%"
+              textAnchor="middle"
+              letterSpacing={1.5}
+            >
+              {t("connectWallet")}
+            </SvgText>
+          </Svg>
+        </TouchableOpacity>
       </View>
     )}
   </ScrollView>
 </CustomBottomSheet>
+
+
 
 
 
@@ -681,7 +895,14 @@ const toggleLanguage = async () => {
     contentContainerStyle={styles.bottomSheetContainer}
     showsVerticalScrollIndicator={false}
   >
-<Text style={styles.sheetTitle}>{t("referralTerms")}</Text>
+<Text
+  style={[
+    styles.sheetTitle,
+    { fontSize: getAdaptiveTextSize(20) }, // 🔹 масштабируем под экран
+  ]}
+>
+  {t("referralTerms")}
+</Text>
 
 <Text style={styles.sheetText}>
   {t("referralText1")}{" "}
@@ -765,28 +986,54 @@ const toggleLanguage = async () => {
   <ScrollView
     contentContainerStyle={styles.bottomSheetContainer}
     showsVerticalScrollIndicator={false}
+    keyboardShouldPersistTaps="handled"
   >
-<Text style={styles.sheetTitle}>{t("withdrawTon")}</Text>
-<Text style={styles.sheetText}>{t("withdrawDesc")}</Text>
+    <Text
+      style={[
+        styles.sheetTitle,
+        { fontSize: getAdaptiveTextSize(20) },
+      ]}
+    >
+      {t("withdrawTon")}
+    </Text>
 
-    {/* Поле ввода TON */}
+    <Text
+      style={[
+        styles.sheetText,
+        { fontSize: getAdaptiveTextSize(16), lineHeight: getAdaptiveTextSize(21) },
+      ]}
+    >
+      {t("withdrawDesc")}
+    </Text>
+
+    {/* === Поле ввода TON — полностью идентичное Deposit === */}
     <View style={[styles.inputWrapper, { marginTop: 30 }]}>
-      <TextInput
-        placeholder="0"
-        placeholderTextColor="#777"
-        style={styles.textInput}
-        keyboardType="numeric"
-        value={withdrawAmount}
-        onChangeText={setWithdrawAmount}
-      />
-      <Animated.Image
-        source={IconTon}
-        resizeMode="contain"
-        style={styles.inputIcon}
-      />
+      <View style={{ flex: 1, position: "relative" }}>
+        <TextInput
+          placeholder="0"
+          placeholderTextColor="#777"
+          style={[styles.textInput, { paddingRight: scale(40) }]} // 🔹 отступ под иконку
+          keyboardType="numeric"
+          value={withdrawAmount}
+          onChangeText={setWithdrawAmount}
+        />
+<Animated.Image
+              source={selectedTab === "Stars" ? IconStar : IconTon}
+              resizeMode="contain"
+              style={[
+                styles.inputIcon,
+                {
+                  position: "absolute",
+                  right: scale(-7),
+                  top: "50%",
+                  transform: [{ translateY: -13 }],
+                },
+              ]}
+            />
+      </View>
     </View>
 
-    {/* ✅ Адаптивная оранжевая кнопка — как в Deposit */}
+    {/* === Кнопка Withdraw === */}
     <TouchableOpacity
       activeOpacity={0.9}
       style={[styles.placeButton, { width: fixedWidth * 1.4, marginTop: 25 }]}
@@ -795,7 +1042,11 @@ const toggleLanguage = async () => {
         setShowWithdrawSheet(false);
       }}
     >
-      <Image source={OrangePng} style={styles.orangePng} resizeMode="contain" />
+      <Image
+        source={OrangePng}
+        style={styles.orangePng}
+        resizeMode="contain"
+      />
 
       <Svg
         height="100%"
@@ -836,12 +1087,72 @@ const toggleLanguage = async () => {
 </CustomBottomSheet>
 
 
+
+
     </LinearGradient>
   );
 };
 
 // ===== Стили =====
 const styles = StyleSheet.create({
+  giftStepsWrapper: {
+    width: "100%",
+    position: "relative",
+    alignItems: "center",
+    marginTop: 30,
+    paddingHorizontal: 10,
+  },
+  verticalLine: {
+    position: "absolute",
+    left: 37,
+    top: 22,
+    width: 10,
+    height: "60%",
+    borderRadius: 2,
+    zIndex: 0,
+  },
+  giftStepsContainer: {
+    width: "100%",
+    paddingHorizontal: 10,
+    marginTop: 20,
+  },
+  stepRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    marginBottom: 32,
+  },
+  stepCircle: {
+    width: 44,
+    height: 44,
+    borderRadius: 30,
+    backgroundColor: "#240058",
+    justifyContent: "center",
+    alignItems: "center",
+    marginRight: 14,
+  },
+  stepCirclePurple: { backgroundColor: "#6B3FD8" },
+  stepNumber: {
+    color: "white",
+    fontSize: 18,
+    fontFamily: "SF-Pro-Heavy",
+    fontWeight: "800",
+  },
+  stepGiftIcon: { width: 22, height: 22, tintColor: "white" },
+  stepAlert: { color: "#FF005C", fontSize: 22, fontWeight: "900" },
+  stepText: {
+    color: "#C4BED4",
+    fontSize: 18,
+    fontFamily: "SF-Pro-Medium",
+    lineHeight: 22,
+    flexShrink: 1,
+  },
+  stepHighlight: {
+    color: "#A07BFF",
+    fontSize: 18,
+    fontFamily: "SF-Pro-Medium",
+  },
+  
+
 
 
   sellButtonSheet: {
@@ -1085,8 +1396,9 @@ const styles = StyleSheet.create({
     fontWeight: "600",
     opacity: 0.85,
     fontFamily: "SF-Pro-Semibold",
-    letterSpacing: 1,
+    letterSpacing: 0.2, // 🔹 стало меньше
   },
+  
   
   menuTextActive: { opacity: 1, fontWeight: "700" },
   icon: { width: 18, height: 18, marginLeft: 1 },
@@ -1202,7 +1514,7 @@ const styles = StyleSheet.create({
   },
   sheetHandle: { backgroundColor: "#6B3FD8", width: 60 },
   sheetContent: { padding: 20, alignItems: "center" },
-  sheetTitle: { color: "#fff", fontSize: 20, fontWeight: "700", marginBottom: 10 },
+  sheetTitle: { color: "#fff", fontSize: 20, fontWeight: "700", marginBottom: 10, textAlign: "center" },
   sheetText: { color: "#C4BED4", fontSize: 16, textAlign: "center", marginBottom: 12 },
   modalButton: {
     backgroundColor: "#6B3FD8",

@@ -23,7 +23,11 @@ const FIXED_WIN_INDEX = 50;
 const ITEM_GAP = 10;
 const SIDE_PADDING = 16;
 const GRID_COLUMNS = 3;
-
+export const vibrate = (pattern: number | number[] = 50) => {
+  if (typeof navigator !== "undefined" && "vibrate" in navigator) {
+    navigator.vibrate(pattern);
+  }
+};
 // 🌍 Переводы
 const translations = {
   ru: {
@@ -209,8 +213,10 @@ export default function CaseRoulette({
   <TouchableOpacity
     activeOpacity={0.9}
     style={[styles.betButton, { width: maxWidth * 1.4 }]} // ✅ как в Profile
-    onPress={onSpin}
-    disabled={spinning}
+    onPress={() => {
+      vibrate();
+      onSpin;
+    }}    disabled={spinning}
   >
     {/* 🔸 Оранжевый фон */}
     <Image source={OrangePng} style={styles.orangePng} resizeMode="contain" />

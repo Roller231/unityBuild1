@@ -32,6 +32,7 @@ import { useLaunchParams } from "@telegram-apps/sdk-react";
 
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { useFocusEffect } from "expo-router";
+import { vibrate } from "./crash";
 
 
 
@@ -78,6 +79,10 @@ const translations = {
     ok: "Понятно",
     deposit: "Внести",
     subscribeToUs: "Подписаться на нас", // 🔹 ← добавлено
+    giftStep1: "Перейдите в ",
+    giftStep2: "Отправьте любой подарок",
+    giftStep3: "Подарок появится в вашем инвентаре",
+    giftStep4: "Убедитесь, что подарок отправлен с того же аккаунта Telegram",
   },
   en: {
     paid: "Paid",
@@ -93,6 +98,10 @@ const translations = {
     ok: "Ok",
     deposit: "Deposit",
     subscribeToUs: "Subscribe To Us", // 🔹 ← добавлено
+    giftStep1: "Go to your profile",
+    giftStep2: "Send any gift",
+    giftStep3: "The gift will appear in your inventory",
+    giftStep4: "Make sure you send the gift from the same Telegram account",
   },
 } as const;
 
@@ -172,7 +181,7 @@ const useTranslation = (lang: Lang) => (key: TranslationKey) =>
 
   const platform = useTelegramPlatform();
   const isDesktop = platform === "tdesktop" || platform === "macos";
-  const bottomSheetHeightRatio = isDesktop ? 0.5 : 0.6;
+  const bottomSheetHeightRatio = isDesktop ? 0.8 : 0.8;
 
   const fixedWidth = isDesktop ? 470 : screenWidth;
   const switchWidth = fixedWidth * 0.9;
@@ -261,16 +270,28 @@ const useTranslation = (lang: Lang) => (key: TranslationKey) =>
 {/* ===== Средняя панель ===== */}
 <View style={styles.middlePanel}>
   {/* 🔸 Кнопка подписки */}
-  <TouchableOpacity style={styles.subscribeButton} activeOpacity={0.8}>
-    <View style={styles.subscribeContent}>
-      <Image
-        source={require("../components/icons/cat.png")}
-        style={styles.subscribeIcon}
-        resizeMode="contain"
-      />
-<Text style={styles.subscribeText}>{t("subscribeToUs")}</Text>
-</View>
-  </TouchableOpacity>
+{/* 🔸 Кнопка подписки */}
+<TouchableOpacity style={[styles.subscribeButton, { height: scale(60) }]} activeOpacity={0.8}>
+  <View style={styles.subscribeContent}>
+    <Image
+      source={require("../components/icons/cat.png")}
+      style={[styles.subscribeIcon, { width: scale(26), height: scale(26), marginRight: scale(8) }]}
+      resizeMode="contain"
+    />
+    <Text
+      style={[
+        styles.subscribeText,
+        { fontSize: scale(18) } // 🔹 адаптивный шрифт
+      ]}
+      numberOfLines={1} // 🔹 не ломает кнопку при длинном переводе
+      adjustsFontSizeToFit // 🔹 автоуменьшает шрифт, если не помещается
+      minimumFontScale={0.8} // 🔹 минимальное уменьшение
+    >
+      {t("subscribeToUs")}
+    </Text>
+  </View>
+</TouchableOpacity>
+
 
   {/* 🔸 История подарков и онлайн */}
   <View style={styles.giftHistoryWrapper}>
@@ -308,10 +329,10 @@ const useTranslation = (lang: Lang) => (key: TranslationKey) =>
   {["paid", "free"].map(tab => (
     <TouchableWithoutFeedback
       key={tab}
-      onPress={() =>
+      onPress={() =>{
         Animated.timing(animation, { toValue: tab === "paid" ? 0 : 1, duration: 250, useNativeDriver: false })
           .start(() => setActiveTab(tab as any))
-      }
+      }}
     >
       <View style={styles.switchButton}>
         <Text style={[styles.switchText, activeTab === tab && styles.switchTextActive]}>
@@ -494,41 +515,312 @@ const useTranslation = (lang: Lang) => (key: TranslationKey) =>
     <Text style={styles.sheetTitle}>{t("enterAmount")}</Text>
 
     {/* Tabs */}
-    <View style={styles.tabRow}>
-      {[
-        { key: "Gifts", label: t("gifts"), icon: require("../components/icons/gift.png") },
-        { key: "Stars", label: t("stars"), icon: require("../components/icons/star.svg") },
-        { key: "TON", label: t("ton"), icon: require("../components/icons/ton.svg") },
-      ].map(({ key, label, icon }) => {
-        const activeTab = selectedTab === key;
-        return (
-          <TouchableOpacity
-            key={key}
-            style={[styles.tabButton, activeTab && styles.tabButtonActive, { flex: 1 }]}
-            onPress={() => setSelectedTab(key as "Gifts" | "Stars" | "TON")}
-            activeOpacity={0.9}
-          >
-            <View style={styles.tabContent}>
-              <Text style={[styles.tabText, activeTab && styles.tabTextActive]}>
-                {label}
-              </Text>
-              <Animated.Image source={icon} resizeMode="contain" style={styles.tabIcon} />
-            </View>
-          </TouchableOpacity>
-        );
-      })}
-    </View>
+{/* Tabs */}
+<View
+  style={{
+    flexDirection: "row",
+    justifyContent: "center",
+    alignItems: "center",
+    marginTop: scale(20),
+    flexWrap: "nowrap", // 🔹 только один ряд
+  }}
+>
+  {[
+    { key: "Gifts", label: t("gifts"), icon: require("../components/icons/gift.png") },
+    { key: "Stars", label: t("stars"), icon: require("../components/icons/star.svg") },
+    { key: "TON", label: t("ton"), icon: require("../components/icons/ton.svg") },
+  ].map(({ key, label, icon }, i) => {
+    const activeTab = selectedTab === key;
+    return (
+      <TouchableOpacity
+        key={key}
+        activeOpacity={0.9}
+        onPress={() => setSelectedTab(key as "Gifts" | "Stars" | "TON")}
+        style={{
+          flexDirection: "row",
+          alignItems: "center",
+          justifyContent: "center",
+          borderWidth: scale(2),
+          borderColor: "#6B3FD8",
+          borderRadius: 100,
+          backgroundColor: activeTab ? "#6B3FD8" : "transparent",
+          paddingVertical: scale(10),
+          paddingHorizontal: scale(16),
+          marginHorizontal: scale(6),
+          minWidth: scale(90),
+        }}
+      >
+<Text
+  style={{
+    color: "#fff",
+    fontSize: scale(14),
+    fontFamily: "SF-Pro-Semibold",
+    letterSpacing: 0.2,
+    fontWeight: activeTab ? "700" : "500",
+    marginRight: scale(5), // теперь отступ после текста
+  }}
+>
+  {label}
+</Text>
+<Image
+  source={icon}
+  resizeMode="contain"
+  style={{
+    width: scale(18),
+    height: scale(18),
+  }}
+/>
+
+      </TouchableOpacity>
+    );
+  })}
+</View>
+
 
     {/* Контент */}
     {selectedTab === "Gifts" && (
-      <View style={{ marginTop: 32, alignItems: "center" }}>
-        <Image
-          source={require("../components/icons/Timeline.svg")}
-          style={styles.timelineIcon}
-          resizeMode="contain"
-        />
-      </View>
-    )}
+  <View style={styles.giftStepsWrapper}>
+    {/* === Вертикальная линия (градиент) === */}
+    <LinearGradient
+      colors={["#59AACC", "rgba(89, 170, 204, 0)"]}
+      style={styles.verticalLine}
+    />
+
+    {/* === Содержимое шагов === */}
+    <View style={styles.giftStepsContainer}>
+      {/* === Шаг 1 === */}
+      <View style={styles.stepRow}>
+  <View style={styles.stepCircle}>
+    <Text style={styles.stepNumber}>1</Text>
+  </View>
+  <Text
+  style={[
+    styles.stepText,
+    {
+      // 🔹 Только если язык русский — уменьшаем текст под маленькие экраны
+      fontSize:
+        language === "ru"
+          ? screenWidth < 360
+            ? 15
+            : screenWidth < 390
+            ? 16
+            : 18
+          : 18,
+      lineHeight:
+        language === "ru"
+          ? screenWidth < 360
+            ? 20
+            : screenWidth < 390
+            ? 21
+            : 22
+          : 22,
+      maxWidth: "80%",
+      flexShrink: 1,
+      flexWrap: "wrap",
+    },
+  ]}
+  adjustsFontSizeToFit
+  minimumFontScale={0.9}
+>
+
+
+    {t("giftStep1")} <Text
+  style={[
+    styles.stepHighlight,
+    {
+      // 🔹 Только если язык русский — уменьшаем текст под маленькие экраны
+      fontSize:
+        language === "ru"
+          ? screenWidth < 360
+            ? 15
+            : screenWidth < 390
+            ? 16
+            : 18
+          : 18,
+      lineHeight:
+        language === "ru"
+          ? screenWidth < 360
+            ? 20
+            : screenWidth < 390
+            ? 21
+            : 22
+          : 22,
+      maxWidth: "80%",
+      flexShrink: 1,
+      flexWrap: "wrap",
+    },
+  ]}
+  adjustsFontSizeToFit
+  minimumFontScale={0.9}
+>@GiftUpRelayer</Text>
+  </Text>
+</View>
+
+<View style={styles.stepRow}>
+  <View style={styles.stepCircle}>
+    <Text style={styles.stepNumber}>2</Text>
+  </View>
+  <Text
+  style={[
+    styles.stepText,
+    {
+      // 🔹 Только если язык русский — уменьшаем текст под маленькие экраны
+      fontSize:
+        language === "ru"
+          ? screenWidth < 360
+            ? 15
+            : screenWidth < 390
+            ? 16
+            : 18
+          : 18,
+      lineHeight:
+        language === "ru"
+          ? screenWidth < 360
+            ? 20
+            : screenWidth < 390
+            ? 21
+            : 22
+          : 22,
+      maxWidth: "80%",
+      flexShrink: 1,
+      flexWrap: "wrap",
+    },
+  ]}
+  adjustsFontSizeToFit
+  minimumFontScale={0.9}
+>{t("giftStep2")}</Text>
+</View>
+
+<View style={styles.stepRow}>
+  <View style={[styles.stepCircle, styles.stepCirclePurple]}>
+    <Image
+      source={require("../components/icons/gift.png")}
+      style={styles.stepGiftIcon}
+      resizeMode="contain"
+    />
+  </View>
+  <Text
+  style={[
+    styles.stepText,
+    {
+      // 🔹 Только если язык русский — уменьшаем текст под маленькие экраны
+      fontSize:
+        language === "ru"
+          ? screenWidth < 360
+            ? 15
+            : screenWidth < 390
+            ? 16
+            : 18
+          : 18,
+      lineHeight:
+        language === "ru"
+          ? screenWidth < 360
+            ? 20
+            : screenWidth < 390
+            ? 21
+            : 22
+          : 22,
+      maxWidth: "80%",
+      flexShrink: 1,
+      flexWrap: "wrap",
+    },
+  ]}
+  adjustsFontSizeToFit
+  minimumFontScale={0.9}
+>{t("giftStep3")}</Text>
+</View>
+
+<View style={styles.stepRow}>
+  <View style={styles.stepCircle}>
+    <Text style={styles.stepAlert}>!</Text>
+  </View>
+  <Text
+  style={[
+    styles.stepText,
+    {
+      // 🔹 Только если язык русский — уменьшаем текст под маленькие экраны
+      fontSize:
+        language === "ru"
+          ? screenWidth < 360
+            ? 15
+            : screenWidth < 390
+            ? 16
+            : 18
+          : 18,
+      lineHeight:
+        language === "ru"
+          ? screenWidth < 360
+            ? 20
+            : screenWidth < 390
+            ? 21
+            : 22
+          : 22,
+      maxWidth: "80%",
+      flexShrink: 1,
+      flexWrap: "wrap",
+    },
+  ]}
+  adjustsFontSizeToFit
+  minimumFontScale={0.9}
+>{t("giftStep4")}</Text>
+</View>
+
+
+      {/* === Кнопка CONNECT WALLET === */}
+     {/* === Кнопка CONNECT WALLET === */}
+<View style={{ width: "100%", alignItems: "center", marginTop: 0 }}>
+  <TouchableOpacity
+    activeOpacity={0.9}
+    style={[styles.placeButton, { width: fixedWidth * 1.4 }]}
+    onPress={() => console.log("Connecting wallet for Gifts")}
+  >
+    <Image
+      source={require("../components/icons/OrangePng.png")}
+      style={styles.orangePng}
+      resizeMode="contain"
+    />
+    <Svg
+      height="100%"
+      width="100%"
+      style={StyleSheet.absoluteFillObject}
+      viewBox="0 0 400 100"
+      preserveAspectRatio="xMidYMid meet"
+    >
+      <SvgText
+        fill="none"
+        stroke="#D35100"
+        strokeWidth={5}
+        fontSize="16"
+        fontFamily="SF-Pro-Heavy"
+        fontWeight="900"
+        x="50%"
+        y="45%"
+        textAnchor="middle"
+        letterSpacing={1.5}
+      >
+        {t("connectWallet")}
+      </SvgText>
+      <SvgText
+        fill="#FFF"
+        fontSize="16"
+        fontFamily="SF-Pro-Heavy"
+        fontWeight="900"
+        x="50%"
+        y="45%"
+        textAnchor="middle"
+        letterSpacing={1.5}
+      >
+        {t("connectWallet")}
+      </SvgText>
+    </Svg>
+  </TouchableOpacity>
+</View>
+
+    </View>
+  </View>
+)}
+
+
 
     {(selectedTab === "Stars" || selectedTab === "TON") && (
       <View style={{ marginTop: 30, width: "100%", alignItems: "center" }}>
@@ -537,26 +829,37 @@ const useTranslation = (lang: Lang) => (key: TranslationKey) =>
         </Text>
 
         <View style={styles.inputWrapper}>
-          <TextInput
-            placeholder="0"
-            placeholderTextColor="#777"
-            style={styles.textInput}
-            keyboardType="numeric"
-            value={selectedTab === "Stars" ? starsAmount : tonAmount}
-            onChangeText={(text) =>
-              selectedTab === "Stars" ? setStarsAmount(text) : setTonAmount(text)
-            }
-          />
-          <Animated.Image
-            source={
-              selectedTab === "Stars"
-                ? require("../components/icons/star.svg")
-                : require("../components/icons/ton.svg")
-            }
-            resizeMode="contain"
-            style={styles.inputIcon}
-          />
-        </View>
+  <View style={{ flex: 1, position: "relative" }}>
+    <TextInput
+      placeholder="0"
+      placeholderTextColor="#777"
+      style={[styles.textInput, { paddingRight: scale(40) }]} // 🔹 отступ под иконку
+      keyboardType="numeric"
+      value={selectedTab === "Stars" ? starsAmount : tonAmount}
+      onChangeText={(text) =>
+        selectedTab === "Stars" ? setStarsAmount(text) : setTonAmount(text)
+      }
+    />
+    <Animated.Image
+      source={
+        selectedTab === "Stars"
+          ? require("../components/icons/star.svg")
+          : require("../components/icons/ton.svg")
+      }
+      resizeMode="contain"
+      style={[
+        styles.inputIcon,
+        {
+          position: "absolute",
+          right: scale(-7),
+          top: "50%",
+          transform: [{ translateY: -13 }],
+        },
+      ]}
+    />
+  </View>
+</View>
+
 
         {/* Кнопка CONNECT WALLET */}
         <TouchableOpacity
@@ -623,6 +926,115 @@ const useTranslation = (lang: Lang) => (key: TranslationKey) =>
 };
 
 const styles = StyleSheet.create({
+
+  giftStepsWrapper: {
+    width: "100%",
+    position: "relative",
+    alignItems: "center",
+    marginTop: 30,
+    paddingHorizontal: 10,
+  },
+  
+  verticalLine: {
+    position: "absolute",
+    left: 37, // центр вертикальной оси для кругов (width 44)
+    top: 22,
+    width: 10,
+    height: "60%",
+    borderRadius: 2,
+    zIndex: 0,
+  },
+  
+  giftStepsContainer: {
+    width: "100%",
+    paddingHorizontal: 10,
+    marginTop: 20,
+  },
+  
+  stepRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    marginBottom: 32, // 🔹 одинаковый отступ между всеми блоками
+  },
+  
+  stepCircle: {
+    width: 44,
+    height: 44,
+    borderRadius: 30,
+    backgroundColor: "#240058", // одинаковый фон для 1, 2 и !
+    justifyContent: "center",
+    alignItems: "center",
+    marginRight: 14,
+  },
+  
+  stepCirclePurple: {
+    backgroundColor: "#6B3FD8",
+  },
+  
+  stepNumber: {
+    color: "white",
+    fontSize: 18,
+    fontFamily: "SF-Pro-Heavy",
+    fontWeight: "800",
+    textTransform: "uppercase",
+  },
+  
+  stepGiftIcon: {
+    width: 22,
+    height: 22,
+    tintColor: "white",
+  },
+  
+  stepAlert: {
+    color: "#FF005C",
+    fontSize: 22,
+    fontWeight: "900",
+    textAlign: "center",
+  },
+  
+  stepText: {
+    color: "#C4BED4",
+    fontSize: 18,
+    fontFamily: "SF-Pro-Medium",
+    lineHeight: 22,
+    flexShrink: 1,
+  },
+  
+  stepHighlight: {
+    color: "#A07BFF",
+    fontSize: 18,
+    fontFamily: "SF-Pro-Medium",
+  },
+  
+
+
+
+
+  
+  
+  stepCircleAlert: {
+    backgroundColor: "#240058",
+    borderWidth: 2,
+    borderColor: "#FF005C",
+  },
+  
+  
+  
+  stepTextWrapper: {
+    flex: 1,
+  },
+  
+  
+  
+  stepLine: {
+    height: 30,
+    width: 2,
+    backgroundColor: "rgba(160,123,255,0.3)",
+    alignSelf: "center",
+    marginLeft: 21,
+    marginBottom: 8,
+  },
+  
 
 
   middlePanel: {
@@ -918,8 +1330,15 @@ const styles = StyleSheet.create({
     color: "#fff",
     fontSize: 18,
     textAlign: "center",
-    ...(Platform.OS === "web" ? { outline: "none" } : {}), // 🔹 это добавит нужное только на Web
+    includeFontPadding: false,
+    textAlignVertical: "center",
+    ...(Platform.OS === "web" ? { outline: "none" } : {}),
+  
+    // 🔹 Добавим компенсацию за paddingRight, чтобы центр остался геометрическим
+    paddingLeft: 38,
+    paddingRight: 40, // под иконку
   },
+  
   inputIcon: {
     width: 26,
     height: 26,

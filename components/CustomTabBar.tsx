@@ -46,8 +46,8 @@ const CustomTabBar: React.FC<BottomTabBarProps> = ({ state, navigation }) => {
   const platform = useTelegramPlatform();
   const [language, setLanguage] = useState<Lang>("en");
   const [windowWidth, setWindowWidth] = useState(Dimensions.get("window").width);
+  const [pressedTab, setPressedTab] = useState<string | null>(null);
 
-  // ✅ Подписываемся на изменение языка
   useEffect(() => {
     (async () => {
       const saved = await AsyncStorage.getItem("app_language");
@@ -80,22 +80,28 @@ const CustomTabBar: React.FC<BottomTabBarProps> = ({ state, navigation }) => {
 
           const route = state.routes[routeIndex];
           const isFocused = state.index === routeIndex;
+          const isTabFocused = isFocused || pressedTab === tabName;
 
           return (
             <TabItem
               key={route.key}
               label={t(tabName as keyof typeof translations["en"])}
-              icon={getTabIcon(tabName, isFocused)}
-              active={isFocused}
+              icon={getTabIcon(tabName, isTabFocused)}
+              active={isTabFocused}
               onPress={() => {
+                setPressedTab(tabName);
+
                 const event = navigation.emit({
                   type: "tabPress",
                   target: route.key,
                   canPreventDefault: true,
                 });
+
                 if (!isFocused && !event.defaultPrevented) {
                   navigation.navigate(route.name);
                 }
+
+                setTimeout(() => setPressedTab(null), 200); // Сброс через 200ms
               }}
             />
           );

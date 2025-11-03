@@ -56,18 +56,22 @@ const { height: screenHeight, width: screenWidth } = Dimensions.get("window");
 //     window.location.reload();
 //   }
 // }
+export const vibrate = (pattern: number | number[] = 50) => {
+  if (typeof navigator !== "undefined" && "vibrate" in navigator) {
+    navigator.vibrate(pattern);
+  }
+};
 
 
 
 const Crash: React.FC = () => {
-
 
   const [graphKey, setGraphKey] = useState(0);
 
   const platform = useTelegramPlatform();
   const isDesktop = platform === "tdesktop" || platform === "macos";
   const fixedWidth = isDesktop ? 470 : Math.min(screenWidth, 470);
-
+  const scale = (size: number) => size * (fixedWidth / 390);
   const styles = createStyles(fixedWidth, screenHeight, isDesktop);
 
   const [resetKey, setResetKey] = useState(0);
@@ -104,7 +108,7 @@ const translations = {
     amountOfTon: "Количество TON",
     autoCashout: "Авто-вывод",
     placeBet: "СДЕЛАТЬ СТАВКУ",
-    inventoryEmpty: "🎁 Инвентарь пуст (скоро будет доступен)",
+    inventoryEmpty: "🎁 Инвентарь пуст",
   },
   en: {
     enterAmount: "Enter amount",
@@ -115,7 +119,7 @@ const translations = {
     amountOfTon: "Amount of TON",
     autoCashout: "Auto cashout",
     placeBet: "PLACE BET",
-    inventoryEmpty: "🎁 Inventory is empty (coming soon)",
+    inventoryEmpty: "🎁 Inventory is empty",
   },
 } as const;
 
@@ -400,7 +404,7 @@ const reloadTimer = setTimeout(() => {
 
   if (!fontLoaded) return null;
 
-  const bottomSheetHeightRatio = isDesktop ? 0.5 : 0.6;
+  const bottomSheetHeightRatio = isDesktop ? 0.8 : 0.8;
 
   return (
     <View key={resetKey} style={{ flex: 1, backgroundColor: "#1B003B" }}>
@@ -628,7 +632,7 @@ const reloadTimer = setTimeout(() => {
           <TouchableOpacity
             activeOpacity={0.9}
             style={[styles.betButton, { width: fixedWidth * 0.9 }]}
-            onPress={handleStart}
+            onPress={() => {handleStart(), vibrate()}}
           >
             <OrangeBtn
               width="100%"
@@ -708,35 +712,65 @@ const reloadTimer = setTimeout(() => {
 <Text style={styles.sheetTitle}>{t("enterAmount")}</Text>
 
           {/* Tabs */}
-          <View style={styles.tabRow}>
-{[
-  { key: "Gifts", label: t("gifts"), icon: giftIcon },
-  { key: "Stars", label: t("stars"), icon: starIcon },
-  { key: "TON", label: t("ton"), icon: tonIcon },
-].map(({ key, label, icon }) => {
+         {/* === Три вкладки Gifts / Stars / TON === */}
+{/* === Три вкладки Gifts / Stars / TON — 1в1 с Profile === */}
+<View
+  style={{
+    flexDirection: "row",
+    justifyContent: "center",
+    alignItems: "center",
+    marginTop: scale(20),
+    flexWrap: "nowrap",
+  }}
+>
+  {[
+    { key: "Gifts", label: t("gifts"), icon: giftIcon },
+    { key: "Stars", label: t("stars"), icon: starIcon },
+    { key: "TON", label: t("ton"), icon: tonIcon },
+  ].map(({ key, label, icon }) => {
+    const activeTab = selectedTab === key;
+    return (
+      <TouchableOpacity
+        key={key}
+        activeOpacity={0.9}
+        onPress={() => setSelectedTab(key as "Gifts" | "Stars" | "TON")}
+        style={{
+          flexDirection: "row",
+          alignItems: "center",
+          justifyContent: "center",
+          borderWidth: scale(2),
+          borderColor: "#6B3FD8",
+          borderRadius: 100,
+          backgroundColor: activeTab ? "#6B3FD8" : "transparent",
+          paddingVertical: scale(10),
+          paddingHorizontal: scale(16),
+          marginHorizontal: scale(6),
+          minWidth: scale(90),
+        }}
+      >
+        <Text
+          style={{
+            color: "#fff",
+            fontSize: scale(14),
+            fontFamily: "SF-Pro-Semibold",
+            letterSpacing: 0.2,
+            fontWeight: activeTab ? "700" : "500",
+            marginRight: scale(5),
+          }}
+        >
+          {label}
+        </Text>
+        <Animated.Image
+          source={icon}
+          resizeMode="contain"
+          style={{ width: scale(18), height: scale(18) }}
+        />
+      </TouchableOpacity>
+    );
+  })}
+</View>
 
-              const activeTab = selectedTab === key;
-              return (
-                <TouchableOpacity
-                  key={key}
-                  style={[styles.tabButton, activeTab && styles.tabButtonActive, { flex: 1 }]}
-                  onPress={() => setSelectedTab(key as "Gifts" | "Stars" | "TON")}
-                  activeOpacity={0.9}
-                >
-                  <View style={styles.tabContent}>
-                    <Text style={[styles.tabText, activeTab && styles.tabTextActive]}>
-                      {label}
-                    </Text>
-                    <Animated.Image
-                      source={icon}
-                      resizeMode="contain"
-                      style={styles.tabIcon}
-                    />
-                  </View>
-                </TouchableOpacity>
-              );
-            })}
-          </View>
+
 
           {/* Content */}
           {selectedTab === "Gifts" && (
@@ -884,31 +918,50 @@ const createStyles = (fixedWidth: number, screenHeight: number, isDesktop: boole
 
     tabRow: {
       flexDirection: "row",
-      justifyContent: "space-around",
+      justifyContent: "space-between",
       alignItems: "center",
       width: "100%",
-
-      paddingHorizontal: fixedWidth * 0.05,
-      marginBottom: 10,
+      paddingHorizontal: fixedWidth * 0.04,
+      marginBottom: 14,
+      gap: 8,
     },
-
+    
     tabButton: {
       flex: 1,
-      flexDirection: "row",
       alignItems: "center",
       justifyContent: "center",
-      paddingVertical: screenHeight * 0.012,
-      marginHorizontal: 4,
       borderRadius: 100,
       borderWidth: 2,
       borderColor: "#6B3FD8",
       backgroundColor: "transparent",
-    },
+      paddingVertical: screenHeight * 0.012,
 
+    },
+    
     tabButtonActive: {
       backgroundColor: "#6B3FD8",
       borderColor: "#6B3FD8",
     },
+    
+    tabText: {
+      color: "#C4BED4",
+      fontFamily: "SF-Pro-Semibold",
+      fontWeight: "600",
+      letterSpacing: 0.2,
+    },
+    
+    tabTextActive: {
+      color: "#fff",
+    },
+    
+    tabIcon: {
+      width: fixedWidth * 0.05,
+      height: fixedWidth * 0.05,
+      marginLeft: 4,
+    },
+    
+
+    
 
     tabContent: {
       flexDirection: "row",
@@ -916,19 +969,8 @@ const createStyles = (fixedWidth: number, screenHeight: number, isDesktop: boole
       justifyContent: "center",
     },
 
-    tabIcon: {
-      width: fixedWidth * 0.05,
-      height: fixedWidth * 0.05,
-      marginLeft: 6,
-    },
+   
 
-    tabText: {
-      color: "#fff",
-      fontSize: 16,
-      fontFamily: "SF-Pro-Semibold",
-    },
-
-    tabTextActive: { color: "white" },
 
     inputIcon: {
       width: fixedWidth * 0.06,
@@ -1062,17 +1104,10 @@ const createStyles = (fixedWidth: number, screenHeight: number, isDesktop: boole
       alignItems: "center",
     
       // 🔹 адаптация отступа сверху по высоте экрана
-      marginTop:
-        isDesktop
-          ? 80
-          : screenHeight < 700
-          ? 60
-          : screenHeight < 850
-          ? 75
-          : 90,
+      marginTop: 100,
     
-      marginBottom: screenHeight < 750 ? 8 : 12,
-      paddingHorizontal: isDesktop ? 20 : 10,
+      marginBottom: screenHeight < 750 ? 0 : 0,
+      paddingHorizontal: isDesktop ? 20 : 0,
       width: "100%",
       alignSelf: "center",
       zIndex: 10,
@@ -1104,7 +1139,7 @@ const createStyles = (fixedWidth: number, screenHeight: number, isDesktop: boole
       top: isDesktop
         ? screenHeight * 0.19 // ✅ было 0.2 → поднимаем граф выше
         : screenHeight < 700
-        ? screenHeight * 0.09 // 🔹 на айфонах поднимаем сильнее
+        ? screenHeight * 0.16 // 🔹 на айфонах поднимаем сильнее
         : screenHeight * 0.12,
       left: 0,
       width: "100%",
