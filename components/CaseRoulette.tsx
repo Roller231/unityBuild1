@@ -213,10 +213,8 @@ export default function CaseRoulette({
   <TouchableOpacity
     activeOpacity={0.9}
     style={[styles.betButton, { width: maxWidth * 1.4 }]} // ✅ как в Profile
-    onPress={() => {
-      vibrate();
-      onSpin;
-    }}    disabled={spinning}
+    onPress= {onSpin}
+       disabled={spinning}
   >
     {/* 🔸 Оранжевый фон */}
     <Image source={OrangePng} style={styles.orangePng} resizeMode="contain" />
