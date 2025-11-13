@@ -1,0 +1,27 @@
+from pydantic import BaseModel
+from typing import Optional, Any
+
+class UserBase(BaseModel):
+    tg_id: Optional[str] = None
+    username: Optional[str] = None
+    firstname: Optional[str] = None
+    balance: Optional[float] = 0
+    refcount: Optional[int] = 0
+    inventory: Optional[Any] = None
+
+class UserCreate(UserBase):
+    pass
+
+class UserUpdate(BaseModel):
+    tg_id: Optional[str] = None
+    username: Optional[str] = None
+    firstname: Optional[str] = None
+    balance: Optional[float] = None
+    refcount: Optional[int] = None
+    inventory: Optional[Any] = None
+
+class UserOut(UserBase):
+    id: int
+
+    class Config:
+        orm_mode = True
