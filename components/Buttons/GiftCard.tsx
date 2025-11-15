@@ -12,6 +12,7 @@ export interface DropItem {
   icon: any;
   rarity: "common" | "rare" | "epic" | "legendary";
   price: number;
+  chance: number;
 }
 
 interface GiftCardProps {

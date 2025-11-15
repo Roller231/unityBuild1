@@ -53,7 +53,7 @@ const useTranslation = (lang: Lang) => (key: TranslationKey) =>
 interface CaseRouletteProps {
   items: DropItem[];
   active?: boolean;
-  resultId?: string | null;
+  resultItem?: DropItem | null;
   onFinish?: (item: DropItem) => void;
   onSpin?: () => void;
   speed?: number;
@@ -65,7 +65,7 @@ interface CaseRouletteProps {
 export default function CaseRoulette({
   items,
   active,
-  resultId,
+  resultItem,
   onFinish,
   onSpin,
   speed = 1,
@@ -79,6 +79,12 @@ export default function CaseRoulette({
   const [winningItem, setWinningItem] = useState<DropItem | null>(null);
   const [language, setLanguage] = useState<"ru" | "en">("ru");
   const t = useTranslation(language);
+
+  console.log("🎯 CaseRoulette MOUNT/RENDER");
+console.log("→ items:", items);
+console.log("→ active:", active);
+console.log("→ resultId:", resultItem);
+
 
   // === Читаем язык из AsyncStorage и подписываемся на изменения ===
   useEffect(() => {
@@ -105,30 +111,39 @@ export default function CaseRoulette({
   const TOTAL_WIDTH = ITEM_WIDTH + ITEM_GAP;
   const CENTER_OFFSET = innerWidth / 2 - TOTAL_WIDTH / 2;
 
-  const getRandomItem = (arr: DropItem[]) =>
-    arr[Math.floor(Math.random() * arr.length)];
+// Берём случайный элемент из items (только для визуального декора)
+const pickRandom = (arr: DropItem[]) =>
+  arr[Math.floor(Math.random() * arr.length)];
 
-  const generateRandomItems = (arr: DropItem[], count: number) =>
-    Array.from({ length: count }, () => getRandomItem(arr));
+// Создаём случайный список-декор
+const makeDecor = (arr: DropItem[], count: number) =>
+  Array.from({ length: count }, () => pickRandom(arr));
 
-  // --- Начальная генерация ---
-  useEffect(() => {
-    if (items.length > 0) setDisplayItems(generateRandomItems(items, 20));
-    anim.setValue(0);
-  }, [items]);
+
+
+
+
+useEffect(() => {
+  if (items.length > 0) {
+    const decor = makeDecor(items, 20);
+    setDisplayItems(decor);
+  }
+  anim.setValue(0);
+}, [items]);
+
 
   // --- Подготовка к кручению ---
   useEffect(() => {
-    if (!active || !resultId || isSpinning || items.length === 0) return;
-    const winner = items.find((i) => i.id === resultId);
+    if (!active || !resultItem || isSpinning || items.length === 0) return;
+    const winner = resultItem;
     if (!winner) return;
 
     setIsSpinning(true);
     anim.stopAnimation();
     anim.setValue(0);
 
-    const itemsBefore = generateRandomItems(items, FIXED_WIN_INDEX);
-    const itemsAfter = generateRandomItems(items, 60);
+    const itemsBefore = makeDecor(items, FIXED_WIN_INDEX);
+    const itemsAfter = makeDecor(items, 60);
     const newDisplay = [...itemsBefore, winner, ...itemsAfter];
     if (newDisplay.length > 104) newDisplay[104] = winner;
 
@@ -139,7 +154,7 @@ export default function CaseRoulette({
     setDisplayItems(newDisplay);
     setTargetOffset(safeOffset);
     setWinningItem(winner);
-  }, [active, resultId, items, isSpinning]);
+  }, [active, resultItem, items, isSpinning]);
 
   // --- Анимация вращения ---
   useLayoutEffect(() => {
@@ -152,6 +167,8 @@ export default function CaseRoulette({
       useNativeDriver: false,
     }).start(({ finished }) => {
       if (!finished) return;
+      console.log("🎉 ПОБЕДИТЕЛЬ:", winningItem);
+
       onFinish?.(winningItem);
       setIsSpinning(false);
       setWinningItem(null);

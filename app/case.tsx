@@ -41,12 +41,6 @@ import { apiGet } from "./api";
 
 const { width: screenWidth, height: screenHeight } = Dimensions.get("window");
 
-const sampleDrops: DropItem[] = [
-  { id: "1", name: "Bronze Coin", icon: require("../components/icons/cat.png"), rarity: "common", price: 6000.05 },
-  { id: "2", name: "Silver Coin", icon: require("../components/icons/Oran.svg"), rarity: "rare", price: 0.15 },
-  { id: "3", name: "Golden Ring", icon: require("../components/icons/VenusP.png"), rarity: "epic", price: 0.35 },
-  { id: "4", name: "Diamond Crown", icon: require("../components/icons/cat.png"), rarity: "legendary", price: 0.7 },
-];
 
 const Case = () => {
 
@@ -191,6 +185,36 @@ useEffect(() => {
 }, []);
 
 
+async function loadDropsForCase(caseId: number) {
+  try {
+    // 1. Получаем список CaseDrops
+    const caseDrops = await apiGet(`/case-drops/case/${caseId}`);
+
+    if (!Array.isArray(caseDrops)) return [];
+
+    // 2. Загружаем сами дропы
+    const drops = await Promise.all(
+      caseDrops.map(async (cd) => {
+        const drop = await apiGet(`/drops/${cd.drop_id}`);
+
+        return {
+          id: String(drop.id),
+          name: drop.name,
+          icon: drop.icon,
+          rarity: drop.rarity,
+          price: drop.price,
+          chance: cd.chance,       // 🔥 Добавили шанс
+        };
+      })
+    );
+
+    return drops;
+  } catch (err) {
+    console.log("❌ Ошибка загрузки дропов:", err);
+    return [];
+  }
+}
+
 
 
 
@@ -219,6 +243,9 @@ useEffect(() => {
     outputRange: [0, switchWidth / 2],
   });
 
+  const [drops, setDrops] = useState<DropItem[]>([]);
+
+
   const toggleLanguage = async () => {
     const newLang = language === "ru" ? "en" : "ru";
     setLanguage(newLang);
@@ -240,23 +267,45 @@ useEffect(() => {
 
   const [selectedCase, setSelectedCase] = useState<any | null>(null);
 
-  const handleGiftPress = (caseItem: any) => {
-    console.log("🟣 Нажали на кейс:", caseItem);
-  
-    setSelectedCase(caseItem); // сохранить выбранный кейс
-    setOpenMenu(true);         // открыть меню
-    setSpinning(false);
-    setResult(null);
-  };
+const handleGiftPress = async (caseItem: any) => {
+  console.log("🟣 Открываем кейс:", caseItem);
+
+  setSelectedCase(caseItem);
+  setOpenMenu(true);
+  setSpinning(false);
+  setResult(null);
+
+  // Загружаем реальные дропы
+  const realDrops = await loadDropsForCase(caseItem.id);
+
+  console.log("🎁 Загружены дропы для кейса:", realDrops);
+
+  setDrops(realDrops); // сохраним в состояние
+};
+
+function pickByChance(drops: DropItem[]) {
+  const total = drops.reduce((sum, d) => sum + d.chance, 0);
+  let rnd = Math.random() * total;
+
+  for (const drop of drops) {
+    rnd -= drop.chance;
+    if (rnd <= 0) return drop;
+  }
+
+  return drops[drops.length - 1]; // fallback
+}
+
   
 
-  const handleSpin = () => {
-    if (spinning) return;
-    setSpinning(true);
-    setResult(null);
-    const randomItem = sampleDrops[Math.floor(Math.random() * sampleDrops.length)];
-    setTimeout(() => setResultId(randomItem.id), 200);
-  };
+const handleSpin = () => {
+  if (spinning) return;
+  setResult(null);
+
+  const randomItem = pickByChance(drops);
+  setResult(randomItem); // set it BEFORE spinning
+  setSpinning(true);
+};
+
 
   const handleFinish = (item: DropItem) => {
     setSpinning(false);
@@ -391,7 +440,7 @@ useEffect(() => {
       price={String(caseItem.price)}
       cardWidth={(switchWidth - 10) / 2}
 
-      drops={sampleDrops}
+      drops={drops}
 
       gradientColors={
         caseItem.gradient_colors
@@ -420,11 +469,14 @@ useEffect(() => {
       >
         <View style={[styles.sheetContainer, styles.sheetBorder]}>
           <View style={styles.sheetContent}>
+
+  
+
             <CaseRoulette
               
-              items={sampleDrops}
+              items={drops}
               active={spinning}
-              resultId={resultId}
+              resultItem={result} // 🔥 pass the item, not just ID
               onFinish={handleFinish}
               onSpin={handleSpin}
               spinning={spinning}
