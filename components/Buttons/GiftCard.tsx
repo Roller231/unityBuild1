@@ -4,6 +4,8 @@ import { LinearGradient } from "expo-linear-gradient";
 import { BlurView } from "expo-blur";
 import TonIcon from "../icons/ton.svg";
 
+import { SvgUri } from "react-native-svg";
+
 export interface DropItem {
   id: string;
   name: string;
@@ -77,11 +79,26 @@ const GiftCard = ({
       </View>
 
       {/* 🖼️ Основная картинка */}
-      <Image
-        source={mainImage}
-        style={styles.mainImage}
-        resizeMode="contain"
-      />
+      {typeof mainImage === "string" ? (
+  // SVG или PNG из URL
+  mainImage.toLowerCase().endsWith(".svg") ? (
+    <SvgUri uri={mainImage} width="80%" height="55%" />
+  ) : (
+    <Image
+      source={{ uri: mainImage }}
+      style={styles.mainImage}
+      resizeMode="contain"
+    />
+  )
+) : (
+  // Локальный файл (require)
+  <Image
+    source={mainImage}
+    style={styles.mainImage}
+    resizeMode="contain"
+  />
+)}
+
 
       {/* 🔹 Градиент фона */}
       {!isSolid && (

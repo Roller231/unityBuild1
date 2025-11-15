@@ -174,8 +174,14 @@ useEffect(() => {
     try {
       console.log("📡 Запрос: GET /cases/");
       const data = await apiGet("/cases/");
-      console.log("📦 Ответ /cases/:", data);
-      setCases(data); // ← ВОТ ЭТО ДОБАВЛЯЕМ
+
+      // 🔥 Проверяем
+      console.log("📦 Cases from backend:", data);
+      data.forEach((c: { gradient_colors: any; }, i: any) => {
+        console.log(`➡️ Case[${i}] gradient_colors =`, c.gradient_colors.split(","));
+      });
+
+      setCases(data);
     } catch (e) {
       console.log("❌ Ошибка загрузки /cases/:", e);
     }
@@ -227,6 +233,9 @@ useEffect(() => {
       Animated.timing(flagAnim, { toValue: 0, duration: 200, useNativeDriver: true }),
     ]).start();
   };
+  const filteredCases = cases.filter(c =>
+    activeTab === "paid" ? c.price > 0 : c.price === 0
+  );
   
 
   const [selectedCase, setSelectedCase] = useState<any | null>(null);
@@ -374,23 +383,24 @@ useEffect(() => {
           {/* Сетка подарков */}
          <View style={[styles.giftGrid, { width: switchWidth }]}>
 
-  {cases.map((caseItem, index) => (
+
+
+         {filteredCases.map((caseItem, index) => (
     <GiftCard
       key={caseItem.id}
       price={String(caseItem.price)}
       cardWidth={(switchWidth - 10) / 2}
 
-      // 🔥 тут будут реальные дропы кейса
-      drops={sampleDrops} 
+      drops={sampleDrops}
 
       gradientColors={
-        activeTab === "paid"
-          ? ["rgba(0,0,0,0)", "rgba(0,255,100,0.25)", "rgba(0,255,100,0.85)"]
-          : ["rgba(255, 100, 100, 0.01)", "rgba(255, 0, 0, 0.2)", "rgba(255, 0, 0, 0.85)"]
+        caseItem.gradient_colors
+          ? caseItem.gradient_colors.split(" ")
+          : ["rgba(0,0,0,0)", "rgba(0,255,100,0.25)", "rgba(0,255,100,0.85)"]
       }
+      mainImage={caseItem.main_image}
 
       onPress={() => handleGiftPress(caseItem)}
-
     />
   ))}
 
