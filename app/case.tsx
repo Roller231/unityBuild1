@@ -34,6 +34,9 @@ import AsyncStorage from "@react-native-async-storage/async-storage";
 import { useFocusEffect } from "expo-router";
 import { vibrate } from "./crash";
 
+import { apiGet } from "./api";
+
+
 
 
 const { width: screenWidth, height: screenHeight } = Dimensions.get("window");
@@ -61,6 +64,8 @@ const Case = () => {
 const [showDepositSheet, setShowDepositSheet] = useState(false);
 const [selectedTab, setSelectedTab] = useState<"Gifts" | "Stars" | "TON">("TON");
 const [tonAmount, setTonAmount] = useState("");
+const [cases, setCases] = useState<any[]>([]);
+
 const [starsAmount, setStarsAmount] = useState("");
 
 // 🌍 Переводы
@@ -163,6 +168,22 @@ const useTranslation = (lang: Lang) => (key: TranslationKey) =>
   
   
   
+// === Загрузка списка кейсов ===
+useEffect(() => {
+  async function loadCases() {
+    try {
+      console.log("📡 Запрос: GET /cases/");
+      const data = await apiGet("/cases/");
+      console.log("📦 Ответ /cases/:", data);
+      setCases(data); // ← ВОТ ЭТО ДОБАВЛЯЕМ
+    } catch (e) {
+      console.log("❌ Ошибка загрузки /cases/:", e);
+    }
+  }
+
+  loadCases();
+}, []);
+
 
 
 
@@ -208,11 +229,17 @@ const useTranslation = (lang: Lang) => (key: TranslationKey) =>
   };
   
 
-  const handleGiftPress = () => {
-    setOpenMenu(true);
+  const [selectedCase, setSelectedCase] = useState<any | null>(null);
+
+  const handleGiftPress = (caseItem: any) => {
+    console.log("🟣 Нажали на кейс:", caseItem);
+  
+    setSelectedCase(caseItem); // сохранить выбранный кейс
+    setOpenMenu(true);         // открыть меню
     setSpinning(false);
     setResult(null);
   };
+  
 
   const handleSpin = () => {
     if (spinning) return;
@@ -345,24 +372,30 @@ const useTranslation = (lang: Lang) => (key: TranslationKey) =>
 
 
           {/* Сетка подарков */}
-          <View style={[styles.giftGrid, { width: switchWidth }]}>
-            {Array.from({ length: 6 }).map((_, index) => (
-              <GiftCard
-                key={index}
-                price={activeTab === "paid" ? "0.5" : "0.1"}
-                cardWidth={(switchWidth - 10)/2}
-                drops={sampleDrops}
-                gradientColors={
-                  activeTab === "paid"
-                    ? ["rgba(0,0,0,0)", "rgba(0,255,100,0.25)", "rgba(0,255,100,0.85)"]
-                    : ["rgba(255, 100, 100, 0.01)", "rgba(255, 0, 0, 0.2)", "rgba(255, 0, 0, 0.85)"]
+         <View style={[styles.giftGrid, { width: switchWidth }]}>
 
+  {cases.map((caseItem, index) => (
+    <GiftCard
+      key={caseItem.id}
+      price={String(caseItem.price)}
+      cardWidth={(switchWidth - 10) / 2}
 
-                }
-                onPress={handleGiftPress}
-              />
-            ))}
-          </View>
+      // 🔥 тут будут реальные дропы кейса
+      drops={sampleDrops} 
+
+      gradientColors={
+        activeTab === "paid"
+          ? ["rgba(0,0,0,0)", "rgba(0,255,100,0.25)", "rgba(0,255,100,0.85)"]
+          : ["rgba(255, 100, 100, 0.01)", "rgba(255, 0, 0, 0.2)", "rgba(255, 0, 0, 0.85)"]
+      }
+
+      onPress={() => handleGiftPress(caseItem)}
+
+    />
+  ))}
+
+</View>
+
         </ScrollView>
       </View>
 

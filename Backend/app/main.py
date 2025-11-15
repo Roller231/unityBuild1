@@ -17,9 +17,21 @@ from app.routers import (
 from app.routers import crash_ws_router
 from app.services.crash_engine import crash_engine
 
-Base.metadata.create_all(bind=engine)
+from fastapi.middleware.cors import CORSMiddleware
+
+
 
 app = FastAPI(title="Krash Backend")
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],  # можно сузить позже
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
+Base.metadata.create_all(bind=engine)
 
 # REST роутеры
 app.include_router(drops_router.router)
