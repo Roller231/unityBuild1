@@ -18,6 +18,10 @@ import OrangePng from "../components/icons/OrangePng.png";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { onLanguageChange } from "@/components/languageEvents";
 
+import { useUser } from "../components/UserContext";
+import { changeUserBalance } from "../app/api";
+
+
 const { width: screenWidth } = Dimensions.get("window");
 const FIXED_WIN_INDEX = 50;
 const ITEM_GAP = 10;
@@ -60,7 +64,10 @@ interface CaseRouletteProps {
   title?: string;
   spinning?: boolean;
   disableClose?: boolean;
+
+  casePrice?: number;   // только это оставляем
 }
+
 
 export default function CaseRoulette({
   items,
@@ -71,6 +78,8 @@ export default function CaseRoulette({
   speed = 1,
   title,
   spinning = false,
+  casePrice = 0,
+
 }: CaseRouletteProps) {
   const anim = useRef(new Animated.Value(0)).current;
   const [displayItems, setDisplayItems] = useState<DropItem[]>([]);
@@ -80,10 +89,18 @@ export default function CaseRoulette({
   const [language, setLanguage] = useState<"ru" | "en">("ru");
   const t = useTranslation(language);
 
-  console.log("🎯 CaseRoulette MOUNT/RENDER");
-console.log("→ items:", items);
-console.log("→ active:", active);
-console.log("→ resultId:", resultItem);
+  const { user, setUser } = useUser();
+
+  const [showError, setShowError] = useState(false);
+const [errorMessage, setErrorMessage] = useState("");
+
+const triggerError = (msg: string) => {
+  setErrorMessage(msg);
+  setShowError(true);
+  setTimeout(() => setShowError(false), 2000);
+};
+
+
 
 
   // === Читаем язык из AsyncStorage и подписываемся на изменения ===
@@ -121,6 +138,36 @@ const makeDecor = (arr: DropItem[], count: number) =>
 
 
 
+const handlePaidSpin = async () => {
+  if (!user) {
+    console.log("❌ user is null");
+    return;
+  }
+
+
+  if (user.balance < casePrice) {
+    triggerError("Недостаточно средств");
+    return;
+  }
+  
+
+  const newBalance = user.balance - casePrice;
+
+  // --- локально обновляем
+  setUser({ ...user, balance: newBalance });
+
+  try {
+    const updated = await changeUserBalance(user.id, newBalance);
+    console.log("✔ Баланс списан, сервер:", updated.balance);
+  } catch (err) {
+    console.log("❌ Ошибка PATCH, откат баланса");
+    setUser({ ...user, balance: user.balance });
+    return;
+  }
+
+  // --- запускаем прокрутку рулетки
+  onSpin?.();
+};
 
 
 useEffect(() => {
@@ -167,7 +214,7 @@ useEffect(() => {
       useNativeDriver: false,
     }).start(({ finished }) => {
       if (!finished) return;
-      console.log("🎉 ПОБЕДИТЕЛЬ:", winningItem);
+      
 
       onFinish?.(winningItem);
       setIsSpinning(false);
@@ -230,7 +277,8 @@ useEffect(() => {
   <TouchableOpacity
     activeOpacity={0.9}
     style={[styles.betButton, { width: maxWidth * 1.4 }]} // ✅ как в Profile
-    onPress= {onSpin}
+    onPress={handlePaidSpin}
+
        disabled={spinning}
   >
     {/* 🔸 Оранжевый фон */}
@@ -305,10 +353,40 @@ useEffect(() => {
         </View>
       </ScrollView>
     </View>
+    
   );
+  {showError && (
+    <View style={styles.toast}>
+      <Text style={styles.toastText}>{errorMessage}</Text>
+    </View>
+  )}
+  
 }
 
 const styles = StyleSheet.create({
+
+  toast: {
+    position: "absolute",
+    bottom: 120,
+    alignSelf: "center",
+    backgroundColor: "rgba(140, 0, 255, 0.85)",
+    paddingVertical: 12,
+    paddingHorizontal: 22,
+    borderRadius: 16,
+    zIndex: 999,
+    shadowColor: "#000",
+    shadowOpacity: 0.25,
+    shadowRadius: 8,
+    shadowOffset: { width: 0, height: 4 },
+  },
+  
+  toastText: {
+    color: "#fff",
+    fontSize: 16,
+    fontWeight: "600",
+    textAlign: "center",
+  },
+  
 
   orangePng: {
     width: "100%",

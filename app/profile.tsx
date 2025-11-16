@@ -29,6 +29,8 @@ import * as Font from "expo-font";
 import Svg, { Text as SvgText } from "react-native-svg";
 import OrangePng from "../components/icons/OrangePng.png"; // ✅ твой PNG-фон кнопки
 
+import { useUser } from "../components/UserContext";
+
 
 // ===== Импорт иконок =====
 import FlagRU from "../components/icons/ru.png";
@@ -151,11 +153,15 @@ const BASE_WIDTH = 390;
 const BASE_HEIGHT = 844;
 const scaleW = screenWidth / BASE_WIDTH;
 const scaleH = screenHeight / BASE_HEIGHT;
-const scale = (size: number) => size * Math.min(scaleW, scaleH);
+
+
 
 
 const Profile = () => {
   
+
+  const { user } = useUser();
+
   type InventoryItem = {
     id: string;
     name: string;
@@ -182,7 +188,7 @@ const [withdrawAmount, setWithdrawAmount] = useState("");
 
   const platform = useTelegramPlatform();
   const isDesktop = platform === "tdesktop" || platform === "macos";
-  const fixedWidth = isDesktop ? 470 : screenWidth;
+  const fixedWidth = isDesktop ? 470 : Math.min(screenWidth, 470);
 
 
   const [showBottomSheet, setShowBottomSheet] = useState(false);
@@ -266,7 +272,7 @@ useEffect(() => {
 
 
 
-
+  const scale = (size: number) => size * (fixedWidth / 390);
 // ...
 
 useEffect(() => {
@@ -564,7 +570,7 @@ const getAdaptiveTextSize = (baseSize: number) => {
   <View style={styles.balanceLeft}>
     <View style={styles.balanceRow}>
       <Text style={styles.balanceLabel}>{t("balance")}</Text>
-      <Text style={styles.balanceValue}>0.00</Text>
+      <Text style={styles.balanceValue}> {(user?.balance ?? 0).toFixed(2)}</Text>
       <Image
         source={require("../components/icons/ton.svg")}
         style={styles.tonIcon}
@@ -574,7 +580,7 @@ const getAdaptiveTextSize = (baseSize: number) => {
 
     <View style={styles.balanceRow}>
       <Text style={styles.balanceLabel}>{t("referrals")}</Text>
-      <Text style={styles.balanceValue}>0.00</Text>
+      <Text style={styles.balanceValue}> {(user?.refcount ?? 0).toFixed(2)}</Text>
     </View>
   </View>
 
@@ -595,6 +601,7 @@ const getAdaptiveTextSize = (baseSize: number) => {
   visible={showBottomSheet}
   onClose={() => setShowBottomSheet(false)}
   heightRatio={bottomSheetHeightRatio}
+   
 >
   <ScrollView
     contentContainerStyle={styles.bottomSheetContainer}
@@ -606,14 +613,17 @@ const getAdaptiveTextSize = (baseSize: number) => {
 
     {/* === Адаптивные Tabs (Gifts / Stars / TON) === */}
     <View
-      style={{
-        flexDirection: "row",
-        justifyContent: "center",
-        alignItems: "center",
-        marginTop: scale(20),
-        flexWrap: "nowrap",
-      }}
-    >
+  style={{
+    flexDirection: "row",
+    justifyContent: "center",
+    alignItems: "center",
+    marginTop: scale(20),
+    flexWrap: "nowrap",
+    width: fixedWidth,          // ← фиксируем ширину
+    alignSelf: "center",        // ← центрируем
+  }}
+>
+
       {[
         { key: "Gifts", label: t("gifts"), icon: IconGift },
         { key: "Stars", label: t("stars"), icon: IconStar },

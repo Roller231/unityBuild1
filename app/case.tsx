@@ -38,12 +38,14 @@ import { apiGet } from "./api";
 
 
 
+import { useUser } from "../components/UserContext";
 
 const { width: screenWidth, height: screenHeight } = Dimensions.get("window");
 
 
 const Case = () => {
 
+  const { user, setUser } = useUser();
 
   const BASE_WIDTH = 390;
   const BASE_HEIGHT = 844; // iPhone 12
@@ -51,7 +53,6 @@ const Case = () => {
   const scaleH = screenHeight / BASE_HEIGHT;
   
   // Универсальный helper: масштабирует относительно меньшей оси
-  const scale = (size: number) => size * Math.min(scaleW, scaleH);
   
 
 // === BottomSheet пополнения ===
@@ -127,6 +128,12 @@ const useTranslation = (lang: Lang) => (key: TranslationKey) =>
   const [resultId, setResultId] = useState<string | null>(null);
   const [result, setResult] = useState<DropItem | null>(null);
 
+  const [dropHistory, setDropHistory] = useState<
+  { uid: string; id: string; icon: string; animate: boolean }[]
+>([]);
+
+
+
 
 // ✅ при загрузке читаем язык из AsyncStorage
   // ✅ при загрузке читаем язык из AsyncStorage
@@ -151,7 +158,7 @@ const useTranslation = (lang: Lang) => (key: TranslationKey) =>
     try {
       return useLaunchParams();
     } catch {
-      console.warn("⚠️ Telegram SDK not found — running in dev mode (localhost)");
+      
       return {
         tgWebAppData: {
           user: { first_name: "Guest", last_name: "", photo_url: null },
@@ -166,18 +173,18 @@ const useTranslation = (lang: Lang) => (key: TranslationKey) =>
 useEffect(() => {
   async function loadCases() {
     try {
-      console.log("📡 Запрос: GET /cases/");
+      
       const data = await apiGet("/cases/");
 
       // 🔥 Проверяем
-      console.log("📦 Cases from backend:", data);
+      
       data.forEach((c: { gradient_colors: any; }, i: any) => {
-        console.log(`➡️ Case[${i}] gradient_colors =`, c.gradient_colors.split(","));
+        
       });
 
       setCases(data);
     } catch (e) {
-      console.log("❌ Ошибка загрузки /cases/:", e);
+      
     }
   }
 
@@ -234,7 +241,11 @@ async function loadDropsForCase(caseId: number) {
   const isDesktop = platform === "tdesktop" || platform === "macos";
   const bottomSheetHeightRatio = isDesktop ? 0.8 : 0.8;
 
+
+  
   const fixedWidth = isDesktop ? 470 : screenWidth;
+  const scale = (size: number) => size * (fixedWidth / 390);
+  
   const switchWidth = fixedWidth * 0.9;
   const iconSize = Math.min(fixedWidth * 0.45, 200);
 
@@ -268,7 +279,7 @@ async function loadDropsForCase(caseId: number) {
   const [selectedCase, setSelectedCase] = useState<any | null>(null);
 
 const handleGiftPress = async (caseItem: any) => {
-  console.log("🟣 Открываем кейс:", caseItem);
+  
 
   setSelectedCase(caseItem);
   setOpenMenu(true);
@@ -278,8 +289,7 @@ const handleGiftPress = async (caseItem: any) => {
   // Загружаем реальные дропы
   const realDrops = await loadDropsForCase(caseItem.id);
 
-  console.log("🎁 Загружены дропы для кейса:", realDrops);
-
+  
   setDrops(realDrops); // сохраним в состояние
 };
 
@@ -295,7 +305,52 @@ function pickByChance(drops: DropItem[]) {
   return drops[drops.length - 1]; // fallback
 }
 
-  
+useEffect(() => {
+  const ws = new WebSocket("ws://127.0.0.1:8000/ws/drops/global");
+
+  ws.onopen = () => {
+    console.log("WS connected to drops");
+  };
+
+  ws.onmessage = (msg) => {
+    try {
+      const { event, data } = JSON.parse(msg.data);
+      if (event === "drop") {
+        console.log("💥 New Drop:", data);
+      
+        setDropHistory((prev) => {
+          const newItem = {
+            uid: `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`, // 🔑 уникальный ключ
+            id: String(data.id),
+            icon: data.icon,
+            animate: true,
+          };
+      
+          const updated = [
+            newItem,
+            ...prev.map((d) => ({ ...d, animate: false })), // всем старым снимаем анимацию
+          ];
+      
+          return updated.slice(0, 6);
+        });
+      }
+      
+    } catch (e) {
+      console.log("WS parse error:", e);
+    }
+  };
+
+  ws.onerror = (err) => {
+    console.log("WS error:", err);
+  };
+
+  ws.onclose = () => {
+    console.log("WS closed");
+  };
+
+  return () => ws.close();
+}, []);
+
 
 const handleSpin = () => {
   if (spinning) return;
@@ -391,19 +446,20 @@ const handleSpin = () => {
       </View>
     </View>
 
-    <View style={styles.giftHistoryMask}>
-      <View style={styles.giftHistoryContainer}>
-        {Array.from({ length: 6 }).map((_, i) => (
-          <View key={i} style={styles.inactiveCircle}>
-            <Image
-              source={require("../components/icons/gift.png")}
-              style={styles.giftIcon}
-              resizeMode="contain"
-            />
-          </View>
-        ))}
-      </View>
-    </View>
+    <View style={styles.giftHistoryContainer}>
+    {dropHistory.map((drop) => (
+  <AnimatedDropBubble
+    key={drop.uid}        // ⬅️ ключ теперь всегда уникальный
+    icon={drop.icon}
+    animate={drop.animate}
+  />
+))}
+
+
+
+
+</View>
+
   </View>
 </View>
 
@@ -480,6 +536,8 @@ const handleSpin = () => {
               onFinish={handleFinish}
               onSpin={handleSpin}
               spinning={spinning}
+
+              casePrice={selectedCase?.price}
             />
           </View>
         </View>
@@ -506,10 +564,11 @@ const handleSpin = () => {
       {/* 🧩 Масштабируем всё меню пропорционально */}
       <View
         style={{
-          transform: [{ scale: Math.min(screenWidth / 390, screenHeight / 844) }],
+          transform: [{ scale: fixedWidth / 450 }],
+
           alignItems: "center",
           justifyContent: "center",
-          width: "100%",
+          width: fixedWidth * 0.9,      // 🔥 как у трёх кнопок
         }}
       >
         <Text
@@ -574,7 +633,7 @@ const handleSpin = () => {
             setTimeout(() => setResetKey((prev) => prev + 1), 300);
           }}
           style={{
-            width: 330,
+            width: fixedWidth * 0.9,   // 🔥 адаптивно, как Crash
             height: 60,
             backgroundColor: "#6B3FD8",
             borderRadius: 100,
@@ -867,7 +926,7 @@ const handleSpin = () => {
   <TouchableOpacity
     activeOpacity={0.9}
     style={[styles.placeButton, { width: fixedWidth * 1.4 }]}
-    onPress={() => console.log("Connecting wallet for Gifts")}
+    
   >
     <Image
       source={require("../components/icons/OrangePng.png")}
@@ -1194,7 +1253,7 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     alignItems: "center",
   },
-  giftIcon: { width: 24, height: 24, opacity: 0.4 },
+  giftIcon: { width: 34, height: 34, opacity: 1 },
   
 
   resultContainer: {
@@ -1457,3 +1516,61 @@ const styles = StyleSheet.create({
 });
 
 export default Case;
+
+
+const AnimatedDropBubble = ({ icon, animate }: { icon: string, animate: boolean }) => {
+  const scale = React.useRef(new Animated.Value(animate ? 0 : 1)).current;
+  const opacity = React.useRef(new Animated.Value(animate ? 0 : 1)).current;
+
+  React.useEffect(() => {
+    if (!animate) return;
+
+    Animated.parallel([
+      Animated.spring(scale, {
+        toValue: 1,
+        damping: 7,
+        stiffness: 140,
+        mass: 0.5,
+        useNativeDriver: true,
+      }),
+      Animated.timing(opacity, {
+        toValue: 1,
+        duration: 200,
+        useNativeDriver: true,
+      }),
+    ]).start();
+  }, [animate]);
+
+  return (
+    <View
+      style={{
+        width: 65,
+        height: 65,
+        borderRadius: 35,
+        backgroundColor: "#1F0248",
+        justifyContent: "center",
+        alignItems: "center",
+        marginRight: 12,
+        overflow: "hidden", // важно
+      }}
+    >
+      <Animated.View
+        style={{
+          transform: [{ scale }],
+          opacity,
+          width: "100%",
+          height: "100%",
+          justifyContent: "center",
+          alignItems: "center",
+        }}
+      >
+        <Image
+          source={{ uri: icon }}
+          style={{ width: 34, height: 34 }}
+          resizeMode="contain"
+        />
+      </Animated.View>
+    </View>
+  );
+};
+

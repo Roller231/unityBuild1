@@ -6,4 +6,6 @@ from . import (
     crash_rounds_router,
     crash_bets_router,
     transactions_router,
+    drops_ws_router,
+    crash_ws_router
 )

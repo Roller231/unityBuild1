@@ -20,5 +20,8 @@ class CrashSettings:
     grow_speed: float = float(os.getenv("CRASH_GROW_SPEED", 0.015))
     # API-токен для WebSocket (очень простой вариант безопасности)
     ws_token: str = os.getenv("CRASH_WS_TOKEN", "supersecret")
+    # Периодичность выпадения подарков (секунды)
+    drop_interval_seconds: float = float(os.getenv("DROP_INTERVAL_SECONDS", 2.0))
+
 
 settings = CrashSettings()
