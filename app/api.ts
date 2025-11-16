@@ -63,3 +63,23 @@ export async function updateUserField(userId: number, field: string, value: any)
 export async function changeUserBalance(userId: number, amount: number) {
   return await apiPatch(`/users/${userId}`, { balance: amount });
 }
+
+
+export async function getDropById(id: number | string) {
+  console.log("📦 FETCHING DROP:", id);
+
+  try {
+    const drop = await apiGet(`/drops/${id}`);
+
+    console.log("📦 DROP RESULT:", drop);
+
+    return drop;
+  } catch (err) {
+    console.log("❌ DROP FETCH ERROR:", err);
+    return null;
+  }
+}
+
+export async function updateInventory(userId: number, newInventory: number[]) {
+  return await apiPatch(`/users/${userId}`, { inventory: newInventory });
+}

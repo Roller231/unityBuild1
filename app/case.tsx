@@ -28,13 +28,14 @@ import TonIcon from "../components/icons/ton.svg";
 import Svg, { Text as SvgText } from "react-native-svg";
 import { emitLanguageChange, onLanguageChange } from "@/components/languageEvents";
 
+
 import { useLaunchParams } from "@telegram-apps/sdk-react";
 
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { useFocusEffect } from "expo-router";
 import { vibrate } from "./crash";
 
-import { apiGet } from "./api";
+import { apiGet, apiPatch } from "./api";
 
 
 
@@ -305,61 +306,107 @@ function pickByChance(drops: DropItem[]) {
   return drops[drops.length - 1]; // fallback
 }
 
-useEffect(() => {
-  const ws = new WebSocket("ws://127.0.0.1:8000/ws/drops/global");
+useFocusEffect(
+  useCallback(() => {
+    console.log("🎯 Case screen focused → connecting WS");
 
-  ws.onopen = () => {
-    console.log("WS connected to drops");
-  };
+    const ws = new WebSocket("ws://127.0.0.1:8000/ws/drops/global");
 
-  ws.onmessage = (msg) => {
-    try {
-      const { event, data } = JSON.parse(msg.data);
-      if (event === "drop") {
-        console.log("💥 New Drop:", data);
-      
-        setDropHistory((prev) => {
+    ws.onopen = () => console.log("WS connected");
+    ws.onerror = (err) => console.log("WS error:", err);
+
+    ws.onmessage = (msg) => {
+      try {
+        const { event, data } = JSON.parse(msg.data);
+        if (event === "drop") {
           const newItem = {
-            uid: `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`, // 🔑 уникальный ключ
+            uid: `${Date.now()}-${Math.random().toString(36).slice(2)}`,
             id: String(data.id),
             icon: data.icon,
             animate: true,
           };
-      
-          const updated = [
-            newItem,
-            ...prev.map((d) => ({ ...d, animate: false })), // всем старым снимаем анимацию
-          ];
-      
-          return updated.slice(0, 6);
-        });
-      }
-      
-    } catch (e) {
-      console.log("WS parse error:", e);
-    }
-  };
 
-  ws.onerror = (err) => {
-    console.log("WS error:", err);
-  };
+          setDropHistory(prev => {
+            const updated = [
+              newItem,
+              ...prev.map((d) => ({ ...d, animate: false })),
+            ];
 
-  ws.onclose = () => {
-    console.log("WS closed");
-  };
+            return updated.slice(0, 6);
+          });
 
-  return () => ws.close();
-}, []);
+          setTimeout(() => {
+            setDropHistory(prev =>
+              prev.filter(item => item.uid !== newItem.uid)
+            );
+          }, 15000);
+        }
+      } catch (e) {}
+    };
+
+    // 🧹 cleanup когда уходим со страницы
+    return () => {
+      console.log("🚪 Case screen blurred → closing WS");
+      ws.close();
+    };
+  }, [])
+);
 
 
-const handleSpin = () => {
+
+const handleSpin = async () => {
   if (spinning) return;
   setResult(null);
 
   const randomItem = pickByChance(drops);
-  setResult(randomItem); // set it BEFORE spinning
+  setResult(randomItem); // победитель выбран ЗДЕСЬ
+
+  if (!user) {
+    console.log("❌ user is null");
+    return;
+  }
+
+  // === 1. Добавляем drop сразу ===
+  try {
+    const inv = user.inventory || [];
+  
+    // ищем, есть ли уже drop_id
+    const existing = inv.find((item: { drop_id: string; }) => item.drop_id === randomItem.id);
+  
+    let updatedInventory;
+  
+    if (existing) {
+      updatedInventory = inv.map((item: { drop_id: string; count: number; }) =>
+        item.drop_id === randomItem.id
+          ? { ...item, count: item.count + 1 }
+          : item
+      );
+    } else {
+      updatedInventory = [
+        ...inv,
+        { drop_id: randomItem.id, count: 1 }
+      ];
+    }
+  
+    // обновляем локально
+    setUser({ ...user, inventory: updatedInventory });
+  
+    // обновляем на сервере
+    await apiPatch(`/users/${user.id}`, {
+      inventory: updatedInventory,
+    });
+  
+    console.log("✔ Дроп добавлен пользователю:", randomItem.id);
+  
+  } catch (err) {
+    console.log("❌ Ошибка добавления дропа:", err);
+  }
+  
+
+  // === 2. Запускаем прокрутку рулетки ===
   setSpinning(true);
 };
+
 
 
   const handleFinish = (item: DropItem) => {

@@ -198,7 +198,7 @@ try {
         firstname: "Local",
         balance: 0,
         refcount: 0,
-        inventory: "[]",
+        inventory: "",
       });
       console.log("✅ Local user created:", finalUser);
     }

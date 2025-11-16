@@ -26,7 +26,7 @@ export async function initTelegramUser() {
       firstname,
       balance: 0,
       refcount: 0,
-      inventory: "[]",
+      inventory: "",
     });
 
     console.log("Создан новый пользователь:", created);
@@ -41,7 +41,7 @@ export async function initTelegramUser() {
       firstname: "Guest",
       balance: 0,
       refcount: 0,
-      inventory: "[]",
+      inventory: "",
       offline: true,
     };
   }
