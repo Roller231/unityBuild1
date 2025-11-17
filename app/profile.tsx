@@ -27,10 +27,11 @@ import { useTelegramPlatform } from "@/hooks/useTelegramPlatform";
 
 import * as Font from "expo-font";
 import Svg, { Text as SvgText } from "react-native-svg";
+
 import OrangePng from "../components/icons/OrangePng.png"; // ✅ твой PNG-фон кнопки
 
 import { useUser } from "../components/UserContext";
-
+import { apiGet, apiPatch } from "../app/api";
 
 // ===== Импорт иконок =====
 import FlagRU from "../components/icons/ru.png";
@@ -54,6 +55,7 @@ import IconArrow from "../components/icons/arrow.svg"; // добавляем с�
 
 import { useLaunchParams } from "@telegram-apps/sdk-react";
 
+import { SvgUri } from "react-native-svg";
 
 
 import AsyncStorage from "@react-native-async-storage/async-storage";
@@ -155,12 +157,40 @@ const scaleW = screenWidth / BASE_WIDTH;
 const scaleH = screenHeight / BASE_HEIGHT;
 
 
+const InventoryImage = ({ uri }: { uri: string }) => {
+  if (!uri) return null;
+
+  const isSvg = uri.toLowerCase().endsWith(".svg");
+
+  return isSvg ? (
+    <SvgUri uri={uri} width="80%" height="55%" />
+  ) : (
+    <Image
+      source={{ uri }}
+      style={{
+        width: "100%",
+        height: 120,
+        borderRadius: 12,
+        marginBottom: 10,
+      }}
+      resizeMode="contain"
+    />
+  );
+};
 
 
 const Profile = () => {
   
 
-  const { user } = useUser();
+  const { user, setUser } = useUser(); // ✅ Add this
+  const rawInventory = user.inventory as UserInventoryEntry[];
+
+
+  type UserInventoryEntry = {
+    drop_id: string;
+    count: number;
+  };
+  
 
   type InventoryItem = {
     id: string;
@@ -168,6 +198,26 @@ const Profile = () => {
     value: string;
   };
   
+  type CaseInfo = {
+    id: number;
+    name: string;
+    price: number;
+    gradient_colours: string;
+    icon: string;
+  };
+  
+  type InventoryItemExpanded = {
+    uniqueId: string;
+    dropId: string;
+    name: string;
+    price: number;
+    image: string;
+  };
+
+  const [inventoryItems, setInventoryItems] = useState<InventoryItemExpanded[]>([]);
+const [isInventoryLoading, setIsInventoryLoading] = useState(false);
+
+
 // === Инвентарь ===
 const [showInventorySheet, setShowInventorySheet] = useState(false);
 const [inventory, setInventory] = useState<InventoryItem[]>([]);
@@ -276,16 +326,113 @@ useEffect(() => {
 // ...
 
 useEffect(() => {
-  const user = launchParams?.tgWebAppData?.user;
-  if (user) {
-    setTgName(`${user.first_name || ""} ${user.last_name || ""}`.trim());
-    setTgAvatar(user.photo_url || null);
-  } else {
-    console.log("⚠️ No user data found in Telegram launchParams");
+  const tgUser = launchParams?.tgWebAppData?.user;
+  if (tgUser) {
+    setTgName(`${tgUser.first_name || ""} ${tgUser.last_name || ""}`.trim());
+    setTgAvatar(tgUser.photo_url || null);
   }
 }, [launchParams]);
 
-  
+
+useFocusEffect(
+  React.useCallback(() => {
+    async function loadInventory() {
+      if (!user) return;
+      setIsInventoryLoading(true);
+      try {
+        const rawInv = user.inventory as { count: number; drop_id: string }[];
+        const expanded: InventoryItemExpanded[] = [];
+
+        for (const invEntry of rawInv) {
+          const { drop_id, count } = invEntry;
+          const caseInfo: CaseInfo = await apiGet(`/drops/${drop_id}`);
+
+          for (let i = 0; i < count; i++) {
+            expanded.push({
+              uniqueId: `drop_${drop_id}_${i}`,
+              dropId: drop_id,
+              name: caseInfo.name,
+              price: caseInfo.price,
+              image: caseInfo.icon,
+            });
+          }
+        }
+
+        setInventoryItems(expanded);
+      } catch (err) {
+        console.warn("❌ Error loading inventory:", err);
+      } finally {
+        setIsInventoryLoading(false);
+      }
+    }
+
+    loadInventory();
+  }, [user?.inventory])
+);
+
+// Sell a single item
+const handleSellItem = async (item: InventoryItemExpanded) => {
+  if (!user) return;
+
+  // 1. Считаем новый баланс
+  const newBalance = user.balance + item.price;
+
+  // 2. Обновляем инвентарь
+  const updatedInventory = (user.inventory as UserInventoryEntry[])
+    .map(inv =>
+      inv.drop_id === item.dropId
+        ? { ...inv, count: inv.count - 1 }
+        : inv
+    )
+    .filter(inv => inv.count > 0);
+
+  // 3. Отправляем ОДИН Паtch
+  await apiPatch(`/users/${user.id}`, {
+    balance: newBalance,
+    inventory: updatedInventory
+  });
+
+  // 4. Обновляем UserContext
+  setUser({
+    ...user,
+    balance: newBalance,
+    inventory: updatedInventory
+  });
+
+  // 5. Убираем проданный экземпляр из inventoryItems
+  setInventoryItems(prev =>
+    prev.filter(g => g.uniqueId !== item.uniqueId)
+  );
+};
+
+
+
+const handleSellAll = async () => {
+  if (!user || inventoryItems.length === 0) return;
+
+  // 1. Считаем итоговую стоимость
+  const totalValue = inventoryItems.reduce((sum, item) => sum + item.price, 0);
+
+  // 2. Обновляем баланс
+  const newBalance = user.balance + totalValue;
+
+  // 3. Патчим одного пользователя
+  await apiPatch(`/users/${user.id}`, {
+    balance: newBalance,
+    inventory: []
+  });
+
+  // 4. Обновляем локально
+  setUser({
+    ...user,
+    balance: newBalance,
+    inventory: []
+  });
+
+  setInventoryItems([]);
+};
+
+
 
 const toggleLanguage = async () => {
   const newLang = language === "ru" ? "en" : "ru";
@@ -342,7 +489,9 @@ const getAdaptiveTextSize = (baseSize: number) => {
     return 18; // desktop
   };
 
-  
+  // Универсальный компонент отображения любой картинки (SVG/PNG/URL/local)
+
+
 
   return (
     <LinearGradient colors={["#340A6F", "#18003A"]} style={styles.background}>
@@ -942,49 +1091,101 @@ const getAdaptiveTextSize = (baseSize: number) => {
   heightRatio={0.75}
 >
   <View style={styles.bottomSheetContainer}>
-  <Text style={styles.sheetTitle}>{t("yourInventory")}</Text>
+    <Text style={styles.sheetTitle}>{t("yourInventory")}</Text>
 
-    {inventory.length === 0 ? (
-<Text style={{ color: "#aaa", marginTop: 16 }}>{t("noGifts")}</Text>    )
- : (
+    {isInventoryLoading ? (
+      <Text style={{ color: "#aaa", marginTop: 16 }}>Loading…</Text>
+    ) : inventoryItems.length === 0 ? (
+      <Text style={{ color: "#aaa", marginTop: 16 }}>{t("noGifts")}</Text>
+    ) : (
       <>
         <ScrollView
-          style={{ width: "100%", marginTop: 16 }}
-          contentContainerStyle={{ gap: 12, paddingBottom: 80 }}
-        >
-          {inventory.map((item) => (
-            <View
-              key={item.id}
-              style={{
-                backgroundColor: "#1F0248",
-                borderRadius: 16,
-                padding: 16,
-                borderWidth: 1,
-                borderColor: "rgba(255,255,255,0.2)",
-              }}
-            >
-              <Text style={{ color: "#fff", fontSize: 18, fontWeight: "600" }}>
-                {item.name}
-              </Text>
-              <Text style={{ color: "#C4BED4", marginTop: 4 }}>{item.value}</Text>
-            </View>
-          ))}
-        </ScrollView>
+  style={{ width: "100%", marginTop: 16 }}
+  contentContainerStyle={{
+    flexDirection: "row",
+    flexWrap: "wrap",
+    justifyContent: "space-between",
+    paddingBottom: 80,
+    rowGap: 12,
+  }}
+>
+  {inventoryItems.map(item => (
+    <View
+      key={item.uniqueId}
+      style={{
+        width: "48%", // 2 карточки в ряд
+        backgroundColor: "#1F0248",
+        borderRadius: 16,
+        padding: 12,
+        borderWidth: 1,
+        borderColor: "rgba(255,255,255,0.2)",
+      }}
+    >
 
-        <Pressable
-          style={[styles.sellButtonSheet, { marginTop: 16, backgroundColor: "#6B3FD8" }]}
-          onPress={() => {
-            console.log("✅ Sold all gift cards");
-            setInventory([]);
-            setShowInventorySheet(false);
+<InventoryImage uri={item.image} />
+
+
+<Text
+  style={{
+    color: "#fff",
+    fontSize: 16,
+    fontWeight: "600",
+    textAlign: "center",     // ← вот это
+    width: "100%",           // ← обязательно для центрирования в flex
+  }}
+>
+  {item.name}
+</Text>
+<Text
+  style={{
+    color: "#C4BED4",
+    marginTop: 4,
+    marginBottom: 10,
+    textAlign: "center",     // ← центр цены
+    width: "100%",
+  }}
+>
+  {item.price.toFixed(2)} TON
+</Text>
+
+      <TouchableOpacity
+        style={{
+          width: "100%",
+          height: 42,
+          borderRadius: 10,
+          backgroundColor: "#6B3FD8",
+          justifyContent: "center",
+          alignItems: "center",
+        }}
+        onPress={() => handleSellItem(item)}
+      >
+        <Text
+          style={{
+            color: "#fff",
+            fontSize: 15,
+            fontWeight: "600",
           }}
         >
-<Text style={[styles.sellButtonText, { color: "#fff" }]}>{t("sellAll")}</Text>
+          Sell
+        </Text>
+      </TouchableOpacity>
+    </View>
+  ))}
+</ScrollView>
+
+
+        <Pressable
+          style={[styles.sellButtonSheet, { marginTop: 16, backgroundColor: "#B98CFF" }]}
+          onPress={handleSellAll}
+
+        >
+          <Text style={[styles.sellButtonText, { color: "#fff" }]}>{t("sellAll")}</Text>
         </Pressable>
       </>
     )}
   </View>
 </CustomBottomSheet>
+
 
 
 {/* === Bottom Sheet Withdraw TON === */}

@@ -20,6 +20,7 @@ import { onLanguageChange } from "@/components/languageEvents";
 
 import { useUser } from "../components/UserContext";
 import { changeUserBalance } from "../app/api";
+import { apiPatch } from "./api";
 
 
 const { width: screenWidth } = Dimensions.get("window");
@@ -139,35 +140,34 @@ const makeDecor = (arr: DropItem[], count: number) =>
 
 
 const handlePaidSpin = async () => {
-  if (!user) {
-    console.log("❌ user is null");
-    return;
-  }
+  if (!user) return;
 
-
+  // 1. Проверка: хватает ли баланса
   if (user.balance < casePrice) {
     triggerError("Недостаточно средств");
     return;
   }
-  
 
+  // 2. Новый баланс
   const newBalance = user.balance - casePrice;
 
-  // --- локально обновляем
-  setUser({ ...user, balance: newBalance });
-
   try {
-    const updated = await changeUserBalance(user.id, newBalance);
-    console.log("✔ Баланс списан, сервер:", updated.balance);
-  } catch (err) {
-    console.log("❌ Ошибка PATCH, откат баланса");
-    setUser({ ...user, balance: user.balance });
-    return;
-  }
+    // 3. Отправка PATCH
+    await apiPatch(`/users/${user.id}`, { balance: newBalance });
 
-  // --- запускаем прокрутку рулетки
-  onSpin?.();
+    // 4. Обновление UserContext локально
+    setUser({ ...user, balance: newBalance });
+
+    // 5. Запуск рулетки
+    onSpin?.();
+  } catch (err) {
+    console.warn("❌ Ошибка при обновлении баланса:", err);
+    triggerError("Ошибка при обновлении баланса");
+  }
 };
+
+
+
 
 
 useEffect(() => {
