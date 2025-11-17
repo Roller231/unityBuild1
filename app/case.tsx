@@ -388,8 +388,11 @@ const handleSpin = async () => {
       ];
     }
   
-    // обновляем локально
-    setUser({ ...user, inventory: updatedInventory });
+    setUser((prev: any) => ({
+      ...prev,
+      inventory: updatedInventory,
+    }));
+    
   
     // обновляем на сервере
     await apiPatch(`/users/${user.id}`, {

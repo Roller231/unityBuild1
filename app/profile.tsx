@@ -100,6 +100,7 @@ const translations = {
 
     amountOfStars: "Количество звёзд",
     amountOfTon: "Количество TON",
+    sell: "Продать",
   },
   en: {
     deposit: "Deposit",
@@ -139,6 +140,8 @@ const translations = {
 
     amountOfStars: "Amount of Stars",
     amountOfTon: "Amount of TON",
+    sell: "Sell",
+
   },
 } as const;
 
@@ -645,42 +648,57 @@ const getAdaptiveTextSize = (baseSize: number) => {
     { fontSize: getAdaptiveTextSize(20) }, // адаптивно
   ]}
 >
-  {t("inventory")} (0)
+  {t("inventory")} ({inventoryItems.length})
 </Text>            <Pressable style={styles.sellButton} onPress={() => setShowInventorySheet(true)}>
             <Text style={styles.sellButtonText}>{t("sellAll")}</Text>
             </Pressable>
           </View>
 
           <View style={styles.inventoryGrid}>
-  {[1, 2, 3].map((_, i) => (
-    <Pressable
-  key={i}
-  style={[styles.inventoryItem, { width: itemSize, height: itemSize }]}
-  onPress={() => setShowInventorySheet(true)}
->
+  {[0, 1, 2].map((i) => {
+    const gift = inventoryItems[i];
 
-      <View style={styles.giftIconWrapper}>
-        {i === 2 ? (
-          <Image
-            source={IconArrow}
-            style={styles.arrow}
-            resizeMode="contain"
-          />
-        ) : (
-          <Image
-            source={IconGift}
-            style={[
-              styles.inventoryIcon,
-              i === 0 && { tintColor: "rgba(53, 40, 81, 1)" }, // 1 подарок — жёлтый
-              i === 1 && { tintColor: "rgba(53, 40, 81, 1)" }, // 2 подарок — красный
-            ]}
-            resizeMode="contain"
-          />
-        )}
-      </View>
-    </Pressable>
-  ))}
+    return (
+      <Pressable
+        key={i}
+        style={[styles.inventoryItem, { width: itemSize, height: itemSize }]}
+        onPress={() => setShowInventorySheet(true)}
+      >
+        <View style={styles.giftIconWrapper}>
+          {i === 2 ? (
+            <Image
+              source={IconArrow}
+              style={styles.arrow}
+              resizeMode="contain"
+            />
+          ) : gift ? (
+            <Image
+              source={{ uri: gift.image }}
+              style={{
+                width: 65,
+                height: 65,
+                opacity: 1,
+                borderRadius: 8,
+              }}
+              resizeMode="contain"
+            />
+          ) : (
+            <Image
+              source={IconGift}
+              style={[
+                styles.inventoryIcon,
+                i === 0 && { tintColor: "rgba(53, 40, 81, 1)" },
+                i === 1 && { tintColor: "rgba(53, 40, 81, 1)" },
+              ]}
+              resizeMode="contain"
+            />
+          )}
+        </View>
+      </Pressable>
+    );
+  })}
 </View>
+
 
 
         </View>
@@ -1166,7 +1184,7 @@ const getAdaptiveTextSize = (baseSize: number) => {
             fontWeight: "600",
           }}
         >
-          Sell
+          {t("sell")}
         </Text>
       </TouchableOpacity>
     </View>
@@ -1175,7 +1193,7 @@ const getAdaptiveTextSize = (baseSize: number) => {
 
 
         <Pressable
-          style={[styles.sellButtonSheet, { marginTop: 16, backgroundColor: "#B98CFF" }]}
+          style={[styles.sellButtonSheet, { marginTop: 16, backgroundColor: "#6B3FD8" }]}
           onPress={handleSellAll}
 
         >

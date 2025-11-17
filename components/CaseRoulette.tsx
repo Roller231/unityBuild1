@@ -156,6 +156,8 @@ const handlePaidSpin = async () => {
     await apiPatch(`/users/${user.id}`, { balance: newBalance });
 
     // 4. Обновление UserContext локально
+    console.warn("DSDSDSDSD");
+
     setUser({ ...user, balance: newBalance });
 
     // 5. Запуск рулетки
