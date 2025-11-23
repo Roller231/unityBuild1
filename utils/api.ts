@@ -40,7 +40,6 @@ export async function apiDelete(path: string) {
 }
 
 // --- расширенные функции ---
-// Получить пользователя по Telegram ID
 export async function getUserByTgId(tgId: string) {
   try {
     return await apiGet(`/users/tg/${tgId}`);
@@ -49,33 +48,26 @@ export async function getUserByTgId(tgId: string) {
   }
 }
 
-// Создать нового пользователя
 export async function createUser(data: any) {
   return await apiPost("/users/", data);
 }
 
-// Обновить одно поле
-export async function updateUserField(userId: number, field: string, value: any) {
+export async function updateUserField(
+  userId: number,
+  field: string,
+  value: any
+) {
   return await apiPatch(`/users/${userId}`, { [field]: value });
 }
 
-// Изменить баланс (+ или -)
 export async function changeUserBalance(userId: number, amount: number) {
   return await apiPatch(`/users/${userId}`, { balance: amount });
 }
 
-
 export async function getDropById(id: number | string) {
-  console.log("📦 FETCHING DROP:", id);
-
   try {
-    const drop = await apiGet(`/drops/${id}`);
-
-    console.log("📦 DROP RESULT:", drop);
-
-    return drop;
-  } catch (err) {
-    console.log("❌ DROP FETCH ERROR:", err);
+    return await apiGet(`/drops/${id}`);
+  } catch {
     return null;
   }
 }

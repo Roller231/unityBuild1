@@ -28,25 +28,25 @@ import TonIcon from "../components/icons/ton.svg";
 import Svg, { Text as SvgText } from "react-native-svg";
 import { emitLanguageChange, onLanguageChange } from "@/components/languageEvents";
 
+
 import { useLaunchParams } from "@telegram-apps/sdk-react";
 
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { useFocusEffect } from "expo-router";
 import { vibrate } from "./crash";
 
+import { apiGet, apiPatch } from "../utils/api";
 
+
+
+import { useUser } from "../components/UserContext";
 
 const { width: screenWidth, height: screenHeight } = Dimensions.get("window");
 
-const sampleDrops: DropItem[] = [
-  { id: "1", name: "Bronze Coin", icon: require("../components/icons/cat.png"), rarity: "common", price: 6000.05 },
-  { id: "2", name: "Silver Coin", icon: require("../components/icons/Oran.svg"), rarity: "rare", price: 0.15 },
-  { id: "3", name: "Golden Ring", icon: require("../components/icons/VenusP.png"), rarity: "epic", price: 0.35 },
-  { id: "4", name: "Diamond Crown", icon: require("../components/icons/cat.png"), rarity: "legendary", price: 0.7 },
-];
 
 const Case = () => {
 
+  const { user, setUser } = useUser();
 
   const BASE_WIDTH = 390;
   const BASE_HEIGHT = 844; // iPhone 12
@@ -54,13 +54,14 @@ const Case = () => {
   const scaleH = screenHeight / BASE_HEIGHT;
   
   // Универсальный helper: масштабирует относительно меньшей оси
-  const scale = (size: number) => size * Math.min(scaleW, scaleH);
   
 
 // === BottomSheet пополнения ===
 const [showDepositSheet, setShowDepositSheet] = useState(false);
 const [selectedTab, setSelectedTab] = useState<"Gifts" | "Stars" | "TON">("TON");
 const [tonAmount, setTonAmount] = useState("");
+const [cases, setCases] = useState<any[]>([]);
+
 const [starsAmount, setStarsAmount] = useState("");
 
 // 🌍 Переводы
@@ -128,6 +129,12 @@ const useTranslation = (lang: Lang) => (key: TranslationKey) =>
   const [resultId, setResultId] = useState<string | null>(null);
   const [result, setResult] = useState<DropItem | null>(null);
 
+  const [dropHistory, setDropHistory] = useState<
+  { uid: string; id: string; icon: string; animate: boolean }[]
+>([]);
+
+
+
 
 // ✅ при загрузке читаем язык из AsyncStorage
   // ✅ при загрузке читаем язык из AsyncStorage
@@ -152,7 +159,7 @@ const useTranslation = (lang: Lang) => (key: TranslationKey) =>
     try {
       return useLaunchParams();
     } catch {
-      console.warn("⚠️ Telegram SDK not found — running in dev mode (localhost)");
+      
       return {
         tgWebAppData: {
           user: { first_name: "Guest", last_name: "", photo_url: null },
@@ -163,6 +170,58 @@ const useTranslation = (lang: Lang) => (key: TranslationKey) =>
   
   
   
+// === Загрузка списка кейсов ===
+useEffect(() => {
+  async function loadCases() {
+    try {
+      
+      const data = await apiGet("/cases/");
+
+      // 🔥 Проверяем
+      
+      data.forEach((c: { gradient_colors: any; }, i: any) => {
+        
+      });
+
+      setCases(data);
+    } catch (e) {
+      
+    }
+  }
+
+  loadCases();
+}, []);
+
+
+async function loadDropsForCase(caseId: number) {
+  try {
+    // 1. Получаем список CaseDrops
+    const caseDrops = await apiGet(`/case-drops/case/${caseId}`);
+
+    if (!Array.isArray(caseDrops)) return [];
+
+    // 2. Загружаем сами дропы
+    const drops = await Promise.all(
+      caseDrops.map(async (cd) => {
+        const drop = await apiGet(`/drops/${cd.drop_id}`);
+
+        return {
+          id: String(drop.id),
+          name: drop.name,
+          icon: drop.icon,
+          rarity: drop.rarity,
+          price: drop.price,
+          chance: cd.chance,       // 🔥 Добавили шанс
+        };
+      })
+    );
+
+    return drops;
+  } catch (err) {
+    console.log("❌ Ошибка загрузки дропов:", err);
+    return [];
+  }
+}
 
 
 
@@ -183,7 +242,11 @@ const useTranslation = (lang: Lang) => (key: TranslationKey) =>
   const isDesktop = platform === "tdesktop" || platform === "macos";
   const bottomSheetHeightRatio = isDesktop ? 0.8 : 0.8;
 
+
+  
   const fixedWidth = isDesktop ? 470 : screenWidth;
+  const scale = (size: number) => size * (fixedWidth / 390);
+  
   const switchWidth = fixedWidth * 0.9;
   const iconSize = Math.min(fixedWidth * 0.45, 200);
 
@@ -191,6 +254,9 @@ const useTranslation = (lang: Lang) => (key: TranslationKey) =>
     inputRange: [0, 1],
     outputRange: [0, switchWidth / 2],
   });
+
+  const [drops, setDrops] = useState<DropItem[]>([]);
+
 
   const toggleLanguage = async () => {
     const newLang = language === "ru" ? "en" : "ru";
@@ -206,21 +272,145 @@ const useTranslation = (lang: Lang) => (key: TranslationKey) =>
       Animated.timing(flagAnim, { toValue: 0, duration: 200, useNativeDriver: true }),
     ]).start();
   };
+  const filteredCases = cases.filter(c =>
+    activeTab === "paid" ? c.price > 0 : c.price === 0
+  );
   
 
-  const handleGiftPress = () => {
-    setOpenMenu(true);
-    setSpinning(false);
-    setResult(null);
-  };
+  const [selectedCase, setSelectedCase] = useState<any | null>(null);
 
-  const handleSpin = () => {
-    if (spinning) return;
-    setSpinning(true);
-    setResult(null);
-    const randomItem = sampleDrops[Math.floor(Math.random() * sampleDrops.length)];
-    setTimeout(() => setResultId(randomItem.id), 200);
-  };
+const handleGiftPress = async (caseItem: any) => {
+  
+
+  setSelectedCase(caseItem);
+  setOpenMenu(true);
+  setSpinning(false);
+  setResult(null);
+
+  // Загружаем реальные дропы
+  const realDrops = await loadDropsForCase(caseItem.id);
+
+  
+  setDrops(realDrops); // сохраним в состояние
+};
+
+function pickByChance(drops: DropItem[]) {
+  const total = drops.reduce((sum, d) => sum + d.chance, 0);
+  let rnd = Math.random() * total;
+
+  for (const drop of drops) {
+    rnd -= drop.chance;
+    if (rnd <= 0) return drop;
+  }
+
+  return drops[drops.length - 1]; // fallback
+}
+
+useFocusEffect(
+  useCallback(() => {
+    console.log("🎯 Case screen focused → connecting WS");
+
+    const ws = new WebSocket("wss://ggcat.org/ws/drops/global");
+
+    ws.onopen = () => console.log("WS connected");
+    ws.onerror = (err) => console.log("WS error:", err);
+
+    ws.onmessage = (msg) => {
+      try {
+        const { event, data } = JSON.parse(msg.data);
+        if (event === "drop") {
+          const newItem = {
+            uid: `${Date.now()}-${Math.random().toString(36).slice(2)}`,
+            id: String(data.id),
+            icon: data.icon,
+            animate: true,
+          };
+
+          setDropHistory(prev => {
+            const updated = [
+              newItem,
+              ...prev.map((d) => ({ ...d, animate: false })),
+            ];
+
+            return updated.slice(0, 6);
+          });
+
+          setTimeout(() => {
+            setDropHistory(prev =>
+              prev.filter(item => item.uid !== newItem.uid)
+            );
+          }, 15000);
+        }
+      } catch (e) {}
+    };
+
+    // 🧹 cleanup когда уходим со страницы
+    return () => {
+      console.log("🚪 Case screen blurred → closing WS");
+      ws.close();
+    };
+  }, [])
+);
+
+
+
+const handleSpin = async () => {
+  if (spinning) return;
+  setResult(null);
+
+  const randomItem = pickByChance(drops);
+  setResult(randomItem); // победитель выбран ЗДЕСЬ
+
+  if (!user) {
+    console.log("❌ user is null");
+    return;
+  }
+
+  // === 1. Добавляем drop сразу ===
+  try {
+    const inv = user.inventory || [];
+  
+    // ищем, есть ли уже drop_id
+    const existing = inv.find((item: { drop_id: string; }) => item.drop_id === randomItem.id);
+  
+    let updatedInventory;
+  
+    if (existing) {
+      updatedInventory = inv.map((item: { drop_id: string; count: number; }) =>
+        item.drop_id === randomItem.id
+          ? { ...item, count: item.count + 1 }
+          : item
+      );
+    } else {
+      updatedInventory = [
+        ...inv,
+        { drop_id: randomItem.id, count: 1 }
+      ];
+    }
+  
+    setUser((prev: any) => ({
+      ...prev,
+      inventory: updatedInventory,
+    }));
+    
+  
+    // обновляем на сервере
+    await apiPatch(`/users/${user.id}`, {
+      inventory: updatedInventory,
+    });
+  
+    console.log("✔ Дроп добавлен пользователю:", randomItem.id);
+  
+  } catch (err) {
+    console.log("❌ Ошибка добавления дропа:", err);
+  }
+  
+
+  // === 2. Запускаем прокрутку рулетки ===
+  setSpinning(true);
+};
+
+
 
   const handleFinish = (item: DropItem) => {
     setSpinning(false);
@@ -306,19 +496,20 @@ const useTranslation = (lang: Lang) => (key: TranslationKey) =>
       </View>
     </View>
 
-    <View style={styles.giftHistoryMask}>
-      <View style={styles.giftHistoryContainer}>
-        {Array.from({ length: 6 }).map((_, i) => (
-          <View key={i} style={styles.inactiveCircle}>
-            <Image
-              source={require("../components/icons/gift.png")}
-              style={styles.giftIcon}
-              resizeMode="contain"
-            />
-          </View>
-        ))}
-      </View>
-    </View>
+    <View style={styles.giftHistoryContainer}>
+    {dropHistory.map((drop) => (
+  <AnimatedDropBubble
+    key={drop.uid}        // ⬅️ ключ теперь всегда уникальный
+    icon={drop.icon}
+    animate={drop.animate}
+  />
+))}
+
+
+
+
+</View>
+
   </View>
 </View>
 
@@ -345,24 +536,31 @@ const useTranslation = (lang: Lang) => (key: TranslationKey) =>
 
 
           {/* Сетка подарков */}
-          <View style={[styles.giftGrid, { width: switchWidth }]}>
-            {Array.from({ length: 6 }).map((_, index) => (
-              <GiftCard
-                key={index}
-                price={activeTab === "paid" ? "0.5" : "0.1"}
-                cardWidth={(switchWidth - 10)/2}
-                drops={sampleDrops}
-                gradientColors={
-                  activeTab === "paid"
-                    ? ["rgba(0,0,0,0)", "rgba(0,255,100,0.25)", "rgba(0,255,100,0.85)"]
-                    : ["rgba(255, 100, 100, 0.01)", "rgba(255, 0, 0, 0.2)", "rgba(255, 0, 0, 0.85)"]
+         <View style={[styles.giftGrid, { width: switchWidth }]}>
 
 
-                }
-                onPress={handleGiftPress}
-              />
-            ))}
-          </View>
+
+         {filteredCases.map((caseItem, index) => (
+    <GiftCard
+      key={caseItem.id}
+      price={String(caseItem.price)}
+      cardWidth={(switchWidth - 10) / 2}
+
+      drops={drops}
+
+      gradientColors={
+        caseItem.gradient_colors
+          ? caseItem.gradient_colors.split(" ")
+          : ["rgba(0,0,0,0)", "rgba(0,255,100,0.25)", "rgba(0,255,100,0.85)"]
+      }
+      mainImage={caseItem.main_image}
+
+      onPress={() => handleGiftPress(caseItem)}
+    />
+  ))}
+
+</View>
+
         </ScrollView>
       </View>
 
@@ -377,14 +575,19 @@ const useTranslation = (lang: Lang) => (key: TranslationKey) =>
       >
         <View style={[styles.sheetContainer, styles.sheetBorder]}>
           <View style={styles.sheetContent}>
+
+  
+
             <CaseRoulette
               
-              items={sampleDrops}
+              items={drops}
               active={spinning}
-              resultId={resultId}
+              resultItem={result} // 🔥 pass the item, not just ID
               onFinish={handleFinish}
               onSpin={handleSpin}
               spinning={spinning}
+
+              casePrice={selectedCase?.price}
             />
           </View>
         </View>
@@ -411,10 +614,11 @@ const useTranslation = (lang: Lang) => (key: TranslationKey) =>
       {/* 🧩 Масштабируем всё меню пропорционально */}
       <View
         style={{
-          transform: [{ scale: Math.min(screenWidth / 390, screenHeight / 844) }],
+          transform: [{ scale: fixedWidth / 450 }],
+
           alignItems: "center",
           justifyContent: "center",
-          width: "100%",
+          width: fixedWidth * 0.9,      // 🔥 как у трёх кнопок
         }}
       >
         <Text
@@ -479,7 +683,7 @@ const useTranslation = (lang: Lang) => (key: TranslationKey) =>
             setTimeout(() => setResetKey((prev) => prev + 1), 300);
           }}
           style={{
-            width: 330,
+            width: fixedWidth * 0.9,   // 🔥 адаптивно, как Crash
             height: 60,
             backgroundColor: "#6B3FD8",
             borderRadius: 100,
@@ -772,7 +976,7 @@ const useTranslation = (lang: Lang) => (key: TranslationKey) =>
   <TouchableOpacity
     activeOpacity={0.9}
     style={[styles.placeButton, { width: fixedWidth * 1.4 }]}
-    onPress={() => console.log("Connecting wallet for Gifts")}
+    
   >
     <Image
       source={require("../components/icons/OrangePng.png")}
@@ -1099,7 +1303,7 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     alignItems: "center",
   },
-  giftIcon: { width: 24, height: 24, opacity: 0.4 },
+  giftIcon: { width: 34, height: 34, opacity: 1 },
   
 
   resultContainer: {
@@ -1362,3 +1566,61 @@ const styles = StyleSheet.create({
 });
 
 export default Case;
+
+
+const AnimatedDropBubble = ({ icon, animate }: { icon: string, animate: boolean }) => {
+  const scale = React.useRef(new Animated.Value(animate ? 0 : 1)).current;
+  const opacity = React.useRef(new Animated.Value(animate ? 0 : 1)).current;
+
+  React.useEffect(() => {
+    if (!animate) return;
+
+    Animated.parallel([
+      Animated.spring(scale, {
+        toValue: 1,
+        damping: 7,
+        stiffness: 140,
+        mass: 0.5,
+        useNativeDriver: true,
+      }),
+      Animated.timing(opacity, {
+        toValue: 1,
+        duration: 200,
+        useNativeDriver: true,
+      }),
+    ]).start();
+  }, [animate]);
+
+  return (
+    <View
+      style={{
+        width: 65,
+        height: 65,
+        borderRadius: 35,
+        backgroundColor: "#1F0248",
+        justifyContent: "center",
+        alignItems: "center",
+        marginRight: 12,
+        overflow: "hidden", // важно
+      }}
+    >
+      <Animated.View
+        style={{
+          transform: [{ scale }],
+          opacity,
+          width: "100%",
+          height: "100%",
+          justifyContent: "center",
+          alignItems: "center",
+        }}
+      >
+        <Image
+          source={{ uri: icon }}
+          style={{ width: 34, height: 34 }}
+          resizeMode="contain"
+        />
+      </Animated.View>
+    </View>
+  );
+};
+
