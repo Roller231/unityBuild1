@@ -53,21 +53,29 @@ function RootLayoutInner() {
   const resizeMode = isDesktop ? "cover" : "contain";
   const { setUser } = useUser();
   const { user } = useUser();
-  let lp: any = null;
-  try {
-    lp = useLaunchParams();
-  } catch (e) {
-    console.warn("⚠ useLaunchParams(): Not available yet", e);
-    lp = null;
-  }
+  const launchParams = (() => {
+    try {
+      return useLaunchParams(); // работает ТОЛЬКО в Telegram
+    } catch {
+      console.warn("⚠ Telegram SDK not found — running in dev mode (localhost)");
+      return {
+        tgWebAppData: {
+          user: {
+            id: "local",
+            username: "localuser",
+            first_name: "Guest",
+            last_name: "",
+            photo_url: null,
+          },
+        },
+      };
+    }
+  })();
+  
   
 const [launchReady, setLaunchReady] = useState(false);
 
-useEffect(() => {
-  if (lp?.tgWebAppData) {
-    setLaunchReady(true);
-  }
-}, [lp]);
+
 
 
 
@@ -85,19 +93,19 @@ useEffect(() => {
     async function initTg() {
       if (await isTMA()) {
         init();
-
+  
         if (viewport.mount.isAvailable()) {
           await viewport.mount();
           viewport.expand();
         }
-
+  
         if (viewport.requestFullscreen.isAvailable()) {
           await viewport.requestFullscreen();
         }
       }
     }
     initTg();
-
+  
   }, []);
 
   useEffect(() => {
@@ -164,23 +172,13 @@ try {
 
 // === LOAD USER (TELEGRAM OR DEFAULT) ===
 try {
-  const telegramAvailable = await isTMA();
+  const tlParams = launchParams; // ← используем наш безопасный launchParams
+  const tgUser = tlParams?.tgWebAppData?.user;
+
   let finalUser = null;
 
-  /** --- Безопасный вызов useLaunchParams(), как в Profile --- */
-  const safeLaunchParams = (() => {
-    try {
-      return useLaunchParams();
-    } catch (e) {
-      console.warn("⚠ useLaunchParams() не доступен (вероятно dev mode)", e);
-      return null;
-    }
-  })();
-
-  const tgUser = safeLaunchParams?.tgWebAppData?.user;
-
-  if (telegramAvailable && tgUser) {
-    // 👉 User from Telegram Mini App
+  if (tgUser && tgUser.id !== "local") {
+    // 👉 Telegram Mini App user
     const tg_id = String(tgUser.id);
     const username = tgUser.username ?? "unknown";
     const firstname = tgUser.first_name ?? "User";
@@ -200,14 +198,13 @@ try {
         firstname,
         balance: 0,
         refcount: 0,
-        inventory: [], // ← Всегда массив
+        inventory: [],
       });
       console.log("✅ User created:", finalUser);
     }
-
   } else {
-    // 👉 Local fallback (dev / browser / no Telegram)
-    console.log("⚠ Telegram SDK недоступен — local mode.");
+    // 👉 Local fallback
+    console.log("⚠ Local fallback user.");
 
     const existingLocal = await getUserByTgId("local");
 
@@ -230,6 +227,7 @@ try {
 } catch (err) {
   console.warn("❌ User init failed:", err);
 }
+
 
 
 
