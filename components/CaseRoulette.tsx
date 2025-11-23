@@ -18,11 +18,6 @@ import OrangePng from "../components/icons/OrangePng.png";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { onLanguageChange } from "@/components/languageEvents";
 
-import { useUser } from "../components/UserContext";
-import { changeUserBalance } from "../app/api";
-import { apiPatch } from "./api";
-
-
 const { width: screenWidth } = Dimensions.get("window");
 const FIXED_WIN_INDEX = 50;
 const ITEM_GAP = 10;
@@ -58,29 +53,24 @@ const useTranslation = (lang: Lang) => (key: TranslationKey) =>
 interface CaseRouletteProps {
   items: DropItem[];
   active?: boolean;
-  resultItem?: DropItem | null;
+  resultId?: string | null;
   onFinish?: (item: DropItem) => void;
   onSpin?: () => void;
   speed?: number;
   title?: string;
   spinning?: boolean;
   disableClose?: boolean;
-
-  casePrice?: number;   // только это оставляем
 }
-
 
 export default function CaseRoulette({
   items,
   active,
-  resultItem,
+  resultId,
   onFinish,
   onSpin,
   speed = 1,
   title,
   spinning = false,
-  casePrice = 0,
-
 }: CaseRouletteProps) {
   const anim = useRef(new Animated.Value(0)).current;
   const [displayItems, setDisplayItems] = useState<DropItem[]>([]);
@@ -89,20 +79,6 @@ export default function CaseRoulette({
   const [winningItem, setWinningItem] = useState<DropItem | null>(null);
   const [language, setLanguage] = useState<"ru" | "en">("ru");
   const t = useTranslation(language);
-
-  const { user, setUser } = useUser();
-
-  const [showError, setShowError] = useState(false);
-const [errorMessage, setErrorMessage] = useState("");
-
-const triggerError = (msg: string) => {
-  setErrorMessage(msg);
-  setShowError(true);
-  setTimeout(() => setShowError(false), 2000);
-};
-
-
-
 
   // === Читаем язык из AsyncStorage и подписываемся на изменения ===
   useEffect(() => {
@@ -129,70 +105,30 @@ const triggerError = (msg: string) => {
   const TOTAL_WIDTH = ITEM_WIDTH + ITEM_GAP;
   const CENTER_OFFSET = innerWidth / 2 - TOTAL_WIDTH / 2;
 
-// Берём случайный элемент из items (только для визуального декора)
-const pickRandom = (arr: DropItem[]) =>
-  arr[Math.floor(Math.random() * arr.length)];
+  const getRandomItem = (arr: DropItem[]) =>
+    arr[Math.floor(Math.random() * arr.length)];
 
-// Создаём случайный список-декор
-const makeDecor = (arr: DropItem[], count: number) =>
-  Array.from({ length: count }, () => pickRandom(arr));
+  const generateRandomItems = (arr: DropItem[], count: number) =>
+    Array.from({ length: count }, () => getRandomItem(arr));
 
-
-
-const handlePaidSpin = async () => {
-  if (!user) return;
-
-  // 1. Проверка: хватает ли баланса
-  if (user.balance < casePrice) {
-    triggerError("Недостаточно средств");
-    return;
-  }
-
-  // 2. Новый баланс
-  const newBalance = user.balance - casePrice;
-
-  try {
-    // 3. Отправка PATCH
-    await apiPatch(`/users/${user.id}`, { balance: newBalance });
-
-    // 4. Обновление UserContext локально
-    console.warn("DSDSDSDSD");
-
-    setUser({ ...user, balance: newBalance });
-
-    // 5. Запуск рулетки
-    onSpin?.();
-  } catch (err) {
-    console.warn("❌ Ошибка при обновлении баланса:", err);
-    triggerError("Ошибка при обновлении баланса");
-  }
-};
-
-
-
-
-
-useEffect(() => {
-  if (items.length > 0) {
-    const decor = makeDecor(items, 20);
-    setDisplayItems(decor);
-  }
-  anim.setValue(0);
-}, [items]);
-
+  // --- Начальная генерация ---
+  useEffect(() => {
+    if (items.length > 0) setDisplayItems(generateRandomItems(items, 20));
+    anim.setValue(0);
+  }, [items]);
 
   // --- Подготовка к кручению ---
   useEffect(() => {
-    if (!active || !resultItem || isSpinning || items.length === 0) return;
-    const winner = resultItem;
+    if (!active || !resultId || isSpinning || items.length === 0) return;
+    const winner = items.find((i) => i.id === resultId);
     if (!winner) return;
 
     setIsSpinning(true);
     anim.stopAnimation();
     anim.setValue(0);
 
-    const itemsBefore = makeDecor(items, FIXED_WIN_INDEX);
-    const itemsAfter = makeDecor(items, 60);
+    const itemsBefore = generateRandomItems(items, FIXED_WIN_INDEX);
+    const itemsAfter = generateRandomItems(items, 60);
     const newDisplay = [...itemsBefore, winner, ...itemsAfter];
     if (newDisplay.length > 104) newDisplay[104] = winner;
 
@@ -203,7 +139,7 @@ useEffect(() => {
     setDisplayItems(newDisplay);
     setTargetOffset(safeOffset);
     setWinningItem(winner);
-  }, [active, resultItem, items, isSpinning]);
+  }, [active, resultId, items, isSpinning]);
 
   // --- Анимация вращения ---
   useLayoutEffect(() => {
@@ -216,8 +152,6 @@ useEffect(() => {
       useNativeDriver: false,
     }).start(({ finished }) => {
       if (!finished) return;
-      
-
       onFinish?.(winningItem);
       setIsSpinning(false);
       setWinningItem(null);
@@ -279,8 +213,7 @@ useEffect(() => {
   <TouchableOpacity
     activeOpacity={0.9}
     style={[styles.betButton, { width: maxWidth * 1.4 }]} // ✅ как в Profile
-    onPress={handlePaidSpin}
-
+    onPress= {onSpin}
        disabled={spinning}
   >
     {/* 🔸 Оранжевый фон */}
@@ -355,40 +288,10 @@ useEffect(() => {
         </View>
       </ScrollView>
     </View>
-    
   );
-  {showError && (
-    <View style={styles.toast}>
-      <Text style={styles.toastText}>{errorMessage}</Text>
-    </View>
-  )}
-  
 }
 
 const styles = StyleSheet.create({
-
-  toast: {
-    position: "absolute",
-    bottom: 120,
-    alignSelf: "center",
-    backgroundColor: "rgba(140, 0, 255, 0.85)",
-    paddingVertical: 12,
-    paddingHorizontal: 22,
-    borderRadius: 16,
-    zIndex: 999,
-    shadowColor: "#000",
-    shadowOpacity: 0.25,
-    shadowRadius: 8,
-    shadowOffset: { width: 0, height: 4 },
-  },
-  
-  toastText: {
-    color: "#fff",
-    fontSize: 16,
-    fontWeight: "600",
-    textAlign: "center",
-  },
-  
 
   orangePng: {
     width: "100%",

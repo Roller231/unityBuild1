@@ -6,16 +6,10 @@ import * as Font from "expo-font";
 import { Asset } from "expo-asset";
 import * as SplashScreen from "expo-splash-screen";
 
-import { UserProvider } from "../components/UserContext";
-
 import CustomTabBar from "@/components/CustomTabBar";
 import { useTelegramPlatform } from "@/hooks/useTelegramPlatform";
 
 import { init, viewport, swipeBehavior, isTMA } from "@telegram-apps/sdk-react";
-
-import { getUserByTgId, createUser } from "./api";
-import { useUser } from "../components/UserContext";
-
 
 // === Импорт ассетов ===
 import FlagRU from "../components/icons/ru.png";
@@ -36,26 +30,13 @@ const { width: screenWidth, height: screenHeight } = Dimensions.get("window");
 
 SplashScreen.preventAutoHideAsync(); // Предотвращаем автo‑скрытие сплэша до готовности
 
-
 export default function RootLayout() {
-  return (
-    <UserProvider>
-      <RootLayoutInner />
-    </UserProvider>
-  );
-}
-
-function RootLayoutInner() {
   const [isReady, setIsReady] = useState(false);
   const progressAnim = useRef(new Animated.Value(0)).current;
 
   const platform = useTelegramPlatform();
   const isDesktop = platform === "tdesktop" || platform === "macos";
   const resizeMode = isDesktop ? "cover" : "contain";
-  const { setUser } = useUser();
-  const { user } = useUser();
-  
-
 
   const animateProgress = (toValue: number, duration = 500) => {
     Animated.timing(progressAnim, {
@@ -134,82 +115,19 @@ function RootLayoutInner() {
         ]);
         animateProgress(70);
   
-// ... SDK инициализация, если нужно
+        // ... SDK инициализация, если нужно
 
-try {
-  init();
-  if (viewport.mount.isAvailable()) viewport.mount();
-  if (viewport.requestFullscreen.isAvailable()) viewport.requestFullscreen();
-  if (swipeBehavior.isSupported()) {
-    swipeBehavior.mount();
-    swipeBehavior.disableVertical();
-  }
-} catch (sdkError) {
-  console.warn("⚠️ Telegram SDK init skipped:", sdkError);
-}
-
-// === LOAD USER (TELEGRAM OR DEFAULT) ===
-try {
-  const telegramAvailable = await isTMA();
-  let finalUser = null;
-
-  if (telegramAvailable && window?.Telegram?.WebApp?.initDataUnsafe?.user) {
-    // 👉 User from Telegram Mini App
-    const tgUser = window.Telegram.WebApp.initDataUnsafe.user;
-
-    const tg_id = String(tgUser.id);
-    const username = tgUser.username ?? "unknown";
-    const firstname = tgUser.first_name ?? "User";
-
-    console.log("🔍 Checking user in DB:", tg_id);
-
-    const existing = await getUserByTgId(tg_id);
-
-    if (existing) {
-      console.log("✅ User found:", existing);
-      finalUser = existing;
-    } else {
-      console.log("🆕 User not found → creating...");
-      finalUser = await createUser({
-        tg_id,
-        username,
-        firstname,
-        balance: 0,
-        refcount: 0,
-        inventory: "[]",
-      });
-      console.log("✅ User created:", finalUser);
-    }
-
-  } else {
-    // 👉 Local fallback mode
-    console.log("⚠ Telegram SDK недоступен — local mode.");
-
-    const existingLocal = await getUserByTgId("local");
-
-    if (existingLocal) {
-      console.log("📁 Local user exists:", existingLocal);
-      finalUser = existingLocal;
-    } else {
-      console.log("🆕 Creating local user...");
-      finalUser = await createUser({
-        tg_id: "local",
-        username: "localuser",
-        firstname: "Local",
-        balance: 0,
-        refcount: 0,
-        inventory: "",
-      });
-      console.log("✅ Local user created:", finalUser);
-    }
-  }
-
-  setUser(finalUser);
-
-} catch (err) {
-  console.warn("❌ User init failed:", err);
-}
-
+          try {
+          init();
+          if (viewport.mount.isAvailable()) viewport.mount();
+          if (viewport.requestFullscreen.isAvailable()) viewport.requestFullscreen();
+          if (swipeBehavior.isSupported()) {
+            swipeBehavior.mount();
+            swipeBehavior.disableVertical();
+          }
+        } catch (sdkError) {
+          console.warn("⚠️ Telegram SDK init skipped:", sdkError);
+        }
 
 
         animateProgress(100);

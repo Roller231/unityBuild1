@@ -27,10 +27,7 @@ import { useTelegramPlatform } from "@/hooks/useTelegramPlatform";
 
 import * as Font from "expo-font";
 import Svg, { Text as SvgText } from "react-native-svg";
-
 import OrangePng from "../components/icons/OrangePng.png"; // ✅ твой PNG-фон кнопки
-
-import { useUser } from "../components/UserContext";
 
 
 // ===== Импорт иконок =====
@@ -55,7 +52,6 @@ import IconArrow from "../components/icons/arrow.svg"; // добавляем с�
 
 import { useLaunchParams } from "@telegram-apps/sdk-react";
 
-import { SvgUri } from "react-native-svg";
 
 
 import AsyncStorage from "@react-native-async-storage/async-storage";
@@ -100,7 +96,6 @@ const translations = {
 
     amountOfStars: "Количество звёзд",
     amountOfTon: "Количество TON",
-    sell: "Продать",
   },
   en: {
     deposit: "Deposit",
@@ -140,8 +135,6 @@ const translations = {
 
     amountOfStars: "Amount of Stars",
     amountOfTon: "Amount of TON",
-    sell: "Sell",
-
   },
 } as const;
 
@@ -158,69 +151,17 @@ const BASE_WIDTH = 390;
 const BASE_HEIGHT = 844;
 const scaleW = screenWidth / BASE_WIDTH;
 const scaleH = screenHeight / BASE_HEIGHT;
-
-
-const InventoryImage = ({ uri }: { uri: string }) => {
-  if (!uri) return null;
-
-  const isSvg = uri.toLowerCase().endsWith(".svg");
-
-  return isSvg ? (
-    <SvgUri uri={uri} width="80%" height="55%" />
-  ) : (
-    <Image
-      source={{ uri }}
-      style={{
-        width: "100%",
-        height: 120,
-        borderRadius: 12,
-        marginBottom: 10,
-      }}
-      resizeMode="contain"
-    />
-  );
-};
+const scale = (size: number) => size * Math.min(scaleW, scaleH);
 
 
 const Profile = () => {
   
-
-  const { user, setUser } = useUser(); // ✅ Add this
-  const rawInventory = user.inventory as UserInventoryEntry[];
-
-
-  type UserInventoryEntry = {
-    drop_id: string;
-    count: number;
-  };
-  
-
   type InventoryItem = {
     id: string;
     name: string;
     value: string;
   };
   
-  type CaseInfo = {
-    id: number;
-    name: string;
-    price: number;
-    gradient_colours: string;
-    icon: string;
-  };
-  
-  type InventoryItemExpanded = {
-    uniqueId: string;
-    dropId: string;
-    name: string;
-    price: number;
-    image: string;
-  };
-
-  const [inventoryItems, setInventoryItems] = useState<InventoryItemExpanded[]>([]);
-const [isInventoryLoading, setIsInventoryLoading] = useState(false);
-
-
 // === Инвентарь ===
 const [showInventorySheet, setShowInventorySheet] = useState(false);
 const [inventory, setInventory] = useState<InventoryItem[]>([]);
@@ -241,7 +182,7 @@ const [withdrawAmount, setWithdrawAmount] = useState("");
 
   const platform = useTelegramPlatform();
   const isDesktop = platform === "tdesktop" || platform === "macos";
-  const fixedWidth = isDesktop ? 470 : Math.min(screenWidth, 470);
+  const fixedWidth = isDesktop ? 470 : screenWidth;
 
 
   const [showBottomSheet, setShowBottomSheet] = useState(false);
@@ -325,103 +266,20 @@ useEffect(() => {
 
 
 
-  const scale = (size: number) => size * (fixedWidth / 390);
+
 // ...
 
 useEffect(() => {
-  const tgUser = launchParams?.tgWebAppData?.user;
-  if (tgUser) {
-    setTgName(`${tgUser.first_name || ""} ${tgUser.last_name || ""}`.trim());
-    setTgAvatar(tgUser.photo_url || null);
+  const user = launchParams?.tgWebAppData?.user;
+  if (user) {
+    setTgName(`${user.first_name || ""} ${user.last_name || ""}`.trim());
+    setTgAvatar(user.photo_url || null);
+  } else {
+    console.log("⚠️ No user data found in Telegram launchParams");
   }
 }, [launchParams]);
 
-
-useFocusEffect(
-  React.useCallback(() => {
-    async function loadInventory() {
-      if (!user) return;
-      setIsInventoryLoading(true);
-      try {
-        const rawInv = user.inventory as { count: number; drop_id: string }[];
-        const expanded: InventoryItemExpanded[] = [];
-
-        for (const invEntry of rawInv) {
-          const { drop_id, count } = invEntry;
-
-
-
-        }
-
-        setInventoryItems(expanded);
-      } catch (err) {
-        console.warn("❌ Error loading inventory:", err);
-      } finally {
-        setIsInventoryLoading(false);
-      }
-    }
-
-    loadInventory();
-  }, [user?.inventory])
-);
-
-// Sell a single item
-const handleSellItem = async (item: InventoryItemExpanded) => {
-  if (!user) return;
-
-  // 1. Считаем новый баланс
-  const newBalance = user.balance + item.price;
-
-  // 2. Обновляем инвентарь
-  const updatedInventory = (user.inventory as UserInventoryEntry[])
-    .map(inv =>
-      inv.drop_id === item.dropId
-        ? { ...inv, count: inv.count - 1 }
-        : inv
-    )
-    .filter(inv => inv.count > 0);
-
-  // 3. Отправляем ОДИН Паtch
-
-
-  // 4. Обновляем UserContext
-  setUser({
-    ...user,
-    balance: newBalance,
-    inventory: updatedInventory
-  });
-
-  // 5. Убираем проданный экземпляр из inventoryItems
-  setInventoryItems(prev =>
-    prev.filter(g => g.uniqueId !== item.uniqueId)
-  );
-};
-
-
-
-const handleSellAll = async () => {
-  if (!user || inventoryItems.length === 0) return;
-
-  // 1. Считаем итоговую стоимость
-  const totalValue = inventoryItems.reduce((sum, item) => sum + item.price, 0);
-
-  // 2. Обновляем баланс
-  const newBalance = user.balance + totalValue;
-
-  // 3. Патчим одного пользователя
-
-
-  // 4. Обновляем локально
-  setUser({
-    ...user,
-    balance: newBalance,
-    inventory: []
-  });
-
-  setInventoryItems([]);
-};
-
-
+  
 
 const toggleLanguage = async () => {
   const newLang = language === "ru" ? "en" : "ru";
@@ -478,9 +336,7 @@ const getAdaptiveTextSize = (baseSize: number) => {
     return 18; // desktop
   };
 
-  // Универсальный компонент отображения любой картинки (SVG/PNG/URL/local)
-
-
+  
 
   return (
     <LinearGradient colors={["#340A6F", "#18003A"]} style={styles.background}>
@@ -634,57 +490,42 @@ const getAdaptiveTextSize = (baseSize: number) => {
     { fontSize: getAdaptiveTextSize(20) }, // адаптивно
   ]}
 >
-  {t("inventory")} ({inventoryItems.length})
+  {t("inventory")} (0)
 </Text>            <Pressable style={styles.sellButton} onPress={() => setShowInventorySheet(true)}>
             <Text style={styles.sellButtonText}>{t("sellAll")}</Text>
             </Pressable>
           </View>
 
           <View style={styles.inventoryGrid}>
-  {[0, 1, 2].map((i) => {
-    const gift = inventoryItems[i];
+  {[1, 2, 3].map((_, i) => (
+    <Pressable
+  key={i}
+  style={[styles.inventoryItem, { width: itemSize, height: itemSize }]}
+  onPress={() => setShowInventorySheet(true)}
+>
 
-    return (
-      <Pressable
-        key={i}
-        style={[styles.inventoryItem, { width: itemSize, height: itemSize }]}
-        onPress={() => setShowInventorySheet(true)}
-      >
-        <View style={styles.giftIconWrapper}>
-          {i === 2 ? (
-            <Image
-              source={IconArrow}
-              style={styles.arrow}
-              resizeMode="contain"
-            />
-          ) : gift ? (
-            <Image
-              source={{ uri: gift.image }}
-              style={{
-                width: 65,
-                height: 65,
-                opacity: 1,
-                borderRadius: 8,
-              }}
-              resizeMode="contain"
-            />
-          ) : (
-            <Image
-              source={IconGift}
-              style={[
-                styles.inventoryIcon,
-                i === 0 && { tintColor: "rgba(53, 40, 81, 1)" },
-                i === 1 && { tintColor: "rgba(53, 40, 81, 1)" },
-              ]}
-              resizeMode="contain"
-            />
-          )}
-        </View>
-      </Pressable>
-    );
-  })}
+      <View style={styles.giftIconWrapper}>
+        {i === 2 ? (
+          <Image
+            source={IconArrow}
+            style={styles.arrow}
+            resizeMode="contain"
+          />
+        ) : (
+          <Image
+            source={IconGift}
+            style={[
+              styles.inventoryIcon,
+              i === 0 && { tintColor: "rgba(53, 40, 81, 1)" }, // 1 подарок — жёлтый
+              i === 1 && { tintColor: "rgba(53, 40, 81, 1)" }, // 2 подарок — красный
+            ]}
+            resizeMode="contain"
+          />
+        )}
+      </View>
+    </Pressable>
+  ))}
 </View>
-
 
 
         </View>
@@ -723,7 +564,7 @@ const getAdaptiveTextSize = (baseSize: number) => {
   <View style={styles.balanceLeft}>
     <View style={styles.balanceRow}>
       <Text style={styles.balanceLabel}>{t("balance")}</Text>
-      <Text style={styles.balanceValue}> {(user?.balance ?? 0).toFixed(2)}</Text>
+      <Text style={styles.balanceValue}>0.00</Text>
       <Image
         source={require("../components/icons/ton.svg")}
         style={styles.tonIcon}
@@ -733,7 +574,7 @@ const getAdaptiveTextSize = (baseSize: number) => {
 
     <View style={styles.balanceRow}>
       <Text style={styles.balanceLabel}>{t("referrals")}</Text>
-      <Text style={styles.balanceValue}> {(user?.refcount ?? 0).toFixed(2)}</Text>
+      <Text style={styles.balanceValue}>0.00</Text>
     </View>
   </View>
 
@@ -754,7 +595,6 @@ const getAdaptiveTextSize = (baseSize: number) => {
   visible={showBottomSheet}
   onClose={() => setShowBottomSheet(false)}
   heightRatio={bottomSheetHeightRatio}
-   
 >
   <ScrollView
     contentContainerStyle={styles.bottomSheetContainer}
@@ -766,17 +606,14 @@ const getAdaptiveTextSize = (baseSize: number) => {
 
     {/* === Адаптивные Tabs (Gifts / Stars / TON) === */}
     <View
-  style={{
-    flexDirection: "row",
-    justifyContent: "center",
-    alignItems: "center",
-    marginTop: scale(20),
-    flexWrap: "nowrap",
-    width: fixedWidth,          // ← фиксируем ширину
-    alignSelf: "center",        // ← центрируем
-  }}
->
-
+      style={{
+        flexDirection: "row",
+        justifyContent: "center",
+        alignItems: "center",
+        marginTop: scale(20),
+        flexWrap: "nowrap",
+      }}
+    >
       {[
         { key: "Gifts", label: t("gifts"), icon: IconGift },
         { key: "Stars", label: t("stars"), icon: IconStar },
@@ -1095,101 +932,49 @@ const getAdaptiveTextSize = (baseSize: number) => {
   heightRatio={0.75}
 >
   <View style={styles.bottomSheetContainer}>
-    <Text style={styles.sheetTitle}>{t("yourInventory")}</Text>
+  <Text style={styles.sheetTitle}>{t("yourInventory")}</Text>
 
-    {isInventoryLoading ? (
-      <Text style={{ color: "#aaa", marginTop: 16 }}>Loading…</Text>
-    ) : inventoryItems.length === 0 ? (
-      <Text style={{ color: "#aaa", marginTop: 16 }}>{t("noGifts")}</Text>
-    ) : (
+    {inventory.length === 0 ? (
+<Text style={{ color: "#aaa", marginTop: 16 }}>{t("noGifts")}</Text>    )
+ : (
       <>
         <ScrollView
-  style={{ width: "100%", marginTop: 16 }}
-  contentContainerStyle={{
-    flexDirection: "row",
-    flexWrap: "wrap",
-    justifyContent: "space-between",
-    paddingBottom: 80,
-    rowGap: 12,
-  }}
->
-  {inventoryItems.map(item => (
-    <View
-      key={item.uniqueId}
-      style={{
-        width: "48%", // 2 карточки в ряд
-        backgroundColor: "#1F0248",
-        borderRadius: 16,
-        padding: 12,
-        borderWidth: 1,
-        borderColor: "rgba(255,255,255,0.2)",
-      }}
-    >
-
-<InventoryImage uri={item.image} />
-
-
-<Text
-  style={{
-    color: "#fff",
-    fontSize: 16,
-    fontWeight: "600",
-    textAlign: "center",     // ← вот это
-    width: "100%",           // ← обязательно для центрирования в flex
-  }}
->
-  {item.name}
-</Text>
-<Text
-  style={{
-    color: "#C4BED4",
-    marginTop: 4,
-    marginBottom: 10,
-    textAlign: "center",     // ← центр цены
-    width: "100%",
-  }}
->
-  {item.price.toFixed(2)} TON
-</Text>
-
-      <TouchableOpacity
-        style={{
-          width: "100%",
-          height: 42,
-          borderRadius: 10,
-          backgroundColor: "#6B3FD8",
-          justifyContent: "center",
-          alignItems: "center",
-        }}
-        onPress={() => handleSellItem(item)}
-      >
-        <Text
-          style={{
-            color: "#fff",
-            fontSize: 15,
-            fontWeight: "600",
-          }}
+          style={{ width: "100%", marginTop: 16 }}
+          contentContainerStyle={{ gap: 12, paddingBottom: 80 }}
         >
-          {t("sell")}
-        </Text>
-      </TouchableOpacity>
-    </View>
-  ))}
-</ScrollView>
-
+          {inventory.map((item) => (
+            <View
+              key={item.id}
+              style={{
+                backgroundColor: "#1F0248",
+                borderRadius: 16,
+                padding: 16,
+                borderWidth: 1,
+                borderColor: "rgba(255,255,255,0.2)",
+              }}
+            >
+              <Text style={{ color: "#fff", fontSize: 18, fontWeight: "600" }}>
+                {item.name}
+              </Text>
+              <Text style={{ color: "#C4BED4", marginTop: 4 }}>{item.value}</Text>
+            </View>
+          ))}
+        </ScrollView>
 
         <Pressable
           style={[styles.sellButtonSheet, { marginTop: 16, backgroundColor: "#6B3FD8" }]}
-          onPress={handleSellAll}
-
+          onPress={() => {
+            console.log("✅ Sold all gift cards");
+            setInventory([]);
+            setShowInventorySheet(false);
+          }}
         >
-          <Text style={[styles.sellButtonText, { color: "#fff" }]}>{t("sellAll")}</Text>
+<Text style={[styles.sellButtonText, { color: "#fff" }]}>{t("sellAll")}</Text>
         </Pressable>
       </>
     )}
   </View>
 </CustomBottomSheet>
-
 
 
 {/* === Bottom Sheet Withdraw TON === */}

@@ -73,7 +73,6 @@ const Crash: React.FC = () => {
   const fixedWidth = isDesktop ? 470 : Math.min(screenWidth, 470);
   const scale = (size: number) => size * (fixedWidth / 390);
   const styles = createStyles(fixedWidth, screenHeight, isDesktop);
-  
 
   const [resetKey, setResetKey] = useState(0);
   const [phase, setPhase] = useState<"idle" | "countdown" | "flight" | "crash">("idle");
@@ -679,7 +678,7 @@ const reloadTimer = setTimeout(() => {
               showsVerticalScrollIndicator={false}
               contentContainerStyle={[
                 styles.betsScrollContainer,
-                { width: fixedWidth * 0.9, minHeight: screenHeight * 1 },
+                { width: fixedWidth * 0.9, minHeight: screenHeight * 0.4 },
               ]}
             >
               {[...Array(9)].map((_, i) => (
