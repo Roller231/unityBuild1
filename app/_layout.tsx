@@ -1,6 +1,14 @@
 // app/_layout.tsx
 import React, { useEffect, useState, useRef, useCallback } from "react";
-import { View, StyleSheet, ImageBackground, Animated, Easing, Dimensions, Platform } from "react-native";
+import {
+  View,
+  StyleSheet,
+  ImageBackground,
+  Animated,
+  Easing,
+  Dimensions,
+  Platform,
+} from "react-native";
 import { Tabs } from "expo-router";
 import * as Font from "expo-font";
 import { Asset } from "expo-asset";
@@ -11,7 +19,13 @@ import { UserProvider } from "../components/UserContext";
 import CustomTabBar from "@/components/CustomTabBar";
 import { useTelegramPlatform } from "@/hooks/useTelegramPlatform";
 
-import { init, viewport, swipeBehavior, isTMA, useLaunchParams } from "@telegram-apps/sdk-react";
+import {
+  init,
+  viewport,
+  swipeBehavior,
+  isTMA,
+  useLaunchParams,
+} from "@telegram-apps/sdk-react";
 
 import { getUserByTgId, createUser } from "../utils/api";
 import { useUser } from "../components/UserContext";
@@ -33,8 +47,7 @@ import BgImage from "../components/icons/12.png";
 
 const { width: screenWidth, height: screenHeight } = Dimensions.get("window");
 
-SplashScreen.preventAutoHideAsync(); // Предотвращаем автo‑скрытие сплэша до готовности
-
+SplashScreen.preventAutoHideAsync();
 
 export default function RootLayout() {
   return (
@@ -50,12 +63,16 @@ function RootLayoutInner() {
 
   const platform = useTelegramPlatform();
   const isDesktop = platform === "tdesktop" || platform === "macos";
-  const resizeMode = isDesktop ? "cover" : "contain";
   const { setUser } = useUser();
-  const { user } = useUser();
-  const launchParams = useLaunchParams();
 
-
+  // === SAFE useLaunchParams (чтобы RootLayout не падал) ===
+  let launchParams: any = {};
+  try {
+    launchParams = useLaunchParams();
+  } catch (e) {
+    console.warn("⚠ useLaunchParams unavailable during bootstrap:", e);
+    launchParams = { tgWebAppData: {} };
+  }
 
   const animateProgress = (toValue: number, duration = 500) => {
     Animated.timing(progressAnim, {
@@ -66,48 +83,52 @@ function RootLayoutInner() {
     }).start();
   };
 
-
+  // === Init Telegram SDK ===
   useEffect(() => {
     async function initTg() {
       if (await isTMA()) {
-        init();
+        try {
+          init();
 
-        if (viewport.mount.isAvailable()) {
-          await viewport.mount();
-          viewport.expand();
-        }
-
-        if (viewport.requestFullscreen.isAvailable()) {
-          await viewport.requestFullscreen();
+          if (viewport.mount.isAvailable()) {
+            await viewport.mount();
+            viewport.expand();
+          }
+          if (viewport.requestFullscreen.isAvailable()) {
+            await viewport.requestFullscreen();
+          }
+        } catch (err) {
+          console.warn("⚠ Telegram Init Error:", err);
         }
       }
     }
     initTg();
-
   }, []);
 
+  // === Disable text selection on web ===
   useEffect(() => {
-  if (Platform.OS === "web") {
-    const style = document.createElement("style");
-    style.innerHTML = `
-      * {
-        -webkit-user-select: none !important;
-        -moz-user-select: none !important;
-        -ms-user-select: none !important;
-        user-select: none !important;
-      }
-    `;
-    document.head.appendChild(style);
-  }
-}, []);
+    if (Platform.OS === "web") {
+      const style = document.createElement("style");
+      style.innerHTML = `
+        * {
+          -webkit-user-select: none !important;
+          -moz-user-select: none !important;
+          -ms-user-select: none !important;
+          user-select: none !important;
+        }
+      `;
+      document.head.appendChild(style);
+    }
+  }, []);
 
+  // === APP INITIALIZATION ===
   useEffect(() => {
     const initialize = async () => {
       try {
         animateProgress(0);
-  
-        const start = Date.now();
-  
+        const startTime = Date.now();
+
+        // Load fonts
         await Font.loadAsync({
           "SF-Pro-Heavy": require("../fonts/SF-Pro-Display-Heavy.otf"),
           "SF-Pro-Bold": require("../fonts/SF-Pro-Display-Bold.otf"),
@@ -116,7 +137,8 @@ function RootLayoutInner() {
           "SF-Pro-Regular": require("../fonts/SF-Pro-Display-Regular.otf"),
         });
         animateProgress(30);
-  
+
+        // Load images
         await Asset.loadAsync([
           FlagRU,
           FlagEN,
@@ -133,101 +155,93 @@ function RootLayoutInner() {
           BgImage,
         ]);
         animateProgress(70);
-  
-// ... SDK инициализация, если нужно
 
-try {
-  init();
-  if (viewport.mount.isAvailable()) viewport.mount();
-  if (viewport.requestFullscreen.isAvailable()) viewport.requestFullscreen();
-  if (swipeBehavior.isSupported()) {
-    swipeBehavior.mount();
-    swipeBehavior.disableVertical();
-  }
-} catch (sdkError) {
-  console.warn("⚠️ Telegram SDK init skipped:", sdkError);
-}
-
-// === LOAD USER (TELEGRAM OR DEFAULT) ===
-try {
-  const telegramAvailable = await isTMA();
-  let finalUser = null;
-
-  const tgUser = launchParams?.tgWebAppData?.user;
-
-  if (telegramAvailable && tgUser) {
-    // 👉 User from Telegram Mini App
-    const tg_id = String(tgUser.id);
-    const username = tgUser.username ?? "unknown";
-    const firstname = tgUser.first_name ?? "User";
-
-    console.log("🔍 Checking user in DB:", tg_id);
-
-    const existing = await getUserByTgId(tg_id);
-
-    if (existing) {
-      console.log("✅ User found:", existing);
-      finalUser = existing;
-    } else {
-      console.log("🆕 User not found → creating...");
-      finalUser = await createUser({
-        tg_id,
-        username,
-        firstname,
-        balance: 0,
-        refcount: 0,
-        inventory: "[]",
-      });
-      console.log("✅ User created:", finalUser);
-    }
-
-  } else {
-    // 👉 Local fallback mode
-    console.log("⚠ Telegram SDK недоступен — local mode.");
-
-    const existingLocal = await getUserByTgId("local");
-
-    if (existingLocal) {
-      finalUser = existingLocal;
-    } else {
-      finalUser = await createUser({
-        tg_id: "local",
-        username: "localuser",
-        firstname: "Local",
-        balance: 0,
-        refcount: 0,
-        inventory: "",
-      });
-    }
-  }
-
-  setUser(finalUser);
-
-} catch (err) {
-  console.warn("❌ User init failed:", err);
-}
-
-
-
-
-        animateProgress(100);
-  
-        const elapsed = Date.now() - start;
-        const remaining = 1500 - elapsed; // минимум 1 секунда
-        if (remaining > 0) {
-          await new Promise((res) => setTimeout(res, remaining));
+        // Init Telegram behavior
+        try {
+          init();
+          if (viewport.mount.isAvailable()) viewport.mount();
+          if (viewport.requestFullscreen.isAvailable())
+            viewport.requestFullscreen();
+          if (swipeBehavior.isSupported()) {
+            swipeBehavior.mount();
+            swipeBehavior.disableVertical();
+          }
+        } catch (err) {
+          console.warn("⚠ Telegram SDK init skipped:", err);
         }
-  
+
+        // === LOAD USER (Telegram OR Local) ===
+        try {
+          const telegramAvailable = await isTMA();
+          let finalUser = null;
+
+          const tgUser = launchParams?.tgWebAppData?.user;
+
+          if (telegramAvailable && tgUser) {
+            // Telegram user detected
+            const tg_id = String(tgUser.id);
+            const username = tgUser.username ?? "unknown";
+            const firstname = tgUser.first_name ?? "User";
+
+            console.log("🔍 Checking user:", tg_id);
+
+            const existing = await getUserByTgId(tg_id);
+
+            if (existing) {
+              finalUser = existing;
+            } else {
+              finalUser = await createUser({
+                tg_id,
+                username,
+                firstname,
+                balance: 0,
+                refcount: 0,
+                inventory: "[]",
+              });
+            }
+          } else {
+            // Local fallback
+            console.log("⚠ Local mode activated");
+
+            const existing = await getUserByTgId("local");
+
+            if (existing) {
+              finalUser = existing;
+            } else {
+              finalUser = await createUser({
+                tg_id: "local",
+                username: "localuser",
+                firstname: "Local",
+                balance: 0,
+                refcount: 0,
+                inventory: "",
+              });
+            }
+          }
+
+          setUser(finalUser);
+        } catch (err) {
+          console.warn("❌ User loading failed:", err);
+        }
+
+        // Progress to 100
+        animateProgress(100);
+
+        // Guarantee 1.5s splash
+        const elapsed = Date.now() - startTime;
+        if (elapsed < 1500) {
+          await new Promise((res) => setTimeout(res, 1500 - elapsed));
+        }
+
         setIsReady(true);
       } catch (err) {
         console.warn("Initialization error:", err);
         setIsReady(true);
       }
     };
-  
+
     initialize();
   }, []);
-  
 
   const barWidth = progressAnim.interpolate({
     inputRange: [0, 100],
@@ -241,36 +255,36 @@ try {
       }, 500);
     }
   }, [isReady]);
-  
-  
 
+  // === Splash screen ===
   if (!isReady) {
     return (
       <View style={styles.fullScreen} onLayout={onLayoutRootView}>
         <View
           style={[
             styles.outerContainer,
-            !isDesktop && { width: "100%", height: "100%" }, // 🔹 мобильный вариант
+            !isDesktop && { width: "100%", height: "100%" },
           ]}
         >
           <View
             style={[
               styles.innerContainer,
-              !isDesktop && styles.innerContainerMobile, // 🔹 мобильный вариант
+              !isDesktop && styles.innerContainerMobile,
             ]}
           >
             <ImageBackground
               source={BgImage}
-              resizeMode={isDesktop ? "cover" : "stretch"} // ✅ cover для десктопа, stretch/cover для мобил
+              resizeMode={isDesktop ? "cover" : "stretch"}
               style={[
                 styles.bgImage,
-                !isDesktop && { width: "100%", height: "100%" }, // мобильный — тянем
+                !isDesktop && { width: "100%", height: "100%" },
               ]}
-              imageStyle={{ width: "100%", height: "100%" }}
             >
               <View style={styles.progressWrapper}>
                 <View style={styles.progressContainer}>
-                  <Animated.View style={[styles.progressBar, { width: barWidth }]} />
+                  <Animated.View
+                    style={[styles.progressBar, { width: barWidth }]}
+                  />
                 </View>
               </View>
             </ImageBackground>
@@ -279,7 +293,6 @@ try {
       </View>
     );
   }
-  
 
   return (
     <View style={styles.wrapper} onLayout={onLayoutRootView}>
@@ -311,8 +324,6 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     alignItems: "center",
   },
-
-  // 💻 десктоп — фиксированный фрейм
   innerContainer: {
     width: 475,
     aspectRatio: 9 / 16,
@@ -320,21 +331,17 @@ const styles = StyleSheet.create({
     overflow: "hidden",
     borderRadius: 25,
   },
-
-  // 📱 мобильный — тянем по экрану
   innerContainerMobile: {
     flex: 1,
     width: "100%",
     height: "100%",
     borderRadius: 0,
   },
-
   bgImage: {
     flex: 1,
     justifyContent: "flex-end",
     alignItems: "center",
   },
-
   progressWrapper: {
     width: "100%",
     alignItems: "center",
@@ -352,7 +359,6 @@ const styles = StyleSheet.create({
     borderRadius: 100,
     backgroundColor: "#6B3FD8",
   },
-
   wrapper: {
     flex: 1,
     backgroundColor: "#000",
@@ -370,4 +376,4 @@ const styles = StyleSheet.create({
   },
 });
 
-
+export {};
