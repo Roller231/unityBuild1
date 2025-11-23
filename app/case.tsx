@@ -174,51 +174,20 @@ const useTranslation = (lang: Lang) => (key: TranslationKey) =>
   
 // === Загрузка списка кейсов ===
 useEffect(() => {
-  async function loadCases() {
-    try {
-      const data = await apiGet("/cases/");
-      setCases(data);
-    } catch (e) {
-      console.log("Ошибка загрузки кейсов:", e);
-    } finally {
-      setLoadingCases(false); // ⬅ ОБЯЗАТЕЛЬНО
-    }
-  }
+  // 🔥 отдаем пустой список кейсов
+  setCases([]);
 
-  loadCases();
+  // 🔥 ключевая строка — UI продолжает работать
+  setLoadingCases(false);
 }, []);
 
 
 
+
 async function loadDropsForCase(caseId: number) {
-  try {
-    // 1. Получаем список CaseDrops
-    const caseDrops = await apiGet(`/case-drops/case/${caseId}`);
-
-    if (!Array.isArray(caseDrops)) return [];
-
-    // 2. Загружаем сами дропы
-    const drops = await Promise.all(
-      caseDrops.map(async (cd) => {
-        const drop = await apiGet(`/drops/${cd.drop_id}`);
-
-        return {
-          id: String(drop.id),
-          name: drop.name,
-          icon: drop.icon,
-          rarity: drop.rarity,
-          price: drop.price,
-          chance: cd.chance,       // 🔥 Добавили шанс
-        };
-      })
-    );
-
-    return drops;
-  } catch (err) {
-    console.log("❌ Ошибка загрузки дропов:", err);
-    return [];
-  }
+  return []; // 🔥 всегда пустой список
 }
+
 
 
 
