@@ -35,7 +35,6 @@ import AsyncStorage from "@react-native-async-storage/async-storage";
 import { useFocusEffect } from "expo-router";
 import { vibrate } from "./crash";
 
-import { apiGet, apiPatch } from "./api";
 
 
 
@@ -360,10 +359,7 @@ const handleSpin = async () => {
     }));
     
   
-    // обновляем на сервере
-    await apiPatch(`/users/${user.id}`, {
-      inventory: updatedInventory,
-    });
+
   
     console.log("✔ Дроп добавлен пользователю:", randomItem.id);
   

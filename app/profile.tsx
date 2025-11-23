@@ -31,7 +31,7 @@ import Svg, { Text as SvgText } from "react-native-svg";
 import OrangePng from "../components/icons/OrangePng.png"; // ✅ твой PNG-фон кнопки
 
 import { useUser } from "../components/UserContext";
-import { apiGet, apiPatch } from "../app/api";
+
 
 // ===== Импорт иконок =====
 import FlagRU from "../components/icons/ru.png";
@@ -348,17 +348,9 @@ useFocusEffect(
 
         for (const invEntry of rawInv) {
           const { drop_id, count } = invEntry;
-          const caseInfo: CaseInfo = await apiGet(`/drops/${drop_id}`);
 
-          for (let i = 0; i < count; i++) {
-            expanded.push({
-              uniqueId: `drop_${drop_id}_${i}`,
-              dropId: drop_id,
-              name: caseInfo.name,
-              price: caseInfo.price,
-              image: caseInfo.icon,
-            });
-          }
+
+
         }
 
         setInventoryItems(expanded);
@@ -390,10 +382,7 @@ const handleSellItem = async (item: InventoryItemExpanded) => {
     .filter(inv => inv.count > 0);
 
   // 3. Отправляем ОДИН Паtch
-  await apiPatch(`/users/${user.id}`, {
-    balance: newBalance,
-    inventory: updatedInventory
-  });
+
 
   // 4. Обновляем UserContext
   setUser({
@@ -420,10 +409,7 @@ const handleSellAll = async () => {
   const newBalance = user.balance + totalValue;
 
   // 3. Патчим одного пользователя
-  await apiPatch(`/users/${user.id}`, {
-    balance: newBalance,
-    inventory: []
-  });
+
 
   // 4. Обновляем локально
   setUser({
