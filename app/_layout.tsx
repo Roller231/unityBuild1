@@ -11,11 +11,10 @@ import { UserProvider } from "../components/UserContext";
 import CustomTabBar from "@/components/CustomTabBar";
 import { useTelegramPlatform } from "@/hooks/useTelegramPlatform";
 
-import { init, viewport, swipeBehavior, isTMA } from "@telegram-apps/sdk-react";
+import { init, viewport, swipeBehavior, isTMA, useLaunchParams } from "@telegram-apps/sdk-react";
 
 import { getUserByTgId, createUser } from "../utils/api";
 import { useUser } from "../components/UserContext";
-
 
 // === Импорт ассетов ===
 import FlagRU from "../components/icons/ru.png";
@@ -54,7 +53,8 @@ function RootLayoutInner() {
   const resizeMode = isDesktop ? "cover" : "contain";
   const { setUser } = useUser();
   const { user } = useUser();
-  
+  const launchParams = useLaunchParams();
+
 
 
   const animateProgress = (toValue: number, duration = 500) => {
@@ -153,10 +153,10 @@ try {
   const telegramAvailable = await isTMA();
   let finalUser = null;
 
-  if (telegramAvailable && window?.Telegram?.WebApp?.initDataUnsafe?.user) {
-    // 👉 User from Telegram Mini App
-    const tgUser = window.Telegram.WebApp.initDataUnsafe.user;
+  const tgUser = launchParams?.tgWebAppData?.user;
 
+  if (telegramAvailable && tgUser) {
+    // 👉 User from Telegram Mini App
     const tg_id = String(tgUser.id);
     const username = tgUser.username ?? "unknown";
     const firstname = tgUser.first_name ?? "User";
@@ -188,10 +188,8 @@ try {
     const existingLocal = await getUserByTgId("local");
 
     if (existingLocal) {
-      console.log("📁 Local user exists:", existingLocal);
       finalUser = existingLocal;
     } else {
-      console.log("🆕 Creating local user...");
       finalUser = await createUser({
         tg_id: "local",
         username: "localuser",
@@ -200,7 +198,6 @@ try {
         refcount: 0,
         inventory: "",
       });
-      console.log("✅ Local user created:", finalUser);
     }
   }
 
@@ -209,6 +206,7 @@ try {
 } catch (err) {
   console.warn("❌ User init failed:", err);
 }
+
 
 
 
