@@ -52,6 +52,8 @@ const Case = () => {
   const BASE_HEIGHT = 844; // iPhone 12
   const scaleW = screenWidth / BASE_WIDTH;
   const scaleH = screenHeight / BASE_HEIGHT;
+  const [loadingCases, setLoadingCases] = useState(true);
+
   
   // Универсальный helper: масштабирует относительно меньшей оси
   
@@ -174,23 +176,18 @@ const useTranslation = (lang: Lang) => (key: TranslationKey) =>
 useEffect(() => {
   async function loadCases() {
     try {
-      
       const data = await apiGet("/cases/");
-
-      // 🔥 Проверяем
-      
-      data.forEach((c: { gradient_colors: any; }, i: any) => {
-        
-      });
-
       setCases(data);
     } catch (e) {
-      
+      console.log("Ошибка загрузки кейсов:", e);
+    } finally {
+      setLoadingCases(false); // ⬅ ОБЯЗАТЕЛЬНО
     }
   }
 
   loadCases();
 }, []);
+
 
 
 async function loadDropsForCase(caseId: number) {
@@ -419,7 +416,16 @@ const handleSpin = async () => {
     setTimeout(() => setResultSheetVisible(true), 300);
   };
 
-  if (!fontLoaded) return null;
+
+  if (!fontLoaded || loadingCases) {
+    return (
+      <View style={{ flex: 1, justifyContent: "center", alignItems: "center" }}>
+        <Text style={{ color: "#fff", fontSize: 22 }}>Загрузка...</Text>
+      </View>
+    );
+  }
+  
+
 
   return (
     <LinearGradient key={resetKey} colors={["#340A6F", "#18003A"]} style={styles.background}>
