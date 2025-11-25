@@ -8,6 +8,8 @@ class UserBase(BaseModel):
     balance: Optional[float] = 0
     refcount: Optional[int] = 0
     inventory: Optional[Any] = None
+    url_image: Optional[str] = None
+
 
 class UserCreate(UserBase):
     pass
@@ -19,6 +21,8 @@ class UserUpdate(BaseModel):
     balance: Optional[float] = None
     refcount: Optional[int] = None
     inventory: Optional[Any] = None
+    url_image: Optional[str] = None
+
 
 class UserOut(UserBase):
     id: int

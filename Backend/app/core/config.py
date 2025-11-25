@@ -22,6 +22,10 @@ class CrashSettings:
     ws_token: str = os.getenv("CRASH_WS_TOKEN", "supersecret")
     # Периодичность выпадения подарков (секунды)
     drop_interval_seconds: float = float(os.getenv("DROP_INTERVAL_SECONDS", 2.0))
+    # шанс, что коэффициент будет высоким (0–1)
+    luck_chance: float = float(os.getenv("CRASH_LUCK_CHANCE", 0.15))
 
+    # множитель удачи (на сколько увеличить crash_point)
+    luck_multiplier: float = float(os.getenv("CRASH_LUCK_MULTIPLIER", 1.5))
 
 settings = CrashSettings()

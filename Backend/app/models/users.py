@@ -2,6 +2,7 @@ from sqlalchemy import Column, Integer, String, Float, DateTime, JSON
 from datetime import datetime
 from sqlalchemy.orm import relationship
 from app.database import Base
+from sqlalchemy.ext.mutable import MutableList, MutableDict
 
 class Users(Base):
     __tablename__ = "users"
@@ -12,7 +13,8 @@ class Users(Base):
     firstname = Column(String(255))
     balance = Column(Float, default=0)
     refcount = Column(Integer, default=0)
-    inventory = Column(JSON)
+    inventory = Column(MutableList.as_mutable(JSON), default=list)
+    url_image = Column(String(255), nullable=True)
     created_at = Column(DateTime, default=datetime.utcnow)
     updated_at = Column(DateTime, default=datetime.utcnow)
 

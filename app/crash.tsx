@@ -41,6 +41,9 @@ import ava from "../components/icons/AvatarTest.svg";
 import Venus from "../components/icons/Venus.svg";
 import bliks from "../components/icons/bliks.svg";
 
+import { useCrashSocket } from "../hooks/useCrashSocket";
+
+
 import giftIcon from "../components/icons/gift.png";
 import starIcon from "../components/icons/star.svg";
 import tonIcon from "../components/icons/ton.svg";
@@ -97,6 +100,40 @@ const Crash: React.FC = () => {
   const [autoValue, setAutoValue] = useState("2.0");
 
   const rotation = useRef(new Animated.Value(0)).current;
+
+  const [serverMultiplier, setServerMultiplier] = useState(1);
+  const [serverPhase, setServerPhase] = useState("idle");
+  const [serverCrashPoint, setServerCrashPoint] = useState(null);
+  
+  const { send: sendWs, connected } = useCrashSocket((msg) => {
+    console.log("WS EVENT:", msg);
+  
+    switch (msg.event) {
+      case "state":
+        setServerPhase(msg.phase);
+        if (msg.multiplier) setServerMultiplier(msg.multiplier);
+        break;
+  
+      case "new_round":
+        setServerPhase("betting");
+        break;
+  
+      case "round_start":
+        setServerPhase("running");
+        break;
+  
+      case "tick":
+        setServerMultiplier(msg.multiplier);
+        break;
+  
+      case "crash":
+        setServerPhase("crashed");
+        setServerCrashPoint(msg.multiplier);
+        break;
+    }
+  });
+  
+
 
   // 🌍 Переводы
 const translations = {
@@ -279,29 +316,7 @@ useEffect(() => {
     }
   }, []);
 
-  useEffect(() => {
-    if (!active || phase !== "flight") return;
-    const e = new CrashEngine();
-    e.onResize(600, 400);
-    e.startTime = Date.now();
-    e.state = CrashEngineState.Active;
-    setEngine(e);
-    let frameId: number;
-    const tick = () => {
-      e.tick();
-      if (e.multiplier >= 2.0) {
-        e.state = CrashEngineState.Over;
-        setPhase("crash");
-      } else {
-        frameId = requestAnimationFrame(tick);
-      }
-    };
-    frameId = requestAnimationFrame(tick);
-    return () => {
-      cancelAnimationFrame(frameId);
-      e.state = CrashEngineState.Over;
-    };
-  }, [phase, active]);
+
 
 // === взрыв и перезапуск ===
 // === взрыв и перезапуск ===

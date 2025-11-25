@@ -1,4 +1,5 @@
 # app/services/crash_engine.py
+
 import asyncio
 import random
 from datetime import datetime
@@ -11,15 +12,23 @@ from app.database import SessionLocal
 from app.core.config import settings
 from app.models import Users, CrashRounds, CrashBets, Transactions
 
+
+# ---------------------------------------------------------------------
+# INTERNAL BET STATE (in-memory only)
+# ---------------------------------------------------------------------
 class CrashBetState:
     def __init__(self, user_id: int, amount: float):
         self.user_id = user_id
         self.amount = amount
         self.cashout_x: Optional[float] = None
+        self.auto_cashout_x: Optional[float] = None
         self.profit: Optional[float] = None
-        self.db_id: Optional[int] = None  # id в таблице crash_bets
+        self.db_id: Optional[int] = None
 
 
+# ---------------------------------------------------------------------
+# CRASH ENGINE
+# ---------------------------------------------------------------------
 class CrashEngine:
     def __init__(self):
         self.clients: Set[WebSocket] = set()
@@ -30,15 +39,14 @@ class CrashEngine:
         self.multiplier: float = settings.start_x
         self.phase: str = "idle"  # idle | betting | running | crashed
 
-        # user_id -> CrashBetState
         self.bets: Dict[int, CrashBetState] = {}
 
-    # ---------- Работа с клиентами ----------
-
+    # -----------------------------------------------------------------
+    # WEBSOCKET MANAGEMENT
+    # -----------------------------------------------------------------
     async def add_client(self, ws: WebSocket):
         async with self.lock:
             self.clients.add(ws)
-        # отправляем текущее состояние
         await self.send_state(ws)
 
     async def remove_client(self, ws: WebSocket):
@@ -52,35 +60,47 @@ class CrashEngine:
                 await ws.send_json(data)
             except Exception:
                 dead_clients.append(ws)
+
         for ws in dead_clients:
             await self.remove_client(ws)
 
     async def send_state(self, ws: WebSocket):
-        state = {
+        await ws.send_json({
             "event": "state",
             "phase": self.phase,
             "round_id": self.round_id,
             "crash_point": self.crash_point if self.phase != "betting" else None,
             "multiplier": self.multiplier,
-        }
-        await ws.send_json(state)
+        })
 
-    # ---------- Генерация crash-коэффициента ----------
-
+    # -----------------------------------------------------------------
+    # GAME MECHANICS
+    # -----------------------------------------------------------------
     def generate_crash_point(self) -> float:
-        """
-        Простой рандом с ограничением [min_x, max_x].
-        Можно заменить на provably fair позже.
-        """
         r = random.random()
-        # базовая формула с тяжелым хвостом
+
+        # базовая формула
         x = 1 / (1 - r + 1e-5)
+
+        # luck system
+        if random.random() < settings.luck_chance:
+            x *= settings.luck_multiplier  # увеличиваем коэффициент
+
         x = max(settings.min_x, min(x, settings.max_x))
         return round(x, 2)
 
-    # ---------- Публичные методы для ставок / кэшаута ----------
+    # -----------------------------------------------------------------
+    # PLACE BET
+    # -----------------------------------------------------------------
+    async def place_bet(
+        self,
+        user_id: int,
+        amount: float,
+        gift: bool = False,
+        gift_id: Optional[int] = None,
+        auto_cashout_x: Optional[float] = None
+    ) -> dict:
 
-    async def place_bet(self, user_id: int, amount: float) -> dict:
         async with self.lock:
             if self.phase != "betting":
                 return {"ok": False, "error": "bets_closed"}
@@ -88,25 +108,69 @@ class CrashEngine:
             if user_id in self.bets:
                 return {"ok": False, "error": "already_bet"}
 
-            if amount <= 0:
-                return {"ok": False, "error": "bad_amount"}
-
-            # проверяем баланс и списываем деньги
             db: Session = SessionLocal()
             try:
                 user = db.query(Users).filter(Users.id == user_id).with_for_update().first()
                 if not user:
                     return {"ok": False, "error": "user_not_found"}
 
-                if (user.balance or 0) < amount:
-                    return {"ok": False, "error": "not_enough_balance"}
+                # -------------------------------------------------------
+                #   СТАВКА ПОДАРКОМ
+                # -------------------------------------------------------
+                if gift:
+                    if not gift_id:
+                        return {"ok": False, "error": "gift_id_required"}
 
-                balance_before = user.balance
-                user.balance -= amount
+                    # --- поиск подарка в инвентаре ---
+                    gift_item = None
+                    for item in user.inventory or []:
+                        if str(item.get("drop_id")) == str(gift_id):
+                            gift_item = item
+                            break
 
-                # создаём запись раунда, если вдруг нет (подстраховка)
+                    if gift_item is None:
+                        return {"ok": False, "error": "gift_not_in_inventory"}
+
+                    from sqlalchemy.ext.mutable import MutableDict
+
+                    # сделать элемент изменяемым для SQLAlchemy
+                    idx = user.inventory.index(gift_item)
+                    gift_item = MutableDict(gift_item)
+                    user.inventory[idx] = gift_item
+
+                    # --- берём цену подарка ---
+                    from app.models import Drops
+                    drop = db.query(Drops).filter(Drops.id == gift_id).first()
+                    if not drop:
+                        return {"ok": False, "error": "gift_not_found"}
+
+                    amount = drop.price  # ставка = цена подарка
+
+                    # --- уменьшаем количество ---
+                    gift_item["count"] -= 1
+                    if gift_item["count"] <= 0:
+                        user.inventory.remove(gift_item)
+
+                    balance_before = user.balance  # баланс не меняем
+
+                # -------------------------------------------------------
+                #   ОБЫЧНАЯ СТАВКА ТОННАМИ
+                # -------------------------------------------------------
+                else:
+                    if amount <= 0:
+                        return {"ok": False, "error": "bad_amount"}
+
+                    if (user.balance or 0) < amount:
+                        return {"ok": False, "error": "not_enough_balance"}
+
+                    balance_before = user.balance
+                    user.balance -= amount
+
+                # -------------------------------------------------------
+                # Убеждаемся, что раунд существует
+                # -------------------------------------------------------
                 if self.round_id is None:
-                    round_obj = CrashRounds(
+                    new_round = CrashRounds(
                         round_number=None,
                         crash_point=0,
                         started_at=None,
@@ -114,40 +178,55 @@ class CrashEngine:
                         total_bet=0,
                         total_payout=0,
                     )
-                    db.add(round_obj)
+                    db.add(new_round)
                     db.flush()
-                    self.round_id = round_obj.id
+                    self.round_id = new_round.id
 
-                # создаём bet
+                # -------------------------------------------------------
+                # Создаём ставку
+                # -------------------------------------------------------
                 bet = CrashBets(
                     round_id=self.round_id,
                     user_id=user_id,
                     amount=amount,
                     cashout_multiplier=None,
                     profit=None,
+                    gift=gift,
+                    gift_id=gift_id,
+                    auto_cashout_x=auto_cashout_x,
                     created_at=datetime.utcnow(),
                 )
                 db.add(bet)
-                db.flush()
 
-                # создаём транзакцию (списание на ставку)
+                # обновляем сумму ставок
+                round_row = db.query(CrashRounds).get(self.round_id)
+                round_row.total_bet += amount
+
+                # -------------------------------------------------------
+                # транзакция
+                # -------------------------------------------------------
                 tx = Transactions(
                     user_id=user_id,
-                    type="crash_bet",
+                    type="crash_bet_gift" if gift else "crash_bet",
                     amount=amount,
                     balance_before=balance_before,
                     balance_after=user.balance,
                     related_round_id=self.round_id,
-                    created_at=datetime.utcnow(),
+                    created_at=datetime.utcnow()
                 )
                 db.add(tx)
 
                 db.commit()
+                db.refresh(bet)
 
-                # локальное состояние
-                state = CrashBetState(user_id=user_id, amount=amount)
-                state.db_id = bet.id
-                self.bets[user_id] = state
+                # -------------------------------------------------------
+                # Состояние в памяти
+                # -------------------------------------------------------
+                st = CrashBetState(user_id=user_id, amount=amount)
+                st.db_id = bet.id
+                st.auto_cashout_x = auto_cashout_x
+                self.bets[user_id] = st
+
             finally:
                 db.close()
 
@@ -155,10 +234,66 @@ class CrashEngine:
             "event": "bet_placed",
             "user_id": user_id,
             "amount": amount,
+            "gift": gift
         })
+
         return {"ok": True}
 
-    async def cashout(self, user_id: int) -> dict:
+
+    # -----------------------------------------------------------------
+    # AUTO CASHOUT
+    # -----------------------------------------------------------------
+    async def _auto_cashout(self, user_id: int, multiplier: float):
+        bet = self.bets.get(user_id)
+        if not bet or bet.cashout_x is not None:
+            return
+
+        bet.cashout_x = multiplier
+
+        db = SessionLocal()
+        try:
+            bet_row = db.get(CrashBets, bet.db_id)
+            user_row = db.query(Users).get(user_id)
+
+            profit = bet.amount * multiplier - bet.amount
+            bet.profit = profit
+
+            bet_row.cashout_multiplier = multiplier
+            bet_row.profit = profit
+
+            balance_before = user_row.balance
+            user_row.balance += bet.amount + profit
+
+            tx = Transactions(
+                user_id=user_id,
+                type="crash_auto_cashout",
+                amount=profit,
+                balance_before=balance_before,
+                balance_after=user_row.balance,
+                related_round_id=self.round_id,
+                created_at=datetime.utcnow()
+            )
+            db.add(tx)
+
+            # increase total payout
+            round_row = db.query(CrashRounds).get(self.round_id)
+            round_row.total_payout += (bet.amount + profit)
+
+            db.commit()
+        finally:
+            db.close()
+
+        await self.broadcast({
+            "event": "cashout",
+            "user_id": user_id,
+            "multiplier": multiplier,
+            "auto": True
+        })
+
+    # -----------------------------------------------------------------
+    # MANUAL CASHOUT
+    # -----------------------------------------------------------------
+    async def cashout(self, user_id: int):
         async with self.lock:
             if self.phase != "running":
                 return {"ok": False, "error": "not_running"}
@@ -172,89 +307,85 @@ class CrashEngine:
 
             bet.cashout_x = self.multiplier
 
-            # считаем прибыль и немедленно записываем в базу и на баланс
-            db: Session = SessionLocal()
-            try:
-                bet_row = db.query(CrashBets).filter(CrashBets.id == bet.db_id).with_for_update().first()
-                user = db.query(Users).filter(Users.id == user_id).with_for_update().first()
+        db = SessionLocal()
+        try:
+            bet_row = db.query(CrashBets).filter(CrashBets.id == bet.db_id).with_for_update().first()
+            user_row = db.query(Users).filter(Users.id == user_id).with_for_update().first()
 
-                if not bet_row or not user:
-                    return {"ok": False, "error": "db_error"}
+            multiplier = bet.cashout_x
+            profit = bet.amount * multiplier - bet.amount  # ← корректный профит
 
-                profit = bet.amount * bet.cashout_x - bet.amount
-                bet.profit = profit
+            bet.profit = profit
 
-                bet_row.cashout_multiplier = bet.cashout_x
-                bet_row.profit = profit
+            bet_row.cashout_multiplier = multiplier
+            bet_row.profit = profit
 
-                balance_before = user.balance
-                user.balance += bet.amount + profit  # возвращаем ставку + профит
+            balance_before = user_row.balance
+            user_row.balance += bet.amount + profit  # ← возвращаем ставку + прибыль
 
-                tx = Transactions(
-                    user_id=user_id,
-                    type="crash_cashout",
-                    amount=profit,
-                    balance_before=balance_before,
-                    balance_after=user.balance,
-                    related_round_id=self.round_id,
-                    created_at=datetime.utcnow(),
-                )
-                db.add(tx)
+            tx = Transactions(
+                user_id=user_id,
+                type="crash_cashout",
+                amount=profit,
+                balance_before=balance_before,
+                balance_after=user_row.balance,
+                related_round_id=self.round_id,
+                created_at=datetime.utcnow()
+            )
+            db.add(tx)
 
-                db.commit()
-            finally:
-                db.close()
+            round_row = db.query(CrashRounds).filter(CrashRounds.id == self.round_id).first()
+            round_row.total_payout += (bet.amount + profit)
+
+            db.commit()  # ← commit обязательно
+            db.refresh(bet_row)
+        finally:
+            db.close()
 
         await self.broadcast({
             "event": "cashout",
             "user_id": user_id,
             "multiplier": self.multiplier,
+            "auto": False
         })
 
         return {"ok": True}
 
-    # ---------- Основной бесконечный цикл игры ----------
-
+    # -----------------------------------------------------------------
+    # GAME LOOP
+    # -----------------------------------------------------------------
     async def game_loop(self):
-        """
-        Бесконечный цикл:
-        - betting: приём ставок
-        - running: рост коэффициента до crash_point
-        - crashed: пауза, расчёт
-        """
         while True:
-            # --- создаём новый раунд ---
             async with self.lock:
                 self.bets = {}
                 self.multiplier = settings.start_x
                 self.crash_point = self.generate_crash_point()
                 self.phase = "betting"
 
-                db: Session = SessionLocal()
+                db = SessionLocal()
                 try:
-                    round_obj = CrashRounds(
+                    new_round = CrashRounds(
                         round_number=None,
                         crash_point=self.crash_point,
                         started_at=None,
                         ended_at=None,
                         total_bet=0,
-                        total_payout=0,
+                        total_payout=0
                     )
-                    db.add(round_obj)
+                    db.add(new_round)
                     db.commit()
-                    db.refresh(round_obj)
-                    self.round_id = round_obj.id
+                    db.refresh(new_round)
+                    self.round_id = new_round.id
                 finally:
                     db.close()
 
             await self.broadcast({
                 "event": "new_round",
                 "round_id": self.round_id,
-                "crash_point_max_hint": self.crash_point,  # можно не показывать полностью на фронте
-                "bet_phase_seconds": settings.bet_phase_seconds,
+                "crash_point_max_hint": self.crash_point,
+                "bet_phase_seconds": settings.bet_phase_seconds
             })
 
-            # --- фаза ставок ---
             await asyncio.sleep(settings.bet_phase_seconds)
 
             async with self.lock:
@@ -262,23 +393,31 @@ class CrashEngine:
 
             await self.broadcast({"event": "round_start"})
 
-            # --- рост коэффициента ---
-            tick = settings.tick_ms / 1000.0
+            tick_s = settings.tick_ms / 1000
+
             while True:
                 async with self.lock:
                     if self.multiplier >= self.crash_point:
                         break
-                    self.multiplier = round(self.multiplier * (1 + settings.grow_speed), 2)
+
+                    self.multiplier = round(
+                        self.multiplier * (1 + settings.grow_speed), 2
+                    )
                     current_x = self.multiplier
+
+                    # AUTO CASHOUT
+                    for uid, bet in list(self.bets.items()):
+                        if bet.auto_cashout_x is not None and bet.cashout_x is None:
+                            if current_x >= bet.auto_cashout_x:
+                                await self._auto_cashout(uid, current_x)
 
                 await self.broadcast({
                     "event": "tick",
                     "multiplier": current_x,
                 })
 
-                await asyncio.sleep(tick)
+                await asyncio.sleep(tick_s)
 
-            # --- краш ---
             async with self.lock:
                 self.phase = "crashed"
                 crashed_x = self.crash_point
@@ -288,38 +427,34 @@ class CrashEngine:
                 "multiplier": crashed_x,
             })
 
-            # --- фиксим проигравших в базе ---
             await self._finalize_losers()
 
-            # --- пауза перед новым раундом ---
             await asyncio.sleep(settings.pause_between_rounds)
 
+    # -----------------------------------------------------------------
+    # FINALIZE LOSERS
+    # -----------------------------------------------------------------
     async def _finalize_losers(self):
-        """
-        Все, кто не сделал cashout, уже проиграли – фиксируем их убыток в БД.
-        """
         async with self.lock:
-            losing_bets: List[CrashBetState] = [
-                b for b in self.bets.values() if b.cashout_x is None
-            ]
+            losers = [b for b in self.bets.values() if b.cashout_x is None]
             round_id = self.round_id
 
-        if not losing_bets or round_id is None:
+        if not losers:
             return
 
-        db: Session = SessionLocal()
+        db = SessionLocal()
         try:
-            for bet in losing_bets:
-                bet_row = db.query(CrashBets).filter(CrashBets.id == bet.db_id).with_for_update().first()
-                if not bet_row:
-                    continue
-                bet_row.cashout_multiplier = None
-                bet_row.profit = -bet.amount
-                # деньги уже списаны при ставке, баланс менять не надо
+            for bet in losers:
+                bet_row = db.get(CrashBets, bet.db_id)
+
+                if bet_row:
+                    bet_row.cashout_multiplier = None
+                    bet_row.profit = -bet.amount
+
             db.commit()
         finally:
             db.close()
 
 
-# глобальный экземпляр движка
+# GLOBAL ENGINE INSTANCE
 crash_engine = CrashEngine()

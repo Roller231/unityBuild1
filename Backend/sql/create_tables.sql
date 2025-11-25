@@ -40,6 +40,7 @@ CREATE TABLE users (
     balance FLOAT DEFAULT 0,
     refcount INT DEFAULT 0,
     inventory JSON,
+    url_image VARCHAR(255) NULL,
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
     updated_at DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
 );
@@ -62,6 +63,12 @@ CREATE TABLE crash_bets (
     cashout_multiplier FLOAT,
     profit FLOAT,
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+
+    -- 🔥 Новые поля
+    gift BOOLEAN NOT NULL DEFAULT FALSE,
+    gift_id INT NULL,
+    auto_cashout_x FLOAT NULL,   -- 🔥 вот этого не хватало
+
     CONSTRAINT fk_bet_round
         FOREIGN KEY (round_id) REFERENCES crash_rounds(id)
         ON DELETE CASCADE,

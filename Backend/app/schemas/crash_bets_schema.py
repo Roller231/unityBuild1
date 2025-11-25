@@ -9,13 +9,25 @@ class CrashBetBase(BaseModel):
     cashout_multiplier: Optional[float] = None
     profit: Optional[float] = None
 
+    # NEW
+    gift: bool = False
+    gift_id: Optional[int] = None
+    auto_cashout_x: Optional[float] = None
+
 class CrashBetCreate(CrashBetBase):
     pass
+
+
 
 class CrashBetUpdate(BaseModel):
     amount: Optional[float] = None
     cashout_multiplier: Optional[float] = None
     profit: Optional[float] = None
+    gift: Optional[bool] = None
+    gift_id: Optional[int] = None
+    auto_cashout_x: Optional[float] = None
+
+
 
 class CrashBetOut(CrashBetBase):
     id: int
@@ -23,3 +35,5 @@ class CrashBetOut(CrashBetBase):
 
     class Config:
         orm_mode = True
+
+

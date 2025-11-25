@@ -19,6 +19,7 @@ def create_bet(db: Session, data: CrashBetCreate) -> CrashBets:
     db.refresh(obj)
     return obj
 
+
 def update_bet(db: Session, bet_id: int, data: CrashBetUpdate) -> Optional[CrashBets]:
     obj = get_bet(db, bet_id)
     if not obj:

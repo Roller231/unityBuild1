@@ -22,8 +22,25 @@ async def crash_ws(websocket: WebSocket):
             if event == "bet":
                 user_id = int(data["user_id"])
                 amount = float(data["amount"])
-                result = await crash_engine.place_bet(user_id, amount)
+                gift = bool(data.get("gift", False))
+                gift_id = data.get("gift_id")
+                raw_auto = data.get("auto_cashout_x")
+
+                try:
+                    auto_cashout_x = float(raw_auto) if raw_auto is not None else None
+                except:
+                    auto_cashout_x = None
+
+                result = await crash_engine.place_bet(
+                    user_id=user_id,
+                    amount=amount,
+                    gift=gift,
+                    gift_id=gift_id,
+                    auto_cashout_x=auto_cashout_x
+                )
+
                 await websocket.send_json({"event": "bet_result", **result})
+
 
             elif event == "cashout":
                 user_id = int(data["user_id"])

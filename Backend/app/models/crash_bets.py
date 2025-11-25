@@ -1,4 +1,4 @@
-from sqlalchemy import Column, Integer, Float, DateTime, ForeignKey
+from sqlalchemy import Column, Integer, Float, DateTime, ForeignKey, Boolean
 from sqlalchemy.orm import relationship
 from datetime import datetime
 from app.database import Base
@@ -14,5 +14,11 @@ class CrashBets(Base):
     profit = Column(Float)
     created_at = Column(DateTime, default=datetime.utcnow)
 
+    # NEW
+    gift = Column(Boolean, default=False)
+    gift_id = Column(Integer, nullable=True)
+    auto_cashout_x = Column(Float, nullable=True)
+
     round = relationship("CrashRounds", back_populates="bets")
     user = relationship("Users", back_populates="crash_bets")
+
