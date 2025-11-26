@@ -161,7 +161,7 @@ const [launchReady, setLaunchReady] = useState(false);
 try {
   init();
   if (viewport.mount.isAvailable()) viewport.mount();
-  if (viewport.requestFullscreen.isAvailable()) viewport.requestFullscreen();
+  
   if (swipeBehavior.isSupported()) {
     swipeBehavior.mount();
     swipeBehavior.disableVertical();
