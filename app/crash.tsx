@@ -1469,11 +1469,10 @@ const reloadTimer = setTimeout(() => {
           {selectedTab === "Gifts" && (
   <View style={{ width: "100%", marginTop: 10, paddingHorizontal: 10 }}>
     
-    {(!user?.inventory || user.inventory.length === 0) && (
-      <Text style={{ color: "#aaa", marginTop: 16, textAlign: "center" }}>
-        {t("inventoryEmpty")}
-      </Text>
-    )}
+    {(!user?.inventory || user.inventory?.length === 0) && (
+  <Text>{t("inventoryEmpty")}</Text>
+)}
+
 
     <ScrollView
       style={{ width: "100%", marginTop: 10 }}
