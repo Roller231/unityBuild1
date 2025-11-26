@@ -38,7 +38,6 @@ import userIcon from "../components/icons/user.svg"; // или user.svg — см
 
 import vzryv from "../components/icons/vzryv.json";
 import LottieView from "lottie-react-native";
-import { init, viewport, swipeBehavior, isTMA } from "@telegram-apps/sdk-react";
 
 import lottieWeb from "lottie-web";
 
@@ -116,11 +115,21 @@ const InventoryImage = ({ uri }: { uri: string }) => {
 };
 const Crash: React.FC = () => {
 
+
+  const { user, setUser } = useUser();
+
+  if (!user) {
+    return (
+      <View style={{ flex: 1, backgroundColor: "#1B003B", alignItems: "center", justifyContent: "center" }}>
+        <Text style={{ color: "#fff", opacity: 0.7 }}>Loading…</Text>
+      </View>
+    );
+  }
+
   const roundIdRef = useRef<number | null>(null);
   
   
 
-  const { user, setUser } = useUser();
 
   const [inventoryItems, setInventoryItems] = useState<InventoryItemExpanded[]>([]);
   const [isInventoryLoading, setIsInventoryLoading] = useState(false);
@@ -428,24 +437,7 @@ const useTranslation = (lang: Lang) => (key: TranslationKey) =>
 const [language, setLanguage] = useState<"ru" | "en">("ru");
 const t = useTranslation(language);
 
-useEffect(() => {
-  async function initTg() {
-    if (await isTMA()) {
-      init();
 
-      if (viewport.mount.isAvailable()) {
-        await viewport.mount();
-        viewport.expand();
-      }
-
-      if (viewport.requestFullscreen.isAvailable()) {
-        await viewport.requestFullscreen();
-      }
-    }
-  }
-  initTg();
-
-}, []);
 
 useEffect(() => {
   const loadLang = async () => {

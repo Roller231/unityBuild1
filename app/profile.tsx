@@ -184,8 +184,17 @@ const InventoryImage = ({ uri }: { uri: string }) => {
 
 const Profile = () => {
   
+  const { user, setUser } = useUser();
 
-  const { user, setUser } = useUser(); // ✅ Add this
+  if (!user) {
+    return (
+      <View style={{ flex: 1, backgroundColor: "#18003A", alignItems: "center", justifyContent: "center" }}>
+        <Text style={{ color: "#fff" }}>Loading…</Text>
+      </View>
+    );
+  }
+  
+
   const rawInventory = user.inventory as UserInventoryEntry[];
 
 
@@ -260,24 +269,6 @@ const [showTermsSheet, setShowTermsSheet] = useState(false);
 
 const t = useTranslation(language);
 
-useEffect(() => {
-  async function initTg() {
-    if (await isTMA()) {
-      init();
-
-      if (viewport.mount.isAvailable()) {
-        await viewport.mount();
-        viewport.expand();
-      }
-
-      if (viewport.requestFullscreen.isAvailable()) {
-        await viewport.requestFullscreen();
-      }
-    }
-  }
-  initTg();
-
-}, []);
 
 
 // ✅ при загрузке читаем язык из AsyncStorage
