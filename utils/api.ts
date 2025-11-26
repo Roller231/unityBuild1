@@ -1,4 +1,4 @@
-export const API_URL = "https://ggcat.org";
+const API_URL = "https://ggcat.org";
 
 // --- базовые методы ---
 export async function apiGet(path: string) {
