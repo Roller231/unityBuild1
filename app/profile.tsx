@@ -84,7 +84,7 @@ const translations = {
     gotIt: "Понятно",
     referralTerms: "📜 Условия реферальной программы",
     referralText1: "Приглашайте друзей по вашей персональной ссылке и получайте",
-    referralText2: "10% от их депозитов прямо на баланс.",
+    referralText2: "от их депозитов прямо на баланс.",
     referralText3:
       "Можно приглашать неограниченное количество друзей. Награды начисляются автоматически после депозита приглашённого.",
     referralText4:
@@ -124,7 +124,7 @@ const translations = {
     gotIt: "Got it",
     referralTerms: "📜 Referral Terms",
     referralText1: "Invite your friends using your personal link and earn",
-    referralText2: "10% of their total deposits directly to your balance.",
+    referralText2: "of their total deposits directly to your balance.",
     referralText3:
       "You can invite unlimited friends. Rewards are credited automatically after deposit.",
     referralText4:
@@ -912,51 +912,51 @@ const getAdaptiveTextSize = (baseSize: number) => {
 
           {/* === Кнопка CONNECT WALLET === */}
           <View style={{ width: "100%", alignItems: "center", marginTop: 0 }}>
-            <TouchableOpacity
-              activeOpacity={0.9}
-              style={[styles.placeButton, { width: fixedWidth * 1.4 }]}
-              onPress={() => console.log("Connecting wallet for Gifts")}
-            >
-              <Image
-                source={OrangePng}
-                style={styles.orangePng}
-                resizeMode="contain"
-              />
-              <Svg
-                height="100%"
-                width="100%"
-                style={StyleSheet.absoluteFillObject}
-                viewBox="0 0 400 100"
-                preserveAspectRatio="xMidYMid meet"
-              >
-                <SvgText
-                  fill="none"
-                  stroke="#D35100"
-                  strokeWidth={5}
-                  fontSize="16"
-                  fontFamily="SF-Pro-Heavy"
-                  fontWeight="900"
-                  x="50%"
-                  y="45%"
-                  textAnchor="middle"
-                  letterSpacing={1.5}
-                >
-                  {t("connectWallet")}
-                </SvgText>
-                <SvgText
-                  fill="#FFF"
-                  fontSize="16"
-                  fontFamily="SF-Pro-Heavy"
-                  fontWeight="900"
-                  x="50%"
-                  y="45%"
-                  textAnchor="middle"
-                  letterSpacing={1.5}
-                >
-                  {t("connectWallet")}
-                </SvgText>
-              </Svg>
-            </TouchableOpacity>
+          <TouchableOpacity
+  activeOpacity={0.9}
+  style={[styles.placeButton, { width: fixedWidth * 1.4 }]}
+>
+  <Image
+    source={OrangePng}
+    style={styles.orangePng}
+    resizeMode="contain"
+  />
+  <Svg
+    height="100%"
+    width="100%"
+    style={StyleSheet.absoluteFillObject}
+    viewBox="0 0 400 100"
+    preserveAspectRatio="xMidYMid meet"
+  >
+    <SvgText
+      fill="none"
+      stroke="#D35100"
+      strokeWidth={5}
+      fontSize="16"
+      fontFamily="SF-Pro-Heavy"
+      fontWeight="900"
+      x="50%"
+      y="45%"
+      textAnchor="middle"
+      letterSpacing={1.5}
+    >
+      {t("connectWallet")}
+    </SvgText>
+    <SvgText
+      fill="#FFF"
+      fontSize="16"
+      fontFamily="SF-Pro-Heavy"
+      fontWeight="900"
+      x="50%"
+      y="45%"
+      textAnchor="middle"
+      letterSpacing={1.5}
+    >
+      {t("connectWallet")}
+    </SvgText>
+  </Svg>
+</TouchableOpacity>
+
           </View>
         </View>
       </View>
@@ -1488,7 +1488,7 @@ const styles = StyleSheet.create({
   },
   placeButton: {
     width: "85%",
-    aspectRatio: 4.8, // 🔥 сохраняет пропорции картинки автоматически
+    aspectRatio: 4.8,
     borderRadius: 100,
     alignItems: "center",
     justifyContent: "center",

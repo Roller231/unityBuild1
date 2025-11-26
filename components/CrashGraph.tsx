@@ -7,15 +7,16 @@ import lottieWeb from "lottie-web";
 import catFly from "../components/icons/catFly.json";
 
 interface CrashGraphProps {
-  engine: CrashEngine | null;
+  multiplier: number;
+  phase: "idle" | "countdown" | "flight" | "crash";
   active?: boolean;
-  onMultiplierChange?: (multiplier: number) => void;
 }
 
+
 export default function CrashGraph({
-  engine,
+  multiplier,
+  phase,
   active = true,
-  onMultiplierChange,
 }: CrashGraphProps) {
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const lottieRef = useRef<LottieView>(null);
@@ -57,61 +58,64 @@ export default function CrashGraph({
   // === Основная отрисовка ===
   const renderFrame = (
     ctx: CanvasRenderingContext2D,
-    width: number,
-    height: number,
-    offsetY: number
+    w: number,
+    h: number
   ) => {
-    if (!engine) return;
-    engine.onResize(width, height);
-    engine.tick();
-
-    const now = Date.now();
-    const multiplier = engine.multiplier;
-    if (
-      onMultiplierChange &&
-      now - lastUpdate.current > 120 &&
-      multiplier > 1.01 &&
-      isFinite(multiplier)
-    ) {
-      lastUpdate.current = now;
-      onMultiplierChange(multiplier);
-    }
-
-    ctx.clearRect(0, 0, width, height);
-    const startY = engine.plotHeight;
-    const mid = engine.getElapsedPosition(engine.elapsedTime * 0.5);
-    const end = engine.getElapsedPosition(engine.elapsedTime);
-
+    ctx.clearRect(0, 0, w, h);
+  
+    const maxM = 10; // что считаем правым краем
+    const progress = Math.min(multiplier / maxM, 1);
+  
+    // Вогнутая экспонента / логарифм
+    // y поднимается быстрее в начале и плавно замедляется
+    const curveY = Math.pow(progress, 0.65); // 0.65 — идеальный crash-сплайн
+  
+    const startY = h * 0.75;            // нижняя часть
+    const endX = w * progress;          // ВСЕГДА доходит до правого края
+    const endY = startY - curveY * (h * 0.55);
+  
+    // линия
     ctx.beginPath();
     ctx.strokeStyle = "#A57BFF";
-    ctx.lineWidth = isLarge ? 4 : isSmall ? 2 : 3;
+    ctx.lineWidth = 4;
     ctx.moveTo(0, startY);
-    ctx.quadraticCurveTo(mid.x, mid.y + offsetY, end.x, end.y);
+  
+    // Точка изгиба: половина X, логическая Y
+    const ctrlX = endX * 0.45;
+    const ctrlY = startY - curveY * (h * 0.25);
+  
+    ctx.quadraticCurveTo(ctrlX, ctrlY, endX, endY);
     ctx.stroke();
-
+  
+    // === ТЕКСТ МНОЖИТЕЛЯ ===
     const text = `x${multiplier.toFixed(2)}`;
     const fontSize = isLarge ? 72 : isSmall ? 44 : 58;
+  
     ctx.font = `1000 ${fontSize}px "SF Pro", sans-serif`;
     ctx.textAlign = "center";
     ctx.textBaseline = "middle";
-
+  
     const gradient = ctx.createLinearGradient(
       0,
-      height / 2 - fontSize,
+      h / 2 - fontSize,
       0,
-      height / 2 + fontSize
+      h / 2 + fontSize
     );
     gradient.addColorStop(0, "#FFAF4D");
     gradient.addColorStop(0.35, "#FFF7A7");
     gradient.addColorStop(0.75, "#FFAF4D");
-
-    ctx.lineWidth = 1.2;
+  
+    ctx.lineWidth = 1.6;
     ctx.strokeStyle = "#070908";
-    const textY = height / 2 - (isLarge ? 137 : isSmall ? 57 : 77);
-    ctx.strokeText(text, width / 2, textY);
+  
+    const textY = h / 2 - (isLarge ? 137 : isSmall ? 57 : 77);
+  
+    ctx.strokeText(text, w / 2, textY);
     ctx.fillStyle = gradient;
-    ctx.fillText(text, width / 2, textY);
+    ctx.fillText(text, w / 2, textY);
   };
+  
+  
 
   // === Canvas (Web) ===
   useEffect(() => {
@@ -136,14 +140,14 @@ export default function CrashGraph({
     const draw = (time: number) => {
       if (time - lastDraw > frameInterval) {
         lastDraw = time;
-        renderFrame(ctx, graphWidth, graphHeight, 25);
+        renderFrame(ctx, graphWidth, graphHeight);
       }
       frameId = requestAnimationFrame(draw);
     };
 
     frameId = requestAnimationFrame(draw);
     return () => cancelAnimationFrame(frameId);
-  }, [engine, active, graphWidth, graphHeight]);
+  }, [multiplier, active, graphWidth, graphHeight]);
 
   // === Canvas (Mobile) ===
   const handleCanvas = (canvas: any) => {
@@ -152,7 +156,7 @@ export default function CrashGraph({
     let frameId: number;
 
     const draw = () => {
-      renderFrame(ctx, graphWidth, graphHeight, 15);
+      renderFrame(ctx, graphWidth, graphHeight);
       frameId = requestAnimationFrame(draw);
     };
     frameId = requestAnimationFrame(draw);
@@ -194,13 +198,14 @@ export default function CrashGraph({
       ref={webLottieContainer}
       style={{
         ...styles.catLottieWeb,
-        width: catSize,
-        height: catSize,
+        width: catSize ,     // ⬅️ уменьшили
+        height: catSize ,    // ⬅️ уменьшили
         left: "50%",
-        top: isLarge ? "58%" : isSmall ? "72%" : "68%",
+        top: isLarge ? "63%" : isSmall ? "75%" : "70%",   // ⬅️ опустили ниже
         transform: "translate(-50%, -50%)",
       }}
     />
+
   ) : (
     <LottieView
       ref={lottieRef}

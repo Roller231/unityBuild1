@@ -26,6 +26,7 @@ class CrashBetState:
         self.db_id: Optional[int] = None
 
 
+
 # ---------------------------------------------------------------------
 # CRASH ENGINE
 # ---------------------------------------------------------------------
@@ -38,6 +39,7 @@ class CrashEngine:
         self.crash_point: float = 0.0
         self.multiplier: float = settings.start_x
         self.phase: str = "idle"  # idle | betting | running | crashed
+        self.next_round_pending_bets: List[dict] = []
 
         self.bets: Dict[int, CrashBetState] = {}
 
@@ -103,7 +105,18 @@ class CrashEngine:
 
         async with self.lock:
             if self.phase != "betting":
-                return {"ok": False, "error": "bets_closed"}
+                self.next_round_pending_bets.append({
+                    "user_id": user_id,
+                    "amount": amount,
+                    "gift": gift,
+                    "gift_id": gift_id,
+                    "auto_cashout_x": auto_cashout_x
+                })
+                return {
+                    "ok": True,
+                    "queued": True,
+                    "message": "bet saved for next round"
+                }
 
             if user_id in self.bets:
                 return {"ok": False, "error": "already_bet"}
@@ -362,6 +375,7 @@ class CrashEngine:
                 self.crash_point = self.generate_crash_point()
                 self.phase = "betting"
 
+                # --- СОЗДАЁМ НОВЫЙ РАУНД ---
                 db = SessionLocal()
                 try:
                     new_round = CrashRounds(
@@ -379,6 +393,94 @@ class CrashEngine:
                 finally:
                     db.close()
 
+                # --- ПЕРЕНОС ОТЛОЖЕННЫХ СТАВОК ТОЛЬКО ОДИН РАЗ ---
+                pending = list(self.next_round_pending_bets)
+                self.next_round_pending_bets.clear()
+
+                if pending:
+                    db = SessionLocal()
+                    try:
+                        for p in pending:
+                            user = db.query(Users).filter(Users.id == p["user_id"]).with_for_update().first()
+                            if not user:
+                                continue
+
+                            amount = p["amount"]
+                            gift = p["gift"]
+                            gift_id = p["gift_id"]
+                            auto_cashout_x = p["auto_cashout_x"]
+
+                            balance_before = user.balance
+
+                            # --- TON ставка ---
+                            if not gift:
+                                if user.balance < amount:
+                                    continue
+                                user.balance -= amount
+
+                            # --- Gift ставка ---
+                            else:
+                                gift_item = None
+                                for item in user.inventory or []:
+                                    if str(item.get("drop_id")) == str(gift_id):
+                                        gift_item = item
+                                        break
+                                if not gift_item:
+                                    continue
+
+                                from sqlalchemy.ext.mutable import MutableDict
+                                idx = user.inventory.index(gift_item)
+                                gift_item = MutableDict(gift_item)
+                                user.inventory[idx] = gift_item
+
+                                from app.models import Drops
+                                drop = db.query(Drops).filter(Drops.id == gift_id).first()
+                                if not drop:
+                                    continue
+
+                                amount = drop.price
+                                gift_item["count"] -= 1
+                                if gift_item["count"] <= 0:
+                                    user.inventory.remove(gift_item)
+
+                            # ---- создаём CrashBet ----
+                            bet = CrashBets(
+                                round_id=self.round_id,
+                                user_id=p["user_id"],
+                                amount=amount,
+                                gift=gift,
+                                gift_id=gift_id,
+                                cashout_multiplier=None,
+                                profit=None,
+                                auto_cashout_x=auto_cashout_x,
+                                created_at=datetime.utcnow(),
+                            )
+                            db.add(bet)
+                            db.flush()
+
+                            # ---- транзакция ----
+                            tx = Transactions(
+                                user_id=p["user_id"],
+                                type="crash_bet_gift" if gift else "crash_bet",
+                                amount=amount,
+                                balance_before=balance_before,
+                                balance_after=user.balance,
+                                related_round_id=self.round_id,
+                                created_at=datetime.utcnow()
+                            )
+                            db.add(tx)
+
+                            # ---- сохраняем в память ----
+                            st = CrashBetState(p["user_id"], amount)
+                            st.db_id = bet.id
+                            st.auto_cashout_x = auto_cashout_x
+                            self.bets[p["user_id"]] = st
+
+                        db.commit()
+                    finally:
+                        db.close()
+
+            # ---- ОПОВЕЩАЕМ О НОВОМ РАУНДЕ ----
             await self.broadcast({
                 "event": "new_round",
                 "round_id": self.round_id,

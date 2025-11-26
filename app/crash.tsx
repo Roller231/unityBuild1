@@ -16,13 +16,21 @@ import {
 import { useFocusEffect } from "@react-navigation/native";
 import { CrashEngine, CrashEngineState } from "../components/CrashEngine";
 import CrashGraph from "../components/CrashGraph";
-import Svg, { Text as SvgText } from "react-native-svg";
+import Svg, {  Text as SvgText } from "react-native-svg";
+import { LinearGradient } from "expo-linear-gradient";
+
 import OrangeBtn from "../components/OrangeBtn";
 import * as Font from "expo-font";
 import BetItem from "../components/BetItem";
 import StarsBackground from "../components/StarsBackground";
 import { useTelegramPlatform } from "@/hooks/useTelegramPlatform";
 import HistoryBar from "../components/HistoryBar";
+
+
+import { useUser } from "../components/UserContext";
+import { apiGet } from "../utils/api";
+
+
 
 import BalanceButton from "../components/Buttons/BalanceButton";
 
@@ -69,6 +77,9 @@ export const vibrate = (pattern: number | number[] = 50) => {
 
 const Crash: React.FC = () => {
 
+  const { user, setUser } = useUser();
+
+
   const [graphKey, setGraphKey] = useState(0);
 
   const platform = useTelegramPlatform();
@@ -77,6 +88,7 @@ const Crash: React.FC = () => {
   const scale = (size: number) => size * (fixedWidth / 390);
   const styles = createStyles(fixedWidth, screenHeight, isDesktop);
   
+  const [crashCounter, setCrashCounter] = useState(0);
 
   const [resetKey, setResetKey] = useState(0);
   const [phase, setPhase] = useState<"idle" | "countdown" | "flight" | "crash">("idle");
@@ -104,36 +116,94 @@ const Crash: React.FC = () => {
   const [serverMultiplier, setServerMultiplier] = useState(1);
   const [serverPhase, setServerPhase] = useState("idle");
   const [serverCrashPoint, setServerCrashPoint] = useState(null);
+
+  const [showDepositSheet, setShowDepositSheet] = useState(false);
+  const [depositTab, setDepositTab] = useState<"Gifts" | "Stars" | "TON">("TON");
+
+  const sanitizeTonInput = (value: string) => {
+    // оставить только цифры и точку
+    let cleaned = value.replace(/[^0-9.]/g, "");
+  
+    // не даём начинать с точки — превращаем ".5" → "0.5"
+    if (cleaned.startsWith(".")) {
+      cleaned = "0" + cleaned;
+    }
+  
+    // удаляем повторные точки
+    const parts = cleaned.split(".");
+    if (parts.length > 2) {
+      cleaned = parts[0] + "." + parts[1];
+    }
+  
+    // запрет отрицательных (убрали минус выше) и запрет простого 0 без дробей
+    if (cleaned === "0" || cleaned === "00" || cleaned === "000") {
+      cleaned = "";
+    }
+  
+    return cleaned;
+  };
+  const sanitizeAutoCashout = (value: string) => {
+    let cleaned = value.replace(/[^0-9.]/g, "");
+  
+    // превращаем ".5" → "1" (нельзя <1)
+    if (cleaned.startsWith(".")) cleaned = "";
+  
+    // убираем повторные точки
+    const parts = cleaned.split(".");
+    if (parts.length > 2) cleaned = parts[0] + "." + parts[1];
+  
+    // если число меньше 1 — ставим 1
+    if (cleaned && parseFloat(cleaned) < 1) cleaned = "1";
+  
+    return cleaned;
+  };
+  
+  
   
   const { send: sendWs, connected } = useCrashSocket((msg) => {
     console.log("WS EVENT:", msg);
   
     switch (msg.event) {
-      case "state":
-        setServerPhase(msg.phase);
-        if (msg.multiplier) setServerMultiplier(msg.multiplier);
-        break;
-  
       case "new_round":
-        setServerPhase("betting");
-        break;
-  
-      case "round_start":
-        setServerPhase("running");
+        setPhase("countdown");
+        setCount(msg.bet_phase_seconds);
+        setPhase("countdown");
+        
         break;
   
       case "tick":
         setServerMultiplier(msg.multiplier);
+        setPhase("flight");
         break;
   
-      case "crash":
-        setServerPhase("crashed");
-        setServerCrashPoint(msg.multiplier);
+        case "crash":
+      setPhase("crash");
+
+      // при краше подтягиваем свежие данные юзера с бэка
+      if (user) {
+        (async () => {
+          try {
+            const freshUser = await apiGet(`/users/${user.id}`);
+            setUser(freshUser);
+          } catch (e) {
+            console.warn("❌ Failed to refresh user on crash:", e);
+          }
+        })();
+      }
+
+      break;
+
+            // запускаем мягкий reset через 2 секунды
         break;
     }
   });
   
+  
 
+  
+  
+
+  
 
   // 🌍 Переводы
 const translations = {
@@ -147,6 +217,12 @@ const translations = {
     autoCashout: "Авто-вывод",
     placeBet: "СДЕЛАТЬ СТАВКУ",
     inventoryEmpty: "🎁 Инвентарь пуст",
+    connectWallet: "ПОДКЛЮЧИТЬ КОШЕЛЁК",
+
+    giftStep1: "Перейдите в ",
+    giftStep2: "Отправьте любой подарок",
+    giftStep3: "Подарок появится в вашем инвентаре",
+    giftStep4: "Убедитесь, что подарок отправлен с того же аккаунта Telegram",
   },
   en: {
     enterAmount: "Enter amount",
@@ -158,6 +234,12 @@ const translations = {
     autoCashout: "Auto cashout",
     placeBet: "PLACE BET",
     inventoryEmpty: "🎁 Inventory is empty",
+    connectWallet: "CONNECT WALLET",
+
+    giftStep1: "Go to your profile",
+    giftStep2: "Send any gift",
+    giftStep3: "The gift will appear in your inventory",
+    giftStep4: "Make sure you send the gift from the same Telegram account",
   },
 } as const;
 
@@ -206,6 +288,34 @@ useEffect(() => {
   });
   return unsub;
 }, []);
+
+const placeTonBet = async () => {
+  if (!user) return; // серверный юзер ещё не загружен
+
+  const amount = parseFloat(tonAmount);
+  if (!amount || amount <= 0) return;
+
+  // отправляем ставку на сервер
+  sendWs({
+    event: "bet",
+    user_id: user.id, // id с сервера
+    amount,
+    gift: false,
+    gift_id: null,
+    auto_cashout_x: autoCashout ? parseFloat(autoValue) : null,
+  });
+
+
+  setUser((prev: any) => ({
+        ...prev,
+    balance: prev.balance - amount
+  }));
+
+  // очищаем поле ввода, закрываем шторку
+  setTonAmount("");
+  setShowBottomSheet(false);
+};
+
 
 
   useFocusEffect(
@@ -272,35 +382,27 @@ useEffect(() => {
         setActive(false);
         setPhase("idle");
         setEngine(null);
-        setCount(3);
+        setCount(5);
       };
     }, [])
   );
 
   useEffect(() => {
     if (!active || phase !== "countdown") return;
+
     if (count > 0) {
-      const timer = setTimeout(() => setCount((c) => c - 1), 1000);
+      const timer = setTimeout(() => setCount(c => c - 1), 1000);
       return () => clearTimeout(timer);
     } else {
       setPhase("flight");
+      
     }
+    
   }, [count, phase, active]);
 
 
   // 🔁 Автоматический цикл краша при загрузке страницы
-useEffect(() => {
-  if (!active) return;
 
-  // Если всё закончилось — сразу новый раунд
-  if (phase === "idle" || phase === "crash") {
-    const restart = setTimeout(() => {
-      setCount(3);
-      setPhase("countdown");
-    }, 5000); // через секунду после краша новый отсчёт
-    return () => clearTimeout(restart);
-  }
-}, [phase, active]);
 
 
   useEffect(() => {
@@ -322,6 +424,25 @@ useEffect(() => {
 // === взрыв и перезапуск ===
 useEffect(() => {
   if (phase !== "crash") return;
+
+  // === Счётчик крашей ===
+setCrashCounter(prev => {
+  const next = prev + 1;
+
+  // 🔥 Каждый 10-й crash → мягкий перезапуск компонента
+  if (next >= 5) {
+    console.warn("⚠️ Soft reset after 10 crash cycles");
+
+    setTimeout(() => {
+      setResetKey(k => k + 1);   // 🔥 Пересоздание компонента
+      setCrashCounter(0);        // сброс счётчика
+      setPhase("idle");
+    }, 300); // небольшая задержка
+  }
+
+  return next;
+});
+
 
   const final = Number(lastMultiplier.toFixed(2));
 
@@ -362,7 +483,7 @@ const reloadTimer = setTimeout(() => {
 
   // 3. Запускаем новый отсчёт
   setPhase("countdown");
-  setCount(3);
+  setCount(5);
 }, 2000);
 
 
@@ -450,7 +571,14 @@ const reloadTimer = setTimeout(() => {
 
 
   {/* Баланс справа */}
-  <BalanceButton onPress={() => setShowBottomSheet(true)} />
+  <BalanceButton 
+  onPress={() => {
+    setDepositTab("TON");
+    setShowDepositSheet(true);
+    vibrate();
+  }} 
+/>
+
 </View>
 
 
@@ -474,17 +602,15 @@ const reloadTimer = setTimeout(() => {
 
         {/* === Отдельный контейнер для CrashGraph === */}
 <View style={styles.graphContainer}>
-  {phase === "flight" && engine && (
-    <CrashGraph
-      key={graphKey}
-      engine={engine}
-      active={active && phase === "flight"}
-      onMultiplierChange={(m) => {
-        setCurrentMultiplier(m);
-        setLastMultiplier(m);
-      }}
-    />
-  )}
+{phase === "flight" && (
+  <CrashGraph
+    multiplier={serverMultiplier}
+    phase={phase}
+    active={true}
+  />
+)}
+
+
 </View>
 
 
@@ -639,10 +765,12 @@ const reloadTimer = setTimeout(() => {
         {/* === НИЖНЯЯ ЧАСТЬ === */}
         <View style={styles.bottomSection}>
         <HistoryBar
-  history={[...pastCoeffs, currentMultiplier]}
-  activeIndex={pastCoeffs.length}
   phase={phase}
+  currentMultiplier={serverMultiplier}
 />
+
+
+
 
 
           <TouchableOpacity
@@ -714,6 +842,376 @@ const reloadTimer = setTimeout(() => {
         </View>
       </View>
 
+
+      <CustomBottomSheet
+  visible={showDepositSheet}
+  onClose={() => setShowDepositSheet(false)}
+  heightRatio={0.8}
+>
+  <ScrollView
+    contentContainerStyle={styles.bottomSheetContainer}
+    keyboardShouldPersistTaps="handled"
+    showsVerticalScrollIndicator={false}
+    nestedScrollEnabled
+  >
+    <Text style={styles.sheetTitle}>{t("enterAmount")}</Text>
+
+    {/* Вкладки Gifts / Stars / TON */}
+    <View style={{
+      flexDirection: "row",
+      justifyContent: "center",
+      alignItems: "center",
+      marginTop: scale(20),
+      flexWrap: "nowrap",
+      width: fixedWidth,
+      alignSelf: "center",
+    }}>
+      {[
+        { key: "Gifts", label: t("gifts"), icon: giftIcon },
+        { key: "Stars", label: t("stars"), icon: starIcon },
+        { key: "TON", label: t("ton"), icon: tonIcon },
+      ].map(({ key, label, icon }) => {
+        const active = depositTab === key;
+        return (
+          <TouchableOpacity
+            key={key}
+            activeOpacity={0.9}
+            onPress={() => setDepositTab(key as "Gifts" | "Stars" | "TON")}
+
+            style={{
+              flexDirection: "row",
+              alignItems: "center",
+              justifyContent: "center",
+              borderWidth: scale(2),
+              borderColor: "#6B3FD8",
+              borderRadius: 100,
+              backgroundColor: active ? "#6B3FD8" : "transparent",
+              paddingVertical: scale(10),
+              paddingHorizontal: scale(16),
+              marginHorizontal: scale(6),
+              minWidth: scale(90),
+            }}
+          >
+            <Text style={{
+              color: "#fff",
+              fontSize: scale(14),
+              fontFamily: "SF-Pro-Semibold",
+              letterSpacing: 0.2,
+              fontWeight: active ? "700" : "500",
+              marginRight: scale(5),
+            }}>
+              {label}
+            </Text>
+            <Image source={icon} resizeMode="contain" style={{ width: scale(18), height: scale(18) }} />
+          </TouchableOpacity>
+        );
+      })}
+    </View>
+
+    {depositTab === "Gifts" && (
+  <View style={styles.giftStepsWrapper}>
+    {/* === Вертикальная линия (градиент) === */}
+    <LinearGradient
+      colors={["#59AACC", "rgba(89, 170, 204, 0)"]}
+      style={styles.verticalLine}
+    />
+
+    {/* === Содержимое шагов === */}
+    <View style={styles.giftStepsContainer}>
+      {/* === Шаг 1 === */}
+      <View style={styles.stepRow}>
+  <View style={styles.stepCircle}>
+    <Text style={styles.stepNumber}>1</Text>
+  </View>
+  <Text
+  style={[
+    styles.stepText,
+    {
+      // 🔹 Только если язык русский — уменьшаем текст под маленькие экраны
+      fontSize:
+        language === "ru"
+          ? screenWidth < 360
+            ? 15
+            : screenWidth < 390
+            ? 16
+            : 18
+          : 18,
+      lineHeight:
+        language === "ru"
+          ? screenWidth < 360
+            ? 20
+            : screenWidth < 390
+            ? 21
+            : 22
+          : 22,
+      maxWidth: "80%",
+      flexShrink: 1,
+      flexWrap: "wrap",
+    },
+  ]}
+  adjustsFontSizeToFit
+  minimumFontScale={0.9}
+>
+
+
+    {t("giftStep1")} <Text
+  style={[
+    styles.stepHighlight,
+    {
+      // 🔹 Только если язык русский — уменьшаем текст под маленькие экраны
+      fontSize:
+        language === "ru"
+          ? screenWidth < 360
+            ? 15
+            : screenWidth < 390
+            ? 16
+            : 18
+          : 18,
+      lineHeight:
+        language === "ru"
+          ? screenWidth < 360
+            ? 20
+            : screenWidth < 390
+            ? 21
+            : 22
+          : 22,
+      maxWidth: "80%",
+      flexShrink: 1,
+      flexWrap: "wrap",
+    },
+  ]}
+  adjustsFontSizeToFit
+  minimumFontScale={0.9}
+>@GiftUpRelayer</Text>
+  </Text>
+</View>
+
+<View style={styles.stepRow}>
+  <View style={styles.stepCircle}>
+    <Text style={styles.stepNumber}>2</Text>
+  </View>
+  <Text
+  style={[
+    styles.stepText,
+    {
+      // 🔹 Только если язык русский — уменьшаем текст под маленькие экраны
+      fontSize:
+        language === "ru"
+          ? screenWidth < 360
+            ? 15
+            : screenWidth < 390
+            ? 16
+            : 18
+          : 18,
+      lineHeight:
+        language === "ru"
+          ? screenWidth < 360
+            ? 20
+            : screenWidth < 390
+            ? 21
+            : 22
+          : 22,
+      maxWidth: "80%",
+      flexShrink: 1,
+      flexWrap: "wrap",
+    },
+  ]}
+  adjustsFontSizeToFit
+  minimumFontScale={0.9}
+>{t("giftStep2")}</Text>
+</View>
+
+<View style={styles.stepRow}>
+  <View style={[styles.stepCircle, styles.stepCirclePurple]}>
+    <Image
+      source={require("../components/icons/gift.png")}
+      style={styles.stepGiftIcon}
+      resizeMode="contain"
+    />
+  </View>
+  <Text
+  style={[
+    styles.stepText,
+    {
+      // 🔹 Только если язык русский — уменьшаем текст под маленькие экраны
+      fontSize:
+        language === "ru"
+          ? screenWidth < 360
+            ? 15
+            : screenWidth < 390
+            ? 16
+            : 18
+          : 18,
+      lineHeight:
+        language === "ru"
+          ? screenWidth < 360
+            ? 20
+            : screenWidth < 390
+            ? 21
+            : 22
+          : 22,
+      maxWidth: "80%",
+      flexShrink: 1,
+      flexWrap: "wrap",
+    },
+  ]}
+  adjustsFontSizeToFit
+  minimumFontScale={0.9}
+>{t("giftStep3")}</Text>
+</View>
+
+<View style={styles.stepRow}>
+  <View style={styles.stepCircle}>
+    <Text style={styles.stepAlert}>!</Text>
+  </View>
+  <Text
+  style={[
+    styles.stepText,
+    {
+      // 🔹 Только если язык русский — уменьшаем текст под маленькие экраны
+      fontSize:
+        language === "ru"
+          ? screenWidth < 360
+            ? 15
+            : screenWidth < 390
+            ? 16
+            : 18
+          : 18,
+      lineHeight:
+        language === "ru"
+          ? screenWidth < 360
+            ? 20
+            : screenWidth < 390
+            ? 21
+            : 22
+          : 22,
+      maxWidth: "80%",
+      flexShrink: 1,
+      flexWrap: "wrap",
+    },
+  ]}
+  adjustsFontSizeToFit
+  minimumFontScale={0.9}
+>{t("giftStep4")}</Text>
+</View>
+
+
+      {/* === Кнопка CONNECT WALLET === */}
+     {/* === Кнопка CONNECT WALLET === */}
+<View style={{ width: "100%", alignItems: "center", marginTop: 0 }}>
+<TouchableOpacity
+                activeOpacity={0.9}
+                style={[styles.placeButton, { width: fixedWidth * 0.95 }]}
+              >
+                <OrangeBtn
+                  width="100%"
+                  height="100%"
+                  style={StyleSheet.absoluteFillObject as any}
+                />
+                <Svg height="100%" width="100%" style={StyleSheet.absoluteFillObject}>
+                  <SvgText
+                    fill="none"
+                    stroke="#D35100"
+                    strokeWidth={fixedWidth * 0.014} // адаптивная толщина обводки
+                    fontSize={fixedWidth * 0.047}     // 🔹 адаптивный размер текста
+                    fontFamily="SF‑Pro‑Heavy"
+                    fontWeight="900"
+                    x="50%"
+                    y="50%"
+                    textAnchor="middle"
+                    alignmentBaseline="middle"
+                    letterSpacing={3}
+                  >
+                      {t("connectWallet")}
+                  </SvgText>
+                  <SvgText
+                    fill="#FFF"
+                    fontSize={fixedWidth * 0.047}     // 🔹 адаптивный размер текста
+                    fontFamily="SF‑Pro‑Heavy"
+                    fontWeight="900"
+                    x="50%"
+                    y="50%"
+                    textAnchor="middle"
+                    alignmentBaseline="middle"
+                    letterSpacing={3}
+                  >
+                      {t("connectWallet")}
+                  </SvgText>
+                </Svg>
+              </TouchableOpacity>
+</View>
+
+    </View>
+  </View>
+)}
+
+
+    {(depositTab === "Stars" || depositTab === "TON") && (
+      <View style={{ marginTop: 30, width: "100%", alignItems: "center" }}>
+        <Text style={styles.inputLabel}>
+          {depositTab === "Stars" ? t("amountOfStars") : t("amountOfTon")}
+        </Text>
+
+        <View style={styles.inputWrapper}>
+          <TextInput
+            placeholder="0"
+            placeholderTextColor="#777"
+            style={styles.textInput}
+            keyboardType="numeric"
+          />
+          <Image source={depositTab === "Stars" ? starIcon : tonIcon}
+            style={styles.inputIcon}
+            resizeMode="contain"
+          />
+        </View>
+
+        <TouchableOpacity
+                activeOpacity={0.9}
+                style={[styles.placeButton, { width: fixedWidth * 0.9 }]}
+
+              >
+                <OrangeBtn
+                  width="100%"
+                  height="100%"
+                  style={StyleSheet.absoluteFillObject as any}
+                />
+                <Svg height="100%" width="100%" style={StyleSheet.absoluteFillObject}>
+                  <SvgText
+                    fill="none"
+                    stroke="#D35100"
+                    strokeWidth={fixedWidth * 0.014} // адаптивная толщина обводки
+                    fontSize={fixedWidth * 0.047}     // 🔹 адаптивный размер текста
+                    fontFamily="SF‑Pro‑Heavy"
+                    fontWeight="900"
+                    x="50%"
+                    y="50%"
+                    textAnchor="middle"
+                    alignmentBaseline="middle"
+                    letterSpacing={3}
+                  >
+                      {t("connectWallet")}
+                  </SvgText>
+                  <SvgText
+                    fill="#FFF"
+                    fontSize={fixedWidth * 0.047}     // 🔹 адаптивный размер текста
+                    fontFamily="SF‑Pro‑Heavy"
+                    fontWeight="900"
+                    x="50%"
+                    y="50%"
+                    textAnchor="middle"
+                    alignmentBaseline="middle"
+                    letterSpacing={3}
+                  >
+                      {t("connectWallet")}
+                  </SvgText>
+                </Svg>
+              </TouchableOpacity>
+      </View>
+    )}
+  </ScrollView>
+</CustomBottomSheet>
+
+
       <CustomBottomSheet
         visible={showBottomSheet}
         onClose={() => setShowBottomSheet(false)}
@@ -741,7 +1239,7 @@ const reloadTimer = setTimeout(() => {
 >
   {[
     { key: "Gifts", label: t("gifts"), icon: giftIcon },
-    { key: "Stars", label: t("stars"), icon: starIcon },
+    
     { key: "TON", label: t("ton"), icon: tonIcon },
   ].map(({ key, label, icon }) => {
     const activeTab = selectedTab === key;
@@ -809,9 +1307,14 @@ const reloadTimer = setTimeout(() => {
                   style={styles.textInput}
                   keyboardType="numeric"
                   value={selectedTab === "Stars" ? starsAmount : tonAmount}
-                  onChangeText={(text) =>
-                    selectedTab === "Stars" ? setStarsAmount(text) : setTonAmount(text)
-                  }
+                  onChangeText={(text) => {
+                    if (selectedTab === "Stars") {
+                      setStarsAmount(text);
+                    } else {
+                      setTonAmount(sanitizeTonInput(text));
+                    }
+                  }}
+                  
                 />
                 <Animated.Image
                   source={selectedTab === "Stars" ? starIcon : tonIcon}
@@ -838,11 +1341,12 @@ const reloadTimer = setTimeout(() => {
                     <Text style={styles.autoControl}>−</Text>
                   </TouchableOpacity>
                   <TextInput
-                    style={styles.autoInput}
-                    value={autoValue}
-                    keyboardType="numeric"
-                    onChangeText={setAutoValue}
-                  />
+  style={styles.autoInput}
+  value={autoValue}
+  keyboardType="numeric"
+  onChangeText={(text) => setAutoValue(sanitizeAutoCashout(text))}
+/>
+
                   <TouchableOpacity
                     onPress={() =>
                       setAutoValue((prev) => (parseFloat(prev) + 0.1).toFixed(1))
@@ -854,9 +1358,16 @@ const reloadTimer = setTimeout(() => {
               </View>
 
               <TouchableOpacity
-                activeOpacity={0.9}
-                style={[styles.placeButton, { width: fixedWidth * 0.85 }]}
-              >
+  activeOpacity={0.9}
+  style={[styles.placeButton, { width: fixedWidth * 0.85 }]}
+  onPress={() => {
+    if (selectedTab === "TON") {
+      placeTonBet();
+      vibrate();
+    }
+  }}
+>
+
                 <OrangeBtn
                   width="100%"
                   height="100%"
@@ -908,7 +1419,7 @@ const createStyles = (fixedWidth: number, screenHeight: number, isDesktop: boole
       color: "#fff",
       fontSize: fixedWidth * 0.045,
       textAlign: "center",
-      ...(Platform.OS === "web" ? { outline: "none" } : {}),
+      ...(Platform.OS === "web" ? { } : {}),
     } as any,
 
     autoInput: {
@@ -916,7 +1427,7 @@ const createStyles = (fixedWidth: number, screenHeight: number, isDesktop: boole
       fontSize: fixedWidth * 0.04,
       width: fixedWidth * 0.12,
       textAlign: "center",
-      ...(Platform.OS === "web" ? { outline: "none" } : {}),
+      ...(Platform.OS === "web" ? {  } : {}),
     } as any,
 
     inputWrapper: {
@@ -1123,7 +1634,7 @@ const createStyles = (fixedWidth: number, screenHeight: number, isDesktop: boole
       marginTop: 100,
     
       marginBottom: screenHeight < 750 ? 0 : 0,
-      paddingHorizontal: isDesktop ? 20 : 0,
+      paddingHorizontal:  20,
       width: "100%",
       alignSelf: "center",
       zIndex: 10,
@@ -1249,7 +1760,14 @@ const createStyles = (fixedWidth: number, screenHeight: number, isDesktop: boole
     },
     
 
-    
+    orangePng: {
+      width: "100%",
+      height: "100%",
+      position: "absolute",
+      top: 0,
+      left: 0,
+      resizeMode: "contain",
+    },
     
     userIcon: {
       width: 18,
@@ -1257,7 +1775,62 @@ const createStyles = (fixedWidth: number, screenHeight: number, isDesktop: boole
       marginRight: 6,
     },
     
-
+    giftStepsWrapper: {
+      width: "100%",
+      position: "relative",
+      alignItems: "center",
+      marginTop: 30,
+      paddingHorizontal: 10,
+    },
+    verticalLine: {
+      position: "absolute",
+      left: 37,
+      top: 22,
+      width: 10,
+      height: "60%",
+      borderRadius: 2,
+      zIndex: 0,
+    },
+    giftStepsContainer: {
+      width: "100%",
+      paddingHorizontal: 10,
+      marginTop: 20,
+    },
+    stepRow: {
+      flexDirection: "row",
+      alignItems: "center",
+      marginBottom: 32,
+    },
+    stepCircle: {
+      width: 44,
+      height: 44,
+      borderRadius: 30,
+      backgroundColor: "#240058",
+      justifyContent: "center",
+      alignItems: "center",
+      marginRight: 14,
+    },
+    stepCirclePurple: { backgroundColor: "#6B3FD8" },
+    stepNumber: {
+      color: "white",
+      fontSize: 18,
+      fontFamily: "SF-Pro-Heavy",
+      fontWeight: "800",
+    },
+    stepGiftIcon: { width: 22, height: 22, tintColor: "white" },
+    stepAlert: { color: "#FF005C", fontSize: 22, fontWeight: "900" },
+    stepText: {
+      color: "#C4BED4",
+      fontSize: 18,
+      fontFamily: "SF-Pro-Medium",
+      lineHeight: 22,
+      flexShrink: 1,
+    },
+    stepHighlight: {
+      color: "#A07BFF",
+      fontSize: 18,
+      fontFamily: "SF-Pro-Medium",
+    },
     
 
     

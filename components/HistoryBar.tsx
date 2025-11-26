@@ -1,152 +1,138 @@
-import React, { useRef, useEffect, useState } from "react";
+import React, { useEffect, useState, useRef } from "react";
 import { View, Text, StyleSheet, FlatList, Dimensions } from "react-native";
-import * as Font from "expo-font";
-import { useTelegramPlatform } from "@/hooks/useTelegramPlatform";
-import AsyncStorage from "@react-native-async-storage/async-storage";
-import { onLanguageChange } from "@/components/languageEvents";
 
-interface HistoryBarProps {
-  history: number[];
-  activeIndex?: number;
-  phase?: "idle" | "countdown" | "flight" | "crash";
-}
+const API_URL = "http://127.0.0.1:8000/crash-rounds?limit=5000000000";
+const LIMIT = 6;
 
 const { width: screenWidth } = Dimensions.get("window");
 const SPACING = 12;
 
-const HistoryBar: React.FC<HistoryBarProps> = ({
-  history,
-  activeIndex = 0,
-  phase = "idle",
-}) => {
+interface Round {
+  id: number;
+  round_number: number;
+  crash_point: number;
+}
+
+interface Props {
+  phase: "idle" | "countdown" | "flight" | "crash";
+  currentMultiplier: number;
+}
+
+export default function FullCrashHistoryBar({ phase, currentMultiplier }: Props) {
+  const [history, setHistory] = useState<Round[]>([]);
   const listRef = useRef<FlatList>(null);
-  const [fontLoaded, setFontLoaded] = useState(false);
-  const [language, setLanguage] = useState<"ru" | "en">("ru");
 
-  const platform = useTelegramPlatform();
-  const isDesktop = platform === "tdesktop" || platform === "macos";
-  const fixedWidth = isDesktop ? 470 : Math.min(screenWidth, 470);
-
-  // 🌍 локализация
-  const translations = {
-    ru: { waiting: "Ожидание" },
-    en: { waiting: "Waiting" },
-  } as const;
-  const t = (key: keyof typeof translations["en"]) => translations[language][key];
-
-  // === загрузка языка ===
-  useEffect(() => {
-    const loadLang = async () => {
-      const saved = await AsyncStorage.getItem("app_language");
-      if (saved === "ru" || saved === "en") setLanguage(saved);
-    };
-    loadLang();
-    const unsub = onLanguageChange((newLang) => {
-      if (newLang === "ru" || newLang === "en") setLanguage(newLang);
-    });
-    return unsub;
-  }, []);
-
-  // === загрузка шрифта ===
-  useEffect(() => {
-    const loadFont = async () => {
-      await Font.loadAsync({
-        "SF-Pro-Medium": require("../fonts/SF-Pro-Display-Medium.otf"),
-      });
-      setFontLoaded(true);
-    };
-    loadFont();
-  }, []);
-
-  // === фильтруем некорректные значения ===
-  const filtered = history.filter((v) => v && !isNaN(v) && v > 0);
-
-  // === история с последним элементом впереди ===
-  const reordered = filtered.length
-    ? [filtered[filtered.length - 1], ...filtered.slice(0, -1).reverse()]
-    : [];
-
-  // === автопрокрутка ===
-  useEffect(() => {
-    if (listRef.current && reordered.length > 0) {
-      try {
-        listRef.current.scrollToOffset({ offset: 0, animated: true });
-      } catch (err) {
-        console.warn("Scroll error:", err);
-      }
+  // === загрузка истории ===
+  const loadHistory = async () => {
+    try {
+      const res = await fetch(API_URL);
+      const data: Round[] = await res.json();
+  
+      // Берём последние 6
+      const lastSix = data.slice(-LIMIT);
+  
+      console.log(
+        "%c🔥 REAL LAST 6 FROM API (correct order):",
+        "color: #00ff90; font-size: 14px; font-weight: bold;"
+      );
+      console.table(lastSix);
+  
+      setHistory(lastSix);  // сохраняем как есть
+  
+    } catch (e) {
+      console.log("History load error:", e);
     }
-  }, [reordered]);
+  };
+  
 
-  if (!fontLoaded) return null;
+  useEffect(() => {
+    loadHistory();
+  }, []);
+
+  useEffect(() => {
+    if (phase === "crash") {
+      setTimeout(loadHistory, 500);
+    }
+  }, [phase]);
+
+  // === формирование ленты ===
+  let items: (number | "waiting")[] = [...history.map(h => h.crash_point)].reverse();
+
+  if (phase === "flight") items = [currentMultiplier, ...items];
+  if (phase === "countdown") items = ["waiting", ...items];
+
+  // автоскролл
+  useEffect(() => {
+    if (!listRef.current) return;
+    listRef.current.scrollToOffset({ offset: 0, animated: true });
+  }, [items]);
 
   return (
     <View style={styles.container}>
-      <View style={{ width: fixedWidth * 0.9 }}>
-        <FlatList
-          ref={listRef}
-          data={reordered}
-          keyExtractor={(_, index) => index.toString()}
-          horizontal
-          showsHorizontalScrollIndicator={false}
-          contentContainerStyle={[
-            styles.list,
-            isDesktop && { paddingLeft: 25, paddingRight: 12 },
-          ]}
-          renderItem={({ item, index }) => {
-            const isActive = index === 0;
-            const showWaiting = phase === "countdown" && isActive;
+      <FlatList
+        ref={listRef}
+        data={items}
+        horizontal
+        keyExtractor={(_, index) => index.toString()}
+        showsHorizontalScrollIndicator={false}
+        contentContainerStyle={styles.list}
+        renderItem={({ item, index }) => {
+          const isActive = index === 0;
+          const waiting = item === "waiting";
 
-            // 🔹 динамический стиль блока
-            const blockStyle = [
-              styles.block,
-              isActive ? styles.activeBlock : styles.inactiveBlock,
-              showWaiting && styles.waitingBlock, // адаптируется под текст
-            ];
-
-            return (
-              <View style={blockStyle}>
-                <Text style={styles.text}>
-                  {showWaiting ? t("waiting") : `x${item.toFixed(2)}`}
-                </Text>
-              </View>
-            );
-          }}
-          ItemSeparatorComponent={() => <View style={{ width: SPACING }} />}
-        />
-      </View>
+          return (
+            <View
+              style={[
+                styles.block,
+                isActive ? styles.activeBlock : styles.inactiveBlock,
+                waiting && styles.waitingBlock,
+              ]}
+            >
+              <Text style={styles.text}>
+                {waiting ? "Ожидание" : `x${Number(item).toFixed(2)}`}
+              </Text>
+            </View>
+          );
+        }}
+        ItemSeparatorComponent={() => <View style={{ width: SPACING }} />}
+      />
     </View>
   );
-};
+}
 
 const styles = StyleSheet.create({
   container: {
     width: "100%",
-    alignItems: "flex-start",
-    justifyContent: "center",
+    paddingLeft: 25,
     marginBottom: 10,
   },
+
   list: {
     flexDirection: "row",
     alignItems: "center",
   },
+
   block: {
-    width: 66, // фиксированный размер для чисел
+    width: 66,
     height: 30,
     borderRadius: 6,
     justifyContent: "center",
     alignItems: "center",
     paddingHorizontal: 8,
   },
+
   waitingBlock: {
-    width: "auto", // 🟣 динамическая ширина
-    paddingHorizontal: 14, // чуть шире, чтобы "Ожидание" не слипалось
-    minWidth: 66, // не меньше стандартного размера
+    width: "auto",
+    paddingHorizontal: 14,
+    minWidth: 66,
   },
+
   inactiveBlock: {
     backgroundColor: "rgba(31, 2, 72, 1)",
     borderWidth: 1.5,
     borderColor: "rgba(82, 40, 140, 1)",
   },
+
   activeBlock: {
     backgroundColor: "rgba(110, 20, 255, 0.7)",
     borderWidth: 1.5,
@@ -155,12 +141,11 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.4,
     shadowRadius: 10,
   },
+
   text: {
     color: "#FFFFFF",
     fontSize: 13,
-    fontFamily: "SF-Pro-Medium",
     fontWeight: "500",
+    fontFamily: "SF-Pro-Medium",
   },
 });
-
-export default HistoryBar;
