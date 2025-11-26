@@ -389,7 +389,7 @@ const translations = {
     amountOfTon: "Количество TON",
     autoCashout: "Авто-вывод",
     placeBet: "СДЕЛАТЬ СТАВКУ",
-    inventoryEmpty: "🎁 Инвентарь пуст",
+    inventoryEmpty: "",
     connectWallet: "ПОДКЛЮЧИТЬ КОШЕЛЁК",
 
     giftStep1: "Перейдите в ",
@@ -409,7 +409,7 @@ const translations = {
     amountOfTon: "Amount of TON",
     autoCashout: "Auto cashout",
     placeBet: "PLACE BET",
-    inventoryEmpty: "🎁 Inventory is empty",
+    inventoryEmpty: "",
     connectWallet: "CONNECT WALLET",
 
     giftStep1: "Go to your profile",
@@ -453,31 +453,31 @@ useEffect(() => {
 }, []);
 
 const placeTonBet = async () => {
-  if (!user) return; // серверный юзер ещё не загружен
+  if (!user) return;
 
   const amount = parseFloat(tonAmount);
-  if (!amount || amount <= 0) return;
 
-  // отправляем ставку на сервер
+  // 🔥 Проверка перед отправкой на сервер
+  if (!amount || amount <= 0) return;
+  if (amount > user.balance) {
+    setTonAmount(user.balance.toString());
+    return;
+  }
+
   sendWs({
     event: "bet",
-    user_id: user.id, // id с сервера
+    user_id: user.id,
     amount,
     gift: false,
     gift_id: null,
     auto_cashout_x: autoCashout ? parseFloat(autoValue) : null,
   });
 
-
-  setUser((prev: any) => ({
-        ...prev,
-    balance: prev.balance - amount
-  }));
-
-  // очищаем поле ввода, закрываем шторку
+  setUser((prev: any) => ({ ...prev, balance: prev.balance - amount }));
   setTonAmount("");
   setShowBottomSheet(false);
 };
+
 
 
 
@@ -1565,19 +1565,25 @@ const reloadTimer = setTimeout(() => {
               alignItems: "center",
             }}
             onPress={() => {
+              // === 1) Локально скрываем один подарок ===
+              setInventoryItems((prev) =>
+                prev.filter((x) => x.uniqueId !== item.uniqueId)
+              );
+            
+              // === 2) Отправляем ставку на сервер ===
               sendWs({
                 event: "bet",
                 user_id: user.id,
                 gift: true,
                 gift_id: item.dropId,
-                amount: item.price,           // обязательный параметр!
+                amount: item.price,
                 auto_cashout_x: autoCashoutGift ? parseFloat(autoValueGift) : null,
-
               });
-
+            
               vibrate();
               setShowBottomSheet(false);
             }}
+            
           >
             <Text
               style={{
@@ -1613,12 +1619,16 @@ const reloadTimer = setTimeout(() => {
                   keyboardType="numeric"
                   value={selectedTab === "Stars" ? starsAmount : tonAmount}
                   onChangeText={(text) => {
-                    if (selectedTab === "Stars") {
-                      setStarsAmount(text);
+                    const cleaned = sanitizeTonInput(text);
+                    const numeric = parseFloat(cleaned) || 0;
+                  
+                    if (numeric > user.balance) {
+                      setTonAmount(user.balance.toString());
                     } else {
-                      setTonAmount(sanitizeTonInput(text));
+                      setTonAmount(cleaned);
                     }
                   }}
+                  
                   
                 />
                 <Animated.Image
@@ -1730,10 +1740,11 @@ const createStyles = (fixedWidth: number, screenHeight: number, isDesktop: boole
     autoInput: {
       color: "#fff",
       fontSize: fixedWidth * 0.04,
-      width: fixedWidth * 0.12,
+      width: fixedWidth * 0.1,       // 🔥 автоадаптация
+      minWidth: 40,                  // 🔥 не меньше 40 px
       textAlign: "center",
-      ...(Platform.OS === "web" ? {  } : {}),
-    } as any,
+    },
+    
 
     inputWrapper: {
       flexDirection: "row",
@@ -1815,11 +1826,12 @@ const createStyles = (fixedWidth: number, screenHeight: number, isDesktop: boole
     autoRow: {
       flexDirection: "row",
       alignItems: "center",
-      justifyContent: "space-between",
-      width: fixedWidth * 0.85,
+      justifyContent: "flex-start", // ближе друг к другу
+      width: fixedWidth * 0.8,
       marginTop: 12,
       marginBottom: 16,
     },
+    
 
     checkbox: {
       width: 24,
@@ -1837,11 +1849,21 @@ const createStyles = (fixedWidth: number, screenHeight: number, isDesktop: boole
       alignItems: "center",
       backgroundColor: "#2B1B59",
       borderRadius: 100,
-      paddingHorizontal: 10,
-      height: 36,
+      paddingHorizontal: 6,
+      height: 34,
+      minWidth: fixedWidth * 0.1,   // 🔥 адаптивно
+      justifyContent: "space-between",
+      marginLeft: 4,
     },
-    autoControl: { color: "#fff", fontSize: 20, paddingHorizontal: 8 },
-
+    
+    autoControl: {
+      color: "#fff",
+      fontSize: fixedWidth * 0.05,
+      paddingHorizontal: 6,
+      minWidth: 20,                  // 🔥 фиксируем размеры
+      textAlign: "center",
+    },
+    
     placeButton: {
       height: Platform.OS === "web" ? 80 : screenHeight * 0.065,
       borderRadius: 32,

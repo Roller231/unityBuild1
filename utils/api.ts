@@ -42,6 +42,8 @@ export async function apiDelete(path: string) {
 // --- расширенные функции ---
 export async function getUserByTgId(tgId: string) {
   try {
+    console.log("TG ID:", tgId);
+
     return await apiGet(`/users/tg/${tgId}`);
   } catch {
     return null;
