@@ -1,8 +1,7 @@
 import React, { useEffect, useState, useRef } from "react";
 import { View, Text, StyleSheet, FlatList, Dimensions } from "react-native";
-import { apiGet, apiPatch } from "../utils/api";
 
-const API_URL_UP = "https://ggcat.org/crash-rounds?limit=5000000000";
+const API_URL = "http://127.0.0.1:8000/crash-rounds?limit=5000000000";
 const LIMIT = 6;
 
 const { width: screenWidth } = Dimensions.get("window");
@@ -26,7 +25,7 @@ export default function FullCrashHistoryBar({ phase, currentMultiplier }: Props)
   // === загрузка истории ===
   const loadHistory = async () => {
     try {
-      const res = await fetch(API_URL_UP);
+      const res = await fetch(API_URL);
       const data: Round[] = await res.json();
   
       // Берём последние 6
