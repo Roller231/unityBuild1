@@ -13,7 +13,7 @@ import { useTelegramPlatform } from "@/hooks/useTelegramPlatform";
 
 import { init, viewport, swipeBehavior, isTMA, useLaunchParams } from "@telegram-apps/sdk-react";
 
-import { getUserByTgId, createUser } from "../utils/api";
+import { getUserByTgId, createUser, apiPatch } from "../utils/api";
 import { useUser } from "../components/UserContext";
 
 // === Импорт ассетов ===
@@ -182,15 +182,17 @@ try {
     const tg_id = String(tgUser.id);
     const username = tgUser.username ?? "unknown";
     const firstname = tgUser.first_name ?? "User";
+    const photo_url = tgUser.photo_url ?? null;
 
     console.log("🔍 Checking user in DB:", tg_id);
 
     const existing = await getUserByTgId(tg_id);
 
     if (existing) {
-      console.log("✅ User found:", existing);
-      finalUser = existing;
-    } else {
+      await apiPatch(`/users/${existing.id}`, {
+        url_image: photo_url,
+      });
+      } else {
       console.log("🆕 User not found → creating...");
       finalUser = await createUser({
         tg_id,
@@ -199,6 +201,7 @@ try {
         balance: 0,
         refcount: 0,
         inventory: [],
+        url_image: photo_url, // ← вот это!
       });
       console.log("✅ User created:", finalUser);
     }

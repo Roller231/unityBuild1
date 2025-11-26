@@ -16,7 +16,7 @@ import {
 import { useFocusEffect } from "@react-navigation/native";
 import { CrashEngine, CrashEngineState } from "../components/CrashEngine";
 import CrashGraph from "../components/CrashGraph";
-import Svg, {  Text as SvgText } from "react-native-svg";
+import Svg, {  Text as SvgText, SvgUri } from "react-native-svg";
 import { LinearGradient } from "expo-linear-gradient";
 
 import OrangeBtn from "../components/OrangeBtn";
@@ -74,11 +74,111 @@ export const vibrate = (pattern: number | number[] = 50) => {
 };
 
 
+type UserInventoryEntry = {
+  drop_id: string;
+  count: number;
+};
 
+type CaseInfo = {
+  id: number;
+  name: string;
+  price: number;
+  gradient_colours: string;
+  icon: string;
+};
+
+type InventoryItemExpanded = {
+  uniqueId: string;
+  dropId: string;
+  name: string;
+  price: number;
+  image: string;
+};
+const InventoryImage = ({ uri }: { uri: string }) => {
+  if (!uri) return null;
+
+  const isSvg = uri.toLowerCase().endsWith(".svg");
+
+  return isSvg ? (
+    <SvgUri uri={uri} width="80%" height="55%" />
+  ) : (
+    <Image
+      source={{ uri }}
+      style={{
+        width: "100%",
+        height: 120,
+        borderRadius: 12,
+        marginBottom: 10,
+      }}
+      resizeMode="contain"
+    />
+  );
+};
 const Crash: React.FC = () => {
+
+  const roundIdRef = useRef<number | null>(null);
+  
+  
 
   const { user, setUser } = useUser();
 
+  const [inventoryItems, setInventoryItems] = useState<InventoryItemExpanded[]>([]);
+  const [isInventoryLoading, setIsInventoryLoading] = useState(false);
+  
+  useFocusEffect(
+    useCallback(() => {
+      const loadInventory = async () => {
+        if (!user) return;
+        console.log("sadsad");
+        setIsInventoryLoading(true);
+      
+        // локальный кэш — не делать повторные запросы на одинаковые drop_id
+        const dropCache = new Map<string, CaseInfo>();
+      
+        try {
+          const rawInv = user.inventory as UserInventoryEntry[];
+          const expanded: InventoryItemExpanded[] = [];
+      
+          for (const entry of rawInv) {
+            const { drop_id, count } = entry;
+      
+            let info: CaseInfo;
+      
+            // ⚡️ если уже был этот drop_id — берём из кэша
+            if (dropCache.has(drop_id)) {
+              info = dropCache.get(drop_id)!;
+            } else {
+              // 🛰️ иначе — запрашиваем с бэка и сохраняем в кэш
+              info = await apiGet(`/drops/${drop_id}`);
+              dropCache.set(drop_id, info);
+            }
+      
+            // разворачиваем каждый drop на `count` штук
+            for (let i = 0; i < count; i++) {
+              expanded.push({
+                uniqueId: `drop_${drop_id}_${i}`,
+                dropId: drop_id,
+                name: info.name,
+                price: info.price,
+                image: info.icon,
+              });
+            }
+          }
+      
+          setInventoryItems(expanded);
+        } catch (err) {
+          console.warn("❌ Ошибка загрузки инвентаря:", err);
+        } finally {
+          setIsInventoryLoading(false);
+        }
+      };
+      
+  
+      loadInventory();
+    }, [user?.inventory])
+  );
+  
+  const [myActiveBet, setMyActiveBet] = useState(null); 
 
   const [graphKey, setGraphKey] = useState(0);
 
@@ -104,7 +204,11 @@ const Crash: React.FC = () => {
 
   const [webReady, setWebReady] = useState(Platform.OS !== "web");
 
+  const [serverRoundId, setServerRoundId] = useState<number | null>(null);
 
+  const [autoCashoutGift, setAutoCashoutGift] = useState(false);
+  const [autoValueGift, setAutoValueGift] = useState("2.0");
+  
   // bottom sheet states
   const [starsAmount, setStarsAmount] = useState("");
   const [tonAmount, setTonAmount] = useState("");
@@ -119,7 +223,36 @@ const Crash: React.FC = () => {
 
   const [showDepositSheet, setShowDepositSheet] = useState(false);
   const [depositTab, setDepositTab] = useState<"Gifts" | "Stars" | "TON">("TON");
-
+  const cashOut = async () => {
+    if (!user) return;
+  
+    // отправляем событие на сервер
+    sendWs({
+      event: "cashout",
+      user_id: user.id
+    });
+  
+    vibrate();
+  
+    // ⏳ ДАЁМ серверу 100–150мс применить изменения
+    setTimeout(async () => {
+      try {
+        // 🔥 получаем свежего пользователя
+        const fresh = await apiGet(`/users/${user.id}`);
+        setUser(fresh);
+  
+        // 🔥 сбрасываем активную ставку
+        setMyActiveBet(null);
+  
+        console.log("💰 CASHOUT UPDATED USER:", fresh.balance);
+  
+      } catch (e) {
+        console.warn("❌ Failed to refresh user after cashout:", e);
+      }
+    }, 120);
+  };
+  
+  
   const sanitizeTonInput = (value: string) => {
     // оставить только цифры и точку
     let cleaned = value.replace(/[^0-9.]/g, "");
@@ -165,11 +298,42 @@ const Crash: React.FC = () => {
   
     switch (msg.event) {
       case "new_round":
+        roundIdRef.current = msg.round_id;   // ✅ моментально
         setPhase("countdown");
         setCount(msg.bet_phase_seconds);
         setPhase("countdown");
-        
+        setServerRoundId(msg.round_id);   // ✅ запоминаем round_id
+        setMyActiveBet(null);             // ✅ на новый раунд своя ставка сначала пустая
         break;
+      
+        case "round_start":
+          console.log("ROUND_START: ref =", roundIdRef.current);
+        
+          const rid = roundIdRef.current;
+          if (user && rid) {
+            setTimeout(async () => {
+              try {
+                const bets = await apiGet(`/crash-bets/user/${user.id}`);
+        
+                const found = bets.find(
+                  (b: any) =>
+                    b.round_id === rid &&
+                    b.profit === null
+                );
+        
+                console.log("FOUND BET:", found);
+                setMyActiveBet(found || null);
+              } catch (e) {
+                console.warn("Failed to fetch bets:", e);
+              }
+            }, 120);
+          }
+        
+          setPhase("flight");
+          break;
+        
+        
+    
   
       case "tick":
         setServerMultiplier(msg.multiplier);
@@ -194,7 +358,7 @@ const Crash: React.FC = () => {
       break;
 
             // запускаем мягкий reset через 2 секунды
-        break;
+        
     }
   });
   
@@ -223,6 +387,9 @@ const translations = {
     giftStep2: "Отправьте любой подарок",
     giftStep3: "Подарок появится в вашем инвентаре",
     giftStep4: "Убедитесь, что подарок отправлен с того же аккаунта Telegram",
+
+    cashOutText: "ВЫВЕСТИ",
+    place: "Поставить"
   },
   en: {
     enterAmount: "Enter amount",
@@ -240,6 +407,10 @@ const translations = {
     giftStep2: "Send any gift",
     giftStep3: "The gift will appear in your inventory",
     giftStep4: "Make sure you send the gift from the same Telegram account",
+
+    cashOutText: "CASH OUT",
+    place: "Place"
+
   },
 } as const;
 
@@ -773,11 +944,19 @@ const reloadTimer = setTimeout(() => {
 
 
 
-          <TouchableOpacity
-            activeOpacity={0.9}
-            style={[styles.betButton, { width: fixedWidth * 0.9 }]}
-            onPress={() => {handleStart(), vibrate()}}
-          >
+<TouchableOpacity
+  activeOpacity={0.9}
+  style={[styles.placeButton, { width: fixedWidth * 0.9 }]}
+  onPress={() => {
+    if (myActiveBet) {
+      cashOut();
+    } else {
+      handleStart();
+      
+    }
+  }}
+>
+
             <OrangeBtn
               width="100%"
               height="100%"
@@ -797,7 +976,7 @@ const reloadTimer = setTimeout(() => {
                 alignmentBaseline="middle"
                 letterSpacing={3}
               >
-                                      {t("placeBet")}
+                                      {myActiveBet ? t("cashOutText") : t("placeBet")}
 
               </SvgText>
               <SvgText
@@ -811,7 +990,7 @@ const reloadTimer = setTimeout(() => {
                 alignmentBaseline="middle"
                 letterSpacing={3}
               >
-                                      {t("placeBet")}
+                                      {myActiveBet ? t("cashOutText") : t("placeBet")}
 
               </SvgText>
             </Svg>
@@ -1288,10 +1467,145 @@ const reloadTimer = setTimeout(() => {
 
           {/* Content */}
           {selectedTab === "Gifts" && (
-            <View style={{ marginTop: 32, alignItems: "center" }}>
-<Text style={{ color: "#aaa" }}>{t("inventoryEmpty")}</Text>
-            </View>
-          )}
+  <View style={{ width: "100%", marginTop: 10, paddingHorizontal: 10 }}>
+    
+    {(!user?.inventory || user.inventory.length === 0) && (
+      <Text style={{ color: "#aaa", marginTop: 16, textAlign: "center" }}>
+        {t("inventoryEmpty")}
+      </Text>
+    )}
+
+    <ScrollView
+      style={{ width: "100%", marginTop: 10 }}
+      contentContainerStyle={{
+        flexDirection: "row",
+        flexWrap: "wrap",
+        justifyContent: "space-between",
+        paddingBottom: 100,
+        rowGap: 12,
+      }}
+    >
+
+<View style={styles.autoRow}>
+  <TouchableOpacity
+    style={[styles.checkbox, autoCashoutGift && styles.checkboxActive]}
+    onPress={() => setAutoCashoutGift((prev) => !prev)}
+  />
+  <Text style={styles.autoLabel}>{t("autoCashout")}</Text>
+
+  <View style={styles.autoValueRow}>
+    <TouchableOpacity
+      onPress={() =>
+        setAutoValueGift((prev) =>
+          Math.max(1, parseFloat(prev) - 0.1).toFixed(1)
+        )
+      }
+    >
+      <Text style={styles.autoControl}>−</Text>
+    </TouchableOpacity>
+    <TextInput
+      style={styles.autoInput}
+      value={autoValueGift}
+      keyboardType="numeric"
+      onChangeText={(text) => setAutoValueGift(sanitizeAutoCashout(text))}
+    />
+    <TouchableOpacity
+      onPress={() =>
+        setAutoValueGift((prev) => (parseFloat(prev) + 0.1).toFixed(1))
+      }
+    >
+      <Text style={styles.autoControl}>＋</Text>
+    </TouchableOpacity>
+  </View>
+</View>
+
+    
+      {inventoryItems.map((item) => (
+        <View
+          key={item.uniqueId}
+          style={{
+            width: "48%",
+            backgroundColor: "#1F0248",
+            borderRadius: 16,
+            padding: 12,
+            borderWidth: 1,
+            borderColor: "rgba(255,255,255,0.2)",
+          }}
+        >
+          {/* Картинка подарка */}
+          <InventoryImage uri={item.image} />
+
+          {/* Имя */}
+          <Text
+            style={{
+              color: "#fff",
+              fontSize: 16,
+              fontWeight: "600",
+              textAlign: "center",
+              width: "100%",
+            }}
+          >
+            {item.name}
+          </Text>
+
+          {/* Цена */}
+          <Text
+            style={{
+              color: "#C4BED4",
+              marginTop: 4,
+              marginBottom: 12,
+              textAlign: "center",
+              width: "100%",
+            }}
+          >
+            {item.price.toFixed(2)} TON
+          </Text>
+
+          
+
+          {/* === КНОПКА ПОСТАВИТЬ === */}
+          <TouchableOpacity
+            style={{
+              width: "100%",
+              height: 42,
+              borderRadius: 10,
+              backgroundColor: "#6B3FD8",
+              justifyContent: "center",
+              alignItems: "center",
+            }}
+            onPress={() => {
+              sendWs({
+                event: "bet",
+                user_id: user.id,
+                gift: true,
+                gift_id: item.dropId,
+                amount: item.price,           // обязательный параметр!
+                auto_cashout_x: autoCashoutGift ? parseFloat(autoValueGift) : null,
+
+              });
+
+              vibrate();
+              setShowBottomSheet(false);
+            }}
+          >
+            <Text
+              style={{
+                color: "#fff",
+                fontSize: 15,
+                fontWeight: "600",
+              }}
+            >
+              {t("place")}
+            </Text>
+          </TouchableOpacity>
+
+        </View>
+      ))}
+    </ScrollView>
+
+  </View>
+)}
+
 
           {(selectedTab === "Stars" || selectedTab === "TON") && (
             <View style={{ marginTop: 30, width: "100%", alignItems: "center" }}>
