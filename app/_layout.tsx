@@ -13,7 +13,7 @@ import { useTelegramPlatform } from "@/hooks/useTelegramPlatform";
 
 import { init, viewport, swipeBehavior, isTMA, useLaunchParams } from "@telegram-apps/sdk-react";
 
-import { getUserByTgId, createUser, apiPatch } from "../utils/api";
+import { getUserByTgId, createUser } from "../utils/api";
 import { useUser } from "../components/UserContext";
 
 // === Импорт ассетов ===
@@ -53,29 +53,21 @@ function RootLayoutInner() {
   const resizeMode = isDesktop ? "cover" : "contain";
   const { setUser } = useUser();
   const { user } = useUser();
-  const launchParams = (() => {
-    try {
-      return useLaunchParams(); // работает ТОЛЬКО в Telegram
-    } catch {
-      console.warn("⚠ Telegram SDK not found — running in dev mode (localhost)");
-      return {
-        tgWebAppData: {
-          user: {
-            id: "local",
-            username: "localuser",
-            first_name: "Guest",
-            last_name: "",
-            photo_url: null,
-          },
-        },
-      };
-    }
-  })();
-  
+  let lp: any = null;
+  try {
+    lp = useLaunchParams();
+  } catch (e) {
+    console.warn("⚠ useLaunchParams(): Not available yet", e);
+    lp = null;
+  }
   
 const [launchReady, setLaunchReady] = useState(false);
 
-
+useEffect(() => {
+  if (lp?.tgWebAppData) {
+    setLaunchReady(true);
+  }
+}, [lp]);
 
 
 
@@ -93,19 +85,19 @@ const [launchReady, setLaunchReady] = useState(false);
     async function initTg() {
       if (await isTMA()) {
         init();
-  
+
         if (viewport.mount.isAvailable()) {
           await viewport.mount();
           viewport.expand();
         }
-  
+
         if (viewport.requestFullscreen.isAvailable()) {
           await viewport.requestFullscreen();
         }
       }
     }
     initTg();
-  
+
   }, []);
 
   useEffect(() => {
@@ -161,7 +153,7 @@ const [launchReady, setLaunchReady] = useState(false);
 try {
   init();
   if (viewport.mount.isAvailable()) viewport.mount();
-  
+  if (viewport.requestFullscreen.isAvailable()) viewport.requestFullscreen();
   if (swipeBehavior.isSupported()) {
     swipeBehavior.mount();
     swipeBehavior.disableVertical();
@@ -172,27 +164,35 @@ try {
 
 // === LOAD USER (TELEGRAM OR DEFAULT) ===
 try {
-  const tlParams = launchParams; // ← используем наш безопасный launchParams
-  const tgUser = tlParams?.tgWebAppData?.user;
-
+  const telegramAvailable = await isTMA();
   let finalUser = null;
 
-  if (tgUser && tgUser.id !== "local") {
-    // 👉 Telegram Mini App user
+  /** --- Безопасный вызов useLaunchParams(), как в Profile --- */
+  const safeLaunchParams = (() => {
+    try {
+      return useLaunchParams();
+    } catch (e) {
+      console.warn("⚠ useLaunchParams() не доступен (вероятно dev mode)", e);
+      return null;
+    }
+  })();
+
+  const tgUser = safeLaunchParams?.tgWebAppData?.user;
+
+  if (telegramAvailable && tgUser) {
+    // 👉 User from Telegram Mini App
     const tg_id = String(tgUser.id);
     const username = tgUser.username ?? "unknown";
     const firstname = tgUser.first_name ?? "User";
-    const photo_url = tgUser.photo_url ?? null;
 
     console.log("🔍 Checking user in DB:", tg_id);
 
     const existing = await getUserByTgId(tg_id);
 
     if (existing) {
-      await apiPatch(`/users/${existing.id}`, {
-        url_image: photo_url,
-      });
-      } else {
+      console.log("✅ User found:", existing);
+      finalUser = existing;
+    } else {
       console.log("🆕 User not found → creating...");
       finalUser = await createUser({
         tg_id,
@@ -200,14 +200,14 @@ try {
         firstname,
         balance: 0,
         refcount: 0,
-        inventory: [],
-        url_image: photo_url, // ← вот это!
+        inventory: [], // ← Всегда массив
       });
       console.log("✅ User created:", finalUser);
     }
+
   } else {
-    // 👉 Local fallback
-    console.log("⚠ Local fallback user.");
+    // 👉 Local fallback (dev / browser / no Telegram)
+    console.log("⚠ Telegram SDK недоступен — local mode.");
 
     const existingLocal = await getUserByTgId("local");
 
@@ -230,7 +230,6 @@ try {
 } catch (err) {
   console.warn("❌ User init failed:", err);
 }
-
 
 
 
@@ -395,5 +394,4 @@ const styles = StyleSheet.create({
     overflow: "hidden",
   },
 });
-
 
