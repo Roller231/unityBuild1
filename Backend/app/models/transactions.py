@@ -17,3 +17,5 @@ class Transactions(Base):
 
     user = relationship("Users", back_populates="transactions")
     round = relationship("CrashRounds", back_populates="transactions")
+    def __str__(self):
+        return f"{self.type}: {self.amount}$ (User {self.user_id})"

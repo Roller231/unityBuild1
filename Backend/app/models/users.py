@@ -20,3 +20,5 @@ class Users(Base):
 
     transactions = relationship("Transactions", back_populates="user")
     crash_bets = relationship("CrashBets", back_populates="user")
+    def __str__(self):
+        return self.username or f"User #{self.id}"

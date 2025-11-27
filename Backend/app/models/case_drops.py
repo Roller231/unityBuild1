@@ -11,3 +11,4 @@ class CaseDrops(Base):
 
     case = relationship("Cases", backref="case_drops")
     drop = relationship("Drops", backref="case_drops")
+

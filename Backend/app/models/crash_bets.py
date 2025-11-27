@@ -22,3 +22,5 @@ class CrashBets(Base):
     round = relationship("CrashRounds", back_populates="bets")
     user = relationship("Users", back_populates="crash_bets")
 
+    def __str__(self):
+        return f"Ставка №{self.id} = {self.amount}$"

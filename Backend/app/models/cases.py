@@ -11,3 +11,14 @@ class Cases(Base):
     gradient_colors = Column(JSON)  # [{},{}] или массив цветов
     main_image = Column(String(255))
     created_at = Column(DateTime, default=datetime.utcnow)
+
+    def __str__(self):
+        return f"{self.name} (${self.price})"
+
+    def drops_pretty(self):
+        if not self.case_drops:
+            return "-"
+        return ", ".join(
+            f"{cd.drop.name} ({cd.chance}%)"
+            for cd in self.case_drops
+        )

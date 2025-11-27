@@ -2,6 +2,8 @@
 import os
 from dataclasses import dataclass
 
+
+
 @dataclass
 class CrashSettings:
     # время в секундах на приём ставок перед началом раунда
