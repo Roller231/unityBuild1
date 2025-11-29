@@ -21,7 +21,7 @@ import { LinearGradient } from "expo-linear-gradient";
 
 import OrangeBtn from "../components/OrangeBtn";
 import * as Font from "expo-font";
-import BetItem from "../components/BetItem";
+import BetItem, { BetItemProps } from "../components/BetItem";
 import StarsBackground from "../components/StarsBackground";
 import { useTelegramPlatform } from "@/hooks/useTelegramPlatform";
 import HistoryBar from "../components/HistoryBar";
@@ -211,6 +211,11 @@ const Crash: React.FC = () => {
   const [showBottomSheet, setShowBottomSheet] = useState(false);
   const [selectedTab, setSelectedTab] = useState<"Gifts" | "Stars" | "TON">("Gifts");
 
+
+  const [betItems, setBetItems] = useState<BetItemProps[]>([]);
+  const usersCache = useRef<Record<number, any>>({});
+  
+
   const [webReady, setWebReady] = useState(Platform.OS !== "web");
 
   const [serverRoundId, setServerRoundId] = useState<number | null>(null);
@@ -232,6 +237,95 @@ const Crash: React.FC = () => {
 
   const [showDepositSheet, setShowDepositSheet] = useState(false);
   const [depositTab, setDepositTab] = useState<"Gifts" | "Stars" | "TON">("TON");
+
+
+  const convertBetToBetItem = (bet: any, user: any): BetItemProps => {
+    const amount = Number(bet.amount ?? 0);
+    const profit = Number(bet.profit ?? 0);
+  
+    const isWin = bet.cashout_multiplier !== null && profit > 0;
+    const isLose = bet.cashout_multiplier === null && profit < 0;  // ← 🟣 ВАЖНО!
+  
+    const state = isWin ? "win" : isLose ? "lose" : "active";
+  
+    let total: number;
+  
+    if (isWin) {
+      total = profit;
+    } else if (isLose) {
+      total = -amount;
+    } else {
+      total = 0;
+    }
+  
+    return {
+      avatar: user.url_image || require("../components/icons/AvatarTest.svg"),
+      username: user.username || user.firstname || "User",
+      betAmount: amount,
+      multiplier: Number(bet.cashout_multiplier ?? 0),
+      total,
+      state,
+      isGift: bet.gift,
+    };
+  };
+  
+  
+  
+
+  
+
+  const fetchRoundBets = async (roundId: number | null) => {
+    if (!roundId) {
+      setBetItems([]);
+      return;
+    }
+
+    console.log("GEEEETTTDS");
+  
+    try {
+      const ids = [roundId - 1, roundId, roundId + 1];
+  
+      // запрашиваем ставки всех 3 раундов
+      const betSets = await Promise.all(
+        ids.map(id =>
+          id > 0
+            ? apiGet(`/crash-bets/round/${id}`).catch(() => [])
+            : Promise.resolve([])
+        )
+      );
+  
+      const allBets = betSets.flat();
+  
+      // === Загружаем всех уникальных юзеров ===
+      const uniqUserIds = [...new Set(allBets.map(b => b.user_id))];
+  
+      const userMap: Record<number, any> = {};
+  
+      await Promise.all(
+        uniqUserIds.map(async uid => {
+          if (usersCache.current[uid]) {
+            userMap[uid] = usersCache.current[uid];
+          } else {
+            const u = await apiGet(`/users/${uid}`);
+            usersCache.current[uid] = u;
+            userMap[uid] = u;
+          }
+        })
+      );
+  
+      // === Конвертируем ставки в BetItemProps ===
+      const items: BetItemProps[] = allBets.map(b =>
+        convertBetToBetItem(b, userMap[b.user_id])
+      );
+  
+      setBetItems(items);
+    } catch (e) {
+      console.warn("❌ Failed loading bets:", e);
+      setBetItems([]);
+    }
+  };
+  
+
   const cashOut = async () => {
     if (!user) return;
   
@@ -242,7 +336,7 @@ const Crash: React.FC = () => {
     });
   
     vibrate();
-  
+    fetchRoundBets(roundIdRef.current);   // 🔥 обновляем ставки мгновенно
     // ⏳ ДАЁМ серверу 100–150мс применить изменения
     setTimeout(async () => {
       try {
@@ -300,7 +394,8 @@ const Crash: React.FC = () => {
     return cleaned;
   };
   
-  
+  const tickCounterRef = useRef(0);
+
   
   const { send: sendWs, connected } = useCrashSocket((msg) => {
     console.log("WS EVENT:", msg);
@@ -313,9 +408,14 @@ const Crash: React.FC = () => {
         setPhase("countdown");
         setServerRoundId(msg.round_id);   // ✅ запоминаем round_id
         setMyActiveBet(null);             // ✅ на новый раунд своя ставка сначала пустая
+        fetchRoundBets(msg.round_id);
+
         break;
       
         case "round_start":
+
+
+        
           console.log("ROUND_START: ref =", roundIdRef.current);
         
           const rid = roundIdRef.current;
@@ -337,20 +437,36 @@ const Crash: React.FC = () => {
               }
             }, 120);
           }
-        
+          fetchRoundBets(roundIdRef.current);
+
           setPhase("flight");
           break;
         
         
     
   
-      case "tick":
-        setServerMultiplier(msg.multiplier);
-        setPhase("flight");
+          case "tick":
+            setServerMultiplier(msg.multiplier);
+            setPhase("flight");
+          
+            tickCounterRef.current++;
+          
+            // 🔥 раз в 10 тик-событий — обновляем ставки
+            if (tickCounterRef.current % 10 === 0) {
+              fetchRoundBets(roundIdRef.current);
+            }
+          
+            break;
+          
+      
+      case "cashout":
+        fetchRoundBets(roundIdRef.current);
         break;
   
         case "crash":
-      setPhase("crash");
+          fetchRoundBets(roundIdRef.current);
+
+          setPhase("crash");
 
       // при краше подтягиваем свежие данные юзера с бэка
       if (user) {
@@ -472,6 +588,8 @@ const placeTonBet = async () => {
     gift_id: null,
     auto_cashout_x: autoCashout ? parseFloat(autoValue) : null,
   });
+
+  fetchRoundBets(roundIdRef.current);
 
   setUser((prev: any) => ({ ...prev, balance: prev.balance - amount }));
   setTonAmount("");
@@ -996,18 +1114,10 @@ const reloadTimer = setTimeout(() => {
                 { width: fixedWidth * 0.9, minHeight: screenHeight * 1 },
               ]}
             >
-              {[...Array(9)].map((_, i) => (
-                <BetItem
-                  key={i}
-                  avatar={ava}
-                  username={i === 0 ? "Crazy Frog" : "MoonSun"}
-                  betAmount={5.12}
-                  multiplier={1.42}
-                  total={i === 0 ? 100 : 0}
-                  state={i === 0 ? "win" : "lose"}
-                  isGift={i === 0}
-                />
-              ))}
+              {betItems.map((item, i) => (
+  <BetItem key={i} {...item} />
+))}
+
             </ScrollView>
           </View>
         </View>

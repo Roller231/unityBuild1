@@ -180,19 +180,47 @@ try {
   const tgUser = safeLaunchParams?.tgWebAppData?.user;
 
   if (telegramAvailable && tgUser) {
-    // 👉 User from Telegram Mini App
     const tg_id = String(tgUser.id);
+  
     const username = tgUser.username ?? "unknown";
     const firstname = tgUser.first_name ?? "User";
-
+    const photo_url = tgUser.photo_url ?? null;
+  
     console.log("🔍 Checking user in DB:", tg_id);
-
+  
     const existing = await getUserByTgId(tg_id);
-
+  
     if (existing) {
       console.log("✅ User found:", existing);
-      finalUser = existing;
+  
+      // === Проверяем, что нужно обновить ===
+      const needUpdate =
+        existing.firstname !== firstname ||
+        existing.username !== username ||
+        existing.url_image !== photo_url;
+  
+      if (needUpdate) {
+        console.log("♻ Updating user profile…");
+  
+        const updated = await createUser({
+          id: existing.id,      // важно!
+          tg_id,
+          username,
+          firstname,
+          balance: existing.balance,
+          refcount: existing.refcount,
+          inventory: existing.inventory,
+          url_image: photo_url,
+        });
+  
+        console.log("✅ Profile updated:", updated);
+        finalUser = updated;
+      } else {
+        finalUser = existing;
+      }
+  
     } else {
+      // === Создаём нового пользователя с фото ===
       console.log("🆕 User not found → creating...");
       finalUser = await createUser({
         tg_id,
@@ -200,12 +228,14 @@ try {
         firstname,
         balance: 0,
         refcount: 0,
-        inventory: [], // ← Всегда массив
+        inventory: [],
+        url_image: photo_url,        // ← сохраняем фото
       });
       console.log("✅ User created:", finalUser);
     }
-
-  } else {
+  }
+  
+   else {
     // 👉 Local fallback (dev / browser / no Telegram)
     console.log("⚠ Telegram SDK недоступен — local mode.");
 
