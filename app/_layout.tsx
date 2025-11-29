@@ -13,7 +13,7 @@ import { useTelegramPlatform } from "@/hooks/useTelegramPlatform";
 
 import { init, viewport, swipeBehavior, isTMA, useLaunchParams } from "@telegram-apps/sdk-react";
 
-import { getUserByTgId, createUser } from "../utils/api";
+import { getUserByTgId, createUser, apiPatch } from "../utils/api";
 import { useUser } from "../components/UserContext";
 
 // === Импорт ассетов ===
@@ -53,21 +53,29 @@ function RootLayoutInner() {
   const resizeMode = isDesktop ? "cover" : "contain";
   const { setUser } = useUser();
   const { user } = useUser();
-  let lp: any = null;
-  try {
-    lp = useLaunchParams();
-  } catch (e) {
-    console.warn("⚠ useLaunchParams(): Not available yet", e);
-    lp = null;
-  }
+  const launchParams = (() => {
+    try {
+      return useLaunchParams(); // работает ТОЛЬКО в Telegram
+    } catch {
+      console.warn("⚠ Telegram SDK not found — running in dev mode (localhost)");
+      return {
+        tgWebAppData: {
+          user: {
+            id: "local",
+            username: "localuser",
+            first_name: "Guest",
+            last_name: "",
+            photo_url: null,
+          },
+        },
+      };
+    }
+  })();
+  
   
 const [launchReady, setLaunchReady] = useState(false);
 
-useEffect(() => {
-  if (lp?.tgWebAppData) {
-    setLaunchReady(true);
-  }
-}, [lp]);
+
 
 
 
@@ -85,19 +93,19 @@ useEffect(() => {
     async function initTg() {
       if (await isTMA()) {
         init();
-
+  
         if (viewport.mount.isAvailable()) {
           await viewport.mount();
           viewport.expand();
         }
-
+  
         if (viewport.requestFullscreen.isAvailable()) {
           await viewport.requestFullscreen();
         }
       }
     }
     initTg();
-
+  
   }, []);
 
   useEffect(() => {
@@ -153,7 +161,7 @@ useEffect(() => {
 try {
   init();
   if (viewport.mount.isAvailable()) viewport.mount();
-  if (viewport.requestFullscreen.isAvailable()) viewport.requestFullscreen();
+  
   if (swipeBehavior.isSupported()) {
     swipeBehavior.mount();
     swipeBehavior.disableVertical();
@@ -164,63 +172,39 @@ try {
 
 // === LOAD USER (TELEGRAM OR DEFAULT) ===
 try {
-  const telegramAvailable = await isTMA();
+  const tlParams = launchParams;
+  const tgUser = tlParams?.tgWebAppData?.user;
+
   let finalUser = null;
 
-  /** --- Безопасный вызов useLaunchParams(), как в Profile --- */
-  const safeLaunchParams = (() => {
-    try {
-      return useLaunchParams();
-    } catch (e) {
-      console.warn("⚠ useLaunchParams() не доступен (вероятно dev mode)", e);
-      return null;
-    }
-  })();
-
-  const tgUser = safeLaunchParams?.tgWebAppData?.user;
-
-  if (telegramAvailable && tgUser) {
+  if (tgUser) {
     const tg_id = String(tgUser.id);
-  
     const username = tgUser.username ?? "unknown";
     const firstname = tgUser.first_name ?? "User";
     const photo_url = tgUser.photo_url ?? null;
-  
+
     console.log("🔍 Checking user in DB:", tg_id);
-  
     const existing = await getUserByTgId(tg_id);
-  
+
     if (existing) {
-      console.log("✅ User found:", existing);
-  
-      // === Проверяем, что нужно обновить ===
+      // Проверяем, нужно ли обновлять
       const needUpdate =
-        existing.firstname !== firstname ||
         existing.username !== username ||
+        existing.firstname !== firstname ||
         existing.url_image !== photo_url;
-  
+
       if (needUpdate) {
         console.log("♻ Updating user profile…");
-  
-        const updated = await createUser({
-          id: existing.id,      // важно!
-          tg_id,
+
+        finalUser = await apiPatch(`/users/${existing.id}`, {
           username,
           firstname,
-          balance: existing.balance,
-          refcount: existing.refcount,
-          inventory: existing.inventory,
           url_image: photo_url,
         });
-  
-        console.log("✅ Profile updated:", updated);
-        finalUser = updated;
       } else {
         finalUser = existing;
       }
-  
     } else {
-      // === Создаём нового пользователя с фото ===
       console.log("🆕 User not found → creating...");
       finalUser = await createUser({
         tg_id,
@@ -229,15 +213,12 @@ try {
         balance: 0,
         refcount: 0,
         inventory: [],
-        url_image: photo_url,        // ← сохраняем фото
+        url_image: photo_url,
       });
-      console.log("✅ User created:", finalUser);
     }
-  }
-  
-   else {
-    // 👉 Local fallback (dev / browser / no Telegram)
-    console.log("⚠ Telegram SDK недоступен — local mode.");
+  } else {
+    // === LOCAL FALLBACK ===
+    console.log("⚠ Local fallback user.");
 
     const existingLocal = await getUserByTgId("local");
 
@@ -251,6 +232,7 @@ try {
         balance: 0,
         refcount: 0,
         inventory: [],
+        url_image: null,
       });
     }
   }
@@ -260,6 +242,8 @@ try {
 } catch (err) {
   console.warn("❌ User init failed:", err);
 }
+
+
 
 
 
