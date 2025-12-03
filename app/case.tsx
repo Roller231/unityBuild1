@@ -310,7 +310,7 @@ useFocusEffect(
   useCallback(() => {
     console.log("🎯 Case screen focused → connecting WS");
 
-    const ws = new WebSocket("wss://ggcat.org/ws/drops/global");
+    const ws = new WebSocket("ws://127.0.0.1:8000/ws/drops/global");
 
     ws.onopen = () => console.log("WS connected");
     ws.onerror = (err) => console.log("WS error:", err);

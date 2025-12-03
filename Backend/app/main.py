@@ -9,7 +9,7 @@ from sqladmin import Admin, ModelView
 
 from app.core.config import settings
 from app.database import Base, engine
-
+from app.services.crash_bots_engine import bot_loop
 # models
 from app.models.users import Users
 from app.models.drops import Drops
@@ -18,6 +18,9 @@ from app.models.case_drops import CaseDrops
 from app.models.crash_bets import CrashBets
 from app.models.crash_rounds import CrashRounds
 from app.models.transactions import Transactions
+from app.routers import crash_bots_router
+
+
 
 # routers
 from app.routers import (
@@ -61,6 +64,7 @@ app.include_router(users_router.router)
 app.include_router(crash_rounds_router.router)
 app.include_router(crash_bets_router.router)
 app.include_router(transactions_router.router)
+app.include_router(crash_bots_router.router)
 
 # WS
 app.include_router(crash_ws_router.router)
@@ -98,11 +102,14 @@ async def drop_global_stream():
         await asyncio.sleep(settings.drop_interval_seconds)
 
 
+
+
+
 @app.on_event("startup")
 async def startup_event():
     asyncio.create_task(crash_engine.game_loop())
     asyncio.create_task(drop_global_stream())
-
+    asyncio.create_task(bot_loop())  # ← запускаем ботов!
 
 # ---------------------------------------------------------
 #               🔥 FASTAPI ADMIN PANEL

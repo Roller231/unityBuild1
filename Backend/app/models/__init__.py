@@ -5,6 +5,7 @@ from .users import Users
 from .crash_rounds import CrashRounds
 from .crash_bets import CrashBets
 from .transactions import Transactions
+from .crash_bots import CrashBots
 
 __all__ = [
     "Drops",
@@ -14,4 +15,5 @@ __all__ = [
     "CrashRounds",
     "CrashBets",
     "Transactions",
+    "CrashBots"
 ]

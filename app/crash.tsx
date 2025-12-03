@@ -134,6 +134,8 @@ const Crash: React.FC = () => {
   const [inventoryItems, setInventoryItems] = useState<InventoryItemExpanded[]>([]);
   const [isInventoryLoading, setIsInventoryLoading] = useState(false);
   
+
+  
   useFocusEffect(
     useCallback(() => {
       const loadInventory = async () => {
@@ -270,6 +272,11 @@ const Crash: React.FC = () => {
   };
   
   
+  useEffect(() => {
+    if (phase === "countdown") {
+      fetchRoundBets(roundIdRef.current);
+    }
+  }, [count]);
   
 
   
@@ -298,20 +305,63 @@ const Crash: React.FC = () => {
   
       // === Загружаем всех уникальных юзеров ===
       const uniqUserIds = [...new Set(allBets.map(b => b.user_id))];
-  
+
       const userMap: Record<number, any> = {};
-  
+      
       await Promise.all(
         uniqUserIds.map(async uid => {
+          // 1. Проверяем кэш
           if (usersCache.current[uid]) {
             userMap[uid] = usersCache.current[uid];
-          } else {
-            const u = await apiGet(`/users/${uid}`);
-            usersCache.current[uid] = u;
-            userMap[uid] = u;
+            return;
           }
+      
+          // 2. Если uid > 0 → обычный юзер
+          if (uid > 0) {
+            try {
+              const u = await apiGet(`/users/${uid}`);
+              const mapped = { ...u, isBot: false };
+              usersCache.current[uid] = mapped;
+              userMap[uid] = mapped;
+              return;
+            } catch {}
+          }
+      
+          // 3. Если uid < 0 → бот
+          if (uid < 0) {
+            try {
+              const botId = Math.abs(uid); // ← 🔥 убираем минус
+              const bot = await apiGet(`/crash-bots/${botId}`);
+      
+              const mapped = {
+                id: uid,                     // оставляем отрицательный как уникальный
+                username: bot.nickname,
+                url_image: bot.avatar_url,
+                min_bet: bot.min_bet,
+                max_bet: bot.max_bet,
+                isBot: true,
+              };
+      
+              usersCache.current[uid] = mapped;
+              userMap[uid] = mapped;
+              return;
+            } catch {}
+          }
+      
+          // 4. если не нашли ни юзера ни бота
+          console.warn("⚠ Unknown user/bot id:", uid);
+          const fallback = {
+            id: uid,
+            username: "Unknown",
+            url_image: null,
+            isBot: true,
+          };
+          usersCache.current[uid] = fallback;
+          userMap[uid] = fallback;
         })
       );
+      
+      
   
       // === Конвертируем ставки в BetItemProps ===
       const items: BetItemProps[] = allBets.map(b =>

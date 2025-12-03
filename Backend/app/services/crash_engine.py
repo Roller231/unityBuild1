@@ -103,6 +103,8 @@ class CrashEngine:
         auto_cashout_x: Optional[float] = None
     ) -> dict:
 
+        is_bot = user_id < 0
+
         async with self.lock:
             if self.phase != "betting":
                 self.next_round_pending_bets.append({
@@ -123,14 +125,17 @@ class CrashEngine:
 
             db: Session = SessionLocal()
             try:
-                user = db.query(Users).filter(Users.id == user_id).with_for_update().first()
-                if not user:
-                    return {"ok": False, "error": "user_not_found"}
+                user = None
+
+                if not is_bot:
+                    user = db.query(Users).filter(Users.id == user_id).with_for_update().first()
+                    if not user:
+                        return {"ok": False, "error": "user_not_found"}
 
                 # -------------------------------------------------------
                 #   СТАВКА ПОДАРКОМ
                 # -------------------------------------------------------
-                if gift:
+                if gift and not is_bot:
                     if not gift_id:
                         return {"ok": False, "error": "gift_id_required"}
 
@@ -166,6 +171,7 @@ class CrashEngine:
 
                     balance_before = user.balance  # баланс не меняем
 
+
                 # -------------------------------------------------------
                 #   ОБЫЧНАЯ СТАВКА ТОННАМИ
                 # -------------------------------------------------------
@@ -173,11 +179,14 @@ class CrashEngine:
                     if amount <= 0:
                         return {"ok": False, "error": "bad_amount"}
 
-                    if (user.balance or 0) < amount:
-                        return {"ok": False, "error": "not_enough_balance"}
+                    if is_bot:
+                        balance_before = 0  # у бота баланс не используется
+                    else:
+                        if (user.balance or 0) < amount:
+                            return {"ok": False, "error": "not_enough_balance"}
 
-                    balance_before = user.balance
-                    user.balance -= amount
+                        balance_before = user.balance
+                        user.balance -= amount
 
                 # -------------------------------------------------------
                 # Убеждаемся, что раунд существует
@@ -218,16 +227,17 @@ class CrashEngine:
                 # -------------------------------------------------------
                 # транзакция
                 # -------------------------------------------------------
-                tx = Transactions(
-                    user_id=user_id,
-                    type="crash_bet_gift" if gift else "crash_bet",
-                    amount=amount,
-                    balance_before=balance_before,
-                    balance_after=user.balance,
-                    related_round_id=self.round_id,
-                    created_at=datetime.utcnow()
-                )
-                db.add(tx)
+                if not is_bot:
+                    tx = Transactions(
+                        user_id=user_id,
+                        type="crash_bet_gift" if gift else "crash_bet",
+                        amount=amount,
+                        balance_before=balance_before,
+                        balance_after=user.balance,
+                        related_round_id=self.round_id,
+                        created_at=datetime.utcnow()
+                    )
+                    db.add(tx)
 
                 db.commit()
                 db.refresh(bet)
@@ -235,6 +245,7 @@ class CrashEngine:
                 # -------------------------------------------------------
                 # Состояние в памяти
                 # -------------------------------------------------------
+                # Боты не имеют user.balance, но ставка должна работать
                 st = CrashBetState(user_id=user_id, amount=amount)
                 st.db_id = bet.id
                 st.auto_cashout_x = auto_cashout_x
@@ -257,6 +268,8 @@ class CrashEngine:
     # AUTO CASHOUT
     # -----------------------------------------------------------------
     async def _auto_cashout(self, user_id: int, multiplier: float):
+        is_bot = user_id < 0
+
         bet = self.bets.get(user_id)
         if not bet or bet.cashout_x is not None:
             return
@@ -274,19 +287,20 @@ class CrashEngine:
             bet_row.cashout_multiplier = multiplier
             bet_row.profit = profit
 
-            balance_before = user_row.balance
-            user_row.balance += bet.amount + profit
+            if not is_bot:
+                balance_before = user_row.balance
+                user_row.balance += bet.amount + profit
 
-            tx = Transactions(
-                user_id=user_id,
-                type="crash_auto_cashout",
-                amount=profit,
-                balance_before=balance_before,
-                balance_after=user_row.balance,
-                related_round_id=self.round_id,
-                created_at=datetime.utcnow()
-            )
-            db.add(tx)
+                tx = Transactions(
+                    user_id=user_id,
+                    type="crash_auto_cashout",
+                    amount=profit,
+                    balance_before=balance_before,
+                    balance_after=user_row.balance,
+                    related_round_id=self.round_id,
+                    created_at=datetime.utcnow()
+                )
+                db.add(tx)
 
             # increase total payout
             round_row = db.query(CrashRounds).get(self.round_id)
@@ -307,6 +321,8 @@ class CrashEngine:
     # MANUAL CASHOUT
     # -----------------------------------------------------------------
     async def cashout(self, user_id: int):
+        is_bot = user_id < 0
+
         async with self.lock:
             if self.phase != "running":
                 return {"ok": False, "error": "not_running"}
@@ -333,19 +349,20 @@ class CrashEngine:
             bet_row.cashout_multiplier = multiplier
             bet_row.profit = profit
 
-            balance_before = user_row.balance
-            user_row.balance += bet.amount + profit  # ← возвращаем ставку + прибыль
+            if not is_bot:
+                balance_before = user_row.balance
+                user_row.balance += bet.amount + profit
 
-            tx = Transactions(
-                user_id=user_id,
-                type="crash_cashout",
-                amount=profit,
-                balance_before=balance_before,
-                balance_after=user_row.balance,
-                related_round_id=self.round_id,
-                created_at=datetime.utcnow()
-            )
-            db.add(tx)
+                tx = Transactions(
+                    user_id=user_id,
+                    type="crash_cashout",
+                    amount=profit,
+                    balance_before=balance_before,
+                    balance_after=user_row.balance,
+                    related_round_id=self.round_id,
+                    created_at=datetime.utcnow()
+                )
+                db.add(tx)
 
             round_row = db.query(CrashRounds).filter(CrashRounds.id == self.round_id).first()
             round_row.total_payout += (bet.amount + profit)
@@ -378,14 +395,19 @@ class CrashEngine:
                 # --- СОЗДАЁМ НОВЫЙ РАУНД ---
                 db = SessionLocal()
                 try:
+                    # получаем последний номер раунда
+                    last_number = db.query(CrashRounds.round_number).order_by(CrashRounds.id.desc()).first()
+                    next_number = (last_number[0] + 1) if last_number else 1
+
                     new_round = CrashRounds(
-                        round_number=None,
+                        round_number=next_number,
                         crash_point=self.crash_point,
                         started_at=None,
                         ended_at=None,
                         total_bet=0,
                         total_payout=0
                     )
+
                     db.add(new_round)
                     db.commit()
                     db.refresh(new_round)

@@ -47,7 +47,7 @@ CREATE TABLE users (
 
 CREATE TABLE crash_rounds (
     id INT AUTO_INCREMENT PRIMARY KEY,
-    round_number INT UNIQUE,
+    round_number INT NULL,
     crash_point FLOAT,
     started_at DATETIME,
     ended_at DATETIME,
@@ -71,9 +71,6 @@ CREATE TABLE crash_bets (
 
     CONSTRAINT fk_bet_round
         FOREIGN KEY (round_id) REFERENCES crash_rounds(id)
-        ON DELETE CASCADE,
-    CONSTRAINT fk_bet_user
-        FOREIGN KEY (user_id) REFERENCES users(id)
         ON DELETE CASCADE
 );
 
@@ -92,4 +89,12 @@ CREATE TABLE transactions (
     CONSTRAINT fk_tx_round
         FOREIGN KEY (related_round_id) REFERENCES crash_rounds(id)
         ON DELETE SET NULL
+);
+
+CREATE TABLE crash_bots (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    nickname VARCHAR(255) NOT NULL,
+    avatar_url VARCHAR(255) NOT NULL,
+    min_bet FLOAT DEFAULT 0,
+    max_bet FLOAT DEFAULT 5
 );

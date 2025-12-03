@@ -6,7 +6,7 @@ export function useCrashSocket(onMessage: (msg: any) => void) {
 
   useEffect(() => {
     const ws = new WebSocket(
-      "wss://ggcat.org/ws/crash?token=supersecret"
+      "ws://127.0.0.1:8000/ws/crash?token=supersecret"
     );
     wsRef.current = ws;
 
