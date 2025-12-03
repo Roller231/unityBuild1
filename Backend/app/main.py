@@ -19,6 +19,7 @@ from app.models.crash_bets import CrashBets
 from app.models.crash_rounds import CrashRounds
 from app.models.transactions import Transactions
 from app.routers import crash_bots_router
+from app.models.crash_bots import CrashBots
 
 
 
@@ -156,6 +157,9 @@ class UsersAdmin(ModelView, model=Users):
     column_list = ["id", "username", "firstname", "balance", "refcount", "created_at"]
     form_excluded_columns = ["transactions", "crash_bets"]
 
+class CrashBotsAdmin(ModelView, model=CrashBots):
+    column_list = ["id", "nickname", "avatar_url", "min_bet", "max_bet"]
+
 
 # ------- DROPS -------
 class DropsAdmin(ModelView, model=Drops):
@@ -261,3 +265,4 @@ admin.add_view(CaseDropsAdmin)
 admin.add_view(CrashBetsAdmin)
 admin.add_view(CrashRoundsAdmin)
 admin.add_view(TransactionsAdmin)
+admin.add_view(CrashBotsAdmin)
