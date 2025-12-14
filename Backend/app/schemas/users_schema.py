@@ -7,6 +7,9 @@ class UserBase(BaseModel):
     firstname: Optional[str] = None
     balance: Optional[float] = 0
     refcount: Optional[int] = 0
+    refLink: Optional[str] = None
+    refererID: Optional[str] = None
+    totalDEP: Optional[float] = None
     inventory: Optional[Any] = None
     url_image: Optional[str] = None
 
@@ -20,6 +23,9 @@ class UserUpdate(BaseModel):
     firstname: Optional[str] = None
     balance: Optional[float] = None
     refcount: Optional[int] = None
+    refLink: Optional[str] = None
+    refererID: Optional[str] = None
+    totalDEP: Optional[float] = None
     inventory: Optional[Any] = None
     url_image: Optional[str] = None
 

@@ -1,0 +1,2 @@
+BOT_TOKEN = "8407502206:AAFYBrNZHtMZu_pja5XG5K-PVu-eTVyQABY"
+API_URL = "https://ggcat.org"
