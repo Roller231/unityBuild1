@@ -4,8 +4,8 @@ def get_rates():
     В будущем можно заменить на внешний API
     """
     return {
-        "USDT": 1.0,
-        "TON": 5.25,
-        "BTC": 64000.0,
-        "ETH": 3400.0,
+        "coins": 1,
+        "gems": 100,
+        "stars": 50,
+        "shields": 10
     }
