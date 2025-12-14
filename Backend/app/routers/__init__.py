@@ -9,5 +9,6 @@ from . import (
     drops_ws_router,
     crash_ws_router,
     crash_bots_ws_router,
-    crash_bots_router
+    crash_bots_router,
+    rates_router
 )

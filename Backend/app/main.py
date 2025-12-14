@@ -23,6 +23,8 @@ from app.models.crash_bots import CrashBots
 
 
 
+
+
 # routers
 from app.routers import (
     drops_router,
@@ -33,7 +35,8 @@ from app.routers import (
     crash_bets_router,
     transactions_router,
     crash_ws_router,
-    drops_ws_router
+    drops_ws_router,
+    rates_router
 )
 
 from app.services.crash_engine import crash_engine
@@ -66,7 +69,7 @@ app.include_router(crash_rounds_router.router)
 app.include_router(crash_bets_router.router)
 app.include_router(transactions_router.router)
 app.include_router(crash_bots_router.router)
-
+app.include_router(rates_router.router)
 # WS
 app.include_router(crash_ws_router.router)
 app.include_router(drops_ws_router.router)
