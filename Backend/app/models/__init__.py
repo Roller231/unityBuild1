@@ -6,6 +6,9 @@ from .crash_rounds import CrashRounds
 from .crash_bets import CrashBets
 from .transactions import Transactions
 from .crash_bots import CrashBots
+from .promo_codes import PromoCodes
+from .user_promos import UserPromos
+from .referral_promos import ReferralPromos
 
 __all__ = [
     "Drops",
@@ -15,5 +18,8 @@ __all__ = [
     "CrashRounds",
     "CrashBets",
     "Transactions",
-    "CrashBots"
+    "CrashBots",
+    "PromoCodes",
+    "UserPromos",
+    "ReferralPromos"
 ]

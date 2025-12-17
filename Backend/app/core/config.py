@@ -30,4 +30,9 @@ class CrashSettings:
     # множитель удачи (на сколько увеличить crash_point)
     luck_multiplier: float = float(os.getenv("CRASH_LUCK_MULTIPLIER", 1.5))
 
+    # ===== PROMO / REFERRAL SETTINGS =====
+    referral_reward_ton: float = float(
+        os.getenv("REFERRAL_REWARD_TON", 1.5)
+    )
+
 settings = CrashSettings()

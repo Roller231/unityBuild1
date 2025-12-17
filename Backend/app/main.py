@@ -20,6 +20,9 @@ from app.models.crash_rounds import CrashRounds
 from app.models.transactions import Transactions
 from app.routers import crash_bots_router
 from app.models.crash_bots import CrashBots
+from app.models.promo_codes import PromoCodes
+from app.models.user_promos import UserPromos
+from app.models.referral_promos import ReferralPromos
 
 
 
@@ -36,7 +39,8 @@ from app.routers import (
     transactions_router,
     crash_ws_router,
     drops_ws_router,
-    rates_router
+    rates_router,
+promo_router
 )
 
 from app.services.crash_engine import crash_engine
@@ -70,6 +74,10 @@ app.include_router(crash_bets_router.router)
 app.include_router(transactions_router.router)
 app.include_router(crash_bots_router.router)
 app.include_router(rates_router.router)
+app.include_router(promo_router.router)
+
+
+
 # WS
 app.include_router(crash_ws_router.router)
 app.include_router(drops_ws_router.router)
@@ -259,6 +267,38 @@ class TransactionsAdmin(ModelView, model=Transactions):
         "round": {"fields": ["round_number"]},
     }
 
+# ------- PROMO CODES -------
+class PromoCodesAdmin(ModelView, model=PromoCodes):
+    column_list = [
+        "id", "code", "type", "value",
+        "wager_games", "max_uses",
+        "used_count", "active", "created_at"
+    ]
+
+
+class UserPromosAdmin(ModelView, model=UserPromos):
+    column_list = [
+        "id", "user", "promo",
+        "remaining_wager_games",
+        "remaining_freespins",
+        "completed", "activated_at"
+    ]
+
+    form_ajax_refs = {
+        "user": {"fields": ["username"]},
+        "promo": {"fields": ["code"]},
+    }
+
+
+class ReferralPromosAdmin(ModelView, model=ReferralPromos):
+    column_list = [
+        "id", "code", "owner",
+        "reward", "active"
+    ]
+
+    form_ajax_refs = {
+        "owner": {"fields": ["username"]},
+    }
 
 # Register all views
 admin.add_view(UsersAdmin)
@@ -269,3 +309,6 @@ admin.add_view(CrashBetsAdmin)
 admin.add_view(CrashRoundsAdmin)
 admin.add_view(TransactionsAdmin)
 admin.add_view(CrashBotsAdmin)
+admin.add_view(PromoCodesAdmin)
+admin.add_view(UserPromosAdmin)
+admin.add_view(ReferralPromosAdmin)

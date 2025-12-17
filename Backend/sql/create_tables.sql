@@ -101,3 +101,64 @@ CREATE TABLE crash_bots (
     min_bet FLOAT DEFAULT 0,
     max_bet FLOAT DEFAULT 5
 );
+
+CREATE TABLE promo_codes (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    code VARCHAR(50) UNIQUE NOT NULL, -- ABC123
+    type ENUM(
+        'deposit_percent',  -- +50% к депозиту
+        'deposit_fixed',    -- +500 TON
+        'freespin',         -- N бесплатных игр
+        'ref_fixed'         -- реферальный фикс
+    ) NOT NULL,
+
+    value FLOAT NOT NULL,         -- 50 / 500 / N / 1.5
+    wager_games INT DEFAULT 0,    -- сколько игр нужно отыграть
+    max_uses INT DEFAULT NULL,    -- лимит активаций
+    used_count INT DEFAULT 0,
+
+    active BOOLEAN DEFAULT TRUE,
+    starts_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    ends_at DATETIME DEFAULT NULL,
+
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+);
+
+
+CREATE TABLE user_promos (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    user_id INT NOT NULL,
+    promo_id INT NULL, -- 👈 теперь NULL допустим (для рефов)
+
+    referral_owner_id INT NULL, -- 👈 НОВОЕ ПОЛЕ
+
+    activated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    completed BOOLEAN DEFAULT FALSE,
+
+    remaining_wager_games INT DEFAULT 0,
+    remaining_freespins INT DEFAULT 0,
+
+    UNIQUE (user_id, promo_id),
+
+    CONSTRAINT fk_up_user FOREIGN KEY (user_id)
+        REFERENCES users(id) ON DELETE CASCADE,
+
+    CONSTRAINT fk_up_promo FOREIGN KEY (promo_id)
+        REFERENCES promo_codes(id) ON DELETE CASCADE,
+
+    CONSTRAINT fk_up_ref_owner FOREIGN KEY (referral_owner_id)
+        REFERENCES users(id) ON DELETE SET NULL
+);
+
+
+
+CREATE TABLE referral_promos (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    owner_user_id INT NOT NULL,
+    code VARCHAR(50) UNIQUE NOT NULL,
+    reward FLOAT NOT NULL, -- фикс TON
+    active BOOLEAN DEFAULT TRUE,
+
+    CONSTRAINT fk_ref_owner FOREIGN KEY (owner_user_id)
+        REFERENCES users(id) ON DELETE CASCADE
+);
