@@ -4,10 +4,12 @@ import time
 from app.database import SessionLocal
 from app.crud.crash_bots_crud import get_all_bots
 from app.services.crash_engine import crash_engine
+from app.models import Drops
 
 async def bot_loop():
     db = SessionLocal()
     bots = get_all_bots(db)
+    drops = db.query(Drops).all()  # ✅ все дропы
 
     print(f"🤖 Loaded {len(bots)} bots")
 
@@ -33,7 +35,10 @@ async def bot_loop():
 
         # Запоминаем время ставки
         last_bet_time[bot.id] = now
-
+        gift_id = None
+        if gift and drops:
+            drop = random.choice(drops)
+            gift_id = drop.id
         amount = round(random.uniform(bot.min_bet, bot.max_bet), 2)
         gift = random.choice([True, False])
 
@@ -49,6 +54,6 @@ async def bot_loop():
             user_id=-bot.id,
             amount=amount,
             gift=int(gift),
-            gift_id=1 if gift else None,
+            gift_id=gift_id,
             auto_cashout_x=auto_cashout_x
         )
