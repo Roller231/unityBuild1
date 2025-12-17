@@ -32,7 +32,7 @@ async def bot_loop():
             if now - last_bet_time[bot.id] < 30:
                 # print(f"⏳ BOT {bot.nickname} пропускает — cooldown {30 - (now - last_bet_time[bot.id]):.1f} sec")
                 continue
-
+        gift = random.choice([True, False])
         # Запоминаем время ставки
         last_bet_time[bot.id] = now
         gift_id = None
@@ -40,7 +40,7 @@ async def bot_loop():
             drop = random.choice(drops)
             gift_id = drop.id
         amount = round(random.uniform(bot.min_bet, bot.max_bet), 2)
-        gift = random.choice([True, False])
+
 
         auto_cashout_x = round(random.uniform(1.5, 3.0), 2)
 
