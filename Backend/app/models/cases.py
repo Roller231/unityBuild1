@@ -8,8 +8,10 @@ class Cases(Base):
     id = Column(Integer, primary_key=True, index=True)
     name = Column(String(255), nullable=False)
     price = Column(Float, nullable=False)
-    gradient_colors = Column(JSON)  # [{},{}] или массив цветов
+    gradient_colors = Column(JSON)
     main_image = Column(String(255))
+    lottie_anim = Column(String(255), nullable=True)
+
     created_at = Column(DateTime, default=datetime.utcnow)
 
     def __str__(self):

@@ -4,6 +4,7 @@ import asyncio
 import random
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.staticfiles import StaticFiles
 
 from sqladmin import Admin, ModelView
 
@@ -50,6 +51,11 @@ from app.services.crash_engine import crash_engine
 #                 APP CONFIG
 # ---------------------------------------------------------
 app = FastAPI(title="Krash Backend")
+app.mount(
+    "/media",
+    StaticFiles(directory="media"),
+    name="media"
+)
 
 app.add_middleware(
     CORSMiddleware,

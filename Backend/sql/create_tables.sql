@@ -7,8 +7,10 @@ CREATE TABLE drops (
     rarity VARCHAR(255) NOT NULL,
     price FLOAT NOT NULL,
     icon VARCHAR(255),
+    lottie_anim VARCHAR(255) NULL,
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP
 );
+
 
 CREATE TABLE cases (
     id INT AUTO_INCREMENT PRIMARY KEY,
@@ -16,8 +18,10 @@ CREATE TABLE cases (
     price FLOAT NOT NULL,
     gradient_colors JSON,
     main_image VARCHAR(255),
+    lottie_anim VARCHAR(255) NULL,
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP
 );
+
 
 CREATE TABLE case_drops (
     case_id INT NOT NULL,
@@ -44,6 +48,7 @@ CREATE TABLE users (
     totalDEP FLOAT,
     inventory JSON,
     url_image VARCHAR(255) NULL,
+    json_anim VARCHAR(255) NULL,
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
     updated_at DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
 );
