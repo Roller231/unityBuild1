@@ -59,6 +59,11 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+import mimetypes
+
+mimetypes.add_type("image/webp", ".webp")
+
 app.mount(
     "/media",
     StaticFiles(directory="media"),
