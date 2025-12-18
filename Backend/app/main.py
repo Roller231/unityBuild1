@@ -51,11 +51,6 @@ from app.services.crash_engine import crash_engine
 #                 APP CONFIG
 # ---------------------------------------------------------
 app = FastAPI(title="Krash Backend")
-app.mount(
-    "/media",
-    StaticFiles(directory="media"),
-    name="media"
-)
 
 app.add_middleware(
     CORSMiddleware,
@@ -63,6 +58,11 @@ app.add_middleware(
     allow_credentials=False,
     allow_methods=["*"],
     allow_headers=["*"],
+)
+app.mount(
+    "/media",
+    StaticFiles(directory="media"),
+    name="media"
 )
 
 Base.metadata.create_all(bind=engine)
