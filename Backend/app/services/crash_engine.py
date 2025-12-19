@@ -11,6 +11,7 @@ from sqlalchemy.orm import Session
 from app.database import SessionLocal
 from app.core.config import settings
 from app.models import Users, CrashRounds, CrashBets, Transactions
+import time
 
 
 # ---------------------------------------------------------------------
@@ -34,10 +35,12 @@ class CrashEngine:
     def __init__(self):
         self.clients: Set[WebSocket] = set()
         self.lock = asyncio.Lock()
+        self.betting_ends_at: Optional[float] = None
 
         self.round_id: Optional[int] = None
         self.crash_point: float = 0.0
         self.multiplier: float = settings.start_x
+        self.started_at: Optional[float] = None  # ⬅ время старта раунда
         self.phase: str = "idle"  # idle | betting | running | crashed
         self.next_round_pending_bets: List[dict] = []
 
@@ -67,13 +70,23 @@ class CrashEngine:
             await self.remove_client(ws)
 
     async def send_state(self, ws: WebSocket):
+        multiplier = self.multiplier
+
+        if self.phase == "running" and self.started_at:
+            elapsed = time.monotonic() - self.started_at
+            multiplier = self.calc_multiplier(elapsed)
+
         await ws.send_json({
             "event": "state",
             "phase": self.phase,
             "round_id": self.round_id,
             "crash_point": self.crash_point if self.phase != "betting" else None,
-            "multiplier": self.multiplier,
+            "multiplier": multiplier,
+            "betting_ends_at": self.betting_ends_at if self.phase == "betting" else None,
         })
+
+    def calc_multiplier(self, elapsed: float) -> float:
+        return round(settings.start_x + elapsed * settings.grow_speed, 2)
 
     # -----------------------------------------------------------------
     # GAME MECHANICS
@@ -391,7 +404,8 @@ class CrashEngine:
                 self.multiplier = settings.start_x
                 self.crash_point = self.generate_crash_point()
                 self.phase = "betting"
-
+                self.betting_ends_at = time.time() + settings.bet_phase_seconds
+                self.started_at = None  # ⬅️ важно, сбрасываем
                 # --- СОЗДАЁМ НОВЫЙ РАУНД ---
                 db = SessionLocal()
                 try:
@@ -507,13 +521,15 @@ class CrashEngine:
                 "event": "new_round",
                 "round_id": self.round_id,
                 "crash_point_max_hint": self.crash_point,
-                "bet_phase_seconds": settings.bet_phase_seconds
+                "betting_ends_at": self.betting_ends_at
             })
 
             await asyncio.sleep(settings.bet_phase_seconds)
 
             async with self.lock:
                 self.phase = "running"
+                self.started_at = time.monotonic()
+                self.betting_ends_at = None
 
             await self.broadcast({"event": "round_start"})
 
@@ -521,22 +537,23 @@ class CrashEngine:
 
             while True:
                 async with self.lock:
-                    if self.multiplier >= self.crash_point:
+                    elapsed = time.monotonic() - self.started_at
+                    current_x = self.calc_multiplier(elapsed)
+
+                    if current_x >= self.crash_point:
                         break
 
-                    self.multiplier = round(
-                        self.multiplier * (1 + settings.grow_speed), 2
-                    )
-                    current_x = self.multiplier
+                    self.multiplier = current_x
 
                     # AUTO CASHOUT
                     for uid, bet in list(self.bets.items()):
                         if bet.auto_cashout_x is not None and bet.cashout_x is None:
                             if current_x >= bet.auto_cashout_x:
-                                await self._auto_cashout(uid, current_x)
+                                await self._auto_cashout(uid, bet.auto_cashout_x)
 
                 await self.broadcast({
                     "event": "tick",
+                    "round_id": self.round_id,
                     "multiplier": current_x,
                 })
 

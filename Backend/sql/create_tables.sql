@@ -129,6 +129,18 @@ CREATE TABLE promo_codes (
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP
 );
 
+CREATE TABLE user_daily_games (
+    user_id INT NOT NULL,
+    day_date DATE NOT NULL,
+    games_played INT DEFAULT 0,
+was_free_spin BOOLEAN NOT NULL DEFAULT FALSE,
+    PRIMARY KEY (user_id, day_date),
+
+    CONSTRAINT fk_udg_user
+        FOREIGN KEY (user_id)
+        REFERENCES users(id)
+        ON DELETE CASCADE
+);
 
 CREATE TABLE user_promos (
     id INT AUTO_INCREMENT PRIMARY KEY,
@@ -155,6 +167,23 @@ CREATE TABLE user_promos (
         REFERENCES users(id) ON DELETE SET NULL
 );
 
+CREATE TABLE roulette_spins (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    user_id INT NOT NULL,
+    drop_id INT NOT NULL,
+    is_free BOOLEAN NOT NULL,
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+
+    CONSTRAINT fk_rs_user
+        FOREIGN KEY (user_id)
+        REFERENCES users(id)
+        ON DELETE CASCADE,
+
+    CONSTRAINT fk_rs_drop
+        FOREIGN KEY (drop_id)
+        REFERENCES drops(id)
+        ON DELETE CASCADE
+);
 
 
 CREATE TABLE referral_promos (

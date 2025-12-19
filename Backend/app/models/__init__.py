@@ -9,6 +9,7 @@ from .crash_bots import CrashBots
 from .promo_codes import PromoCodes
 from .user_promos import UserPromos
 from .referral_promos import ReferralPromos
+from .user_daily_games import UserDailyGames
 
 __all__ = [
     "Drops",
@@ -21,5 +22,6 @@ __all__ = [
     "CrashBots",
     "PromoCodes",
     "UserPromos",
-    "ReferralPromos"
+    "ReferralPromos",
+    "UserDailyGames"
 ]
