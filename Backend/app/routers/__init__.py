@@ -11,5 +11,7 @@ from . import (
     crash_bots_ws_router,
     crash_bots_router,
     rates_router,
-    games_router
+    games_router,
+    roulette_router,
+
 )

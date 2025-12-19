@@ -10,6 +10,7 @@ from .promo_codes import PromoCodes
 from .user_promos import UserPromos
 from .referral_promos import ReferralPromos
 from .user_daily_games import UserDailyGames
+from .roulette_spins import RouletteSpins
 
 __all__ = [
     "Drops",
@@ -23,5 +24,6 @@ __all__ = [
     "PromoCodes",
     "UserPromos",
     "ReferralPromos",
-    "UserDailyGames"
+    "UserDailyGames",
+    "RouletteSpins"
 ]
