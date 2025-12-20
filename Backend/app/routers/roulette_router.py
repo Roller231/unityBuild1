@@ -51,7 +51,7 @@ def free_spin(
             .first()
         )
 
-        if not daily or daily.games_played < 10 or daily.was_free_spin:
+        if not daily or daily.games_played < 0 or daily.was_free_spin:
             raise HTTPException(status_code=400, detail="Free spin not available")
 
         used_reason = "daily"

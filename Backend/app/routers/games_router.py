@@ -93,42 +93,105 @@ def get_free_spin_status(
 ):
     today = date.today()
 
-    # 1️⃣ freespin по промо
-    promo_freespin = (
-        db.query(UserPromos)
-        .join(PromoCodes, PromoCodes.id == UserPromos.promo_id)
-        .filter(
-            UserPromos.user_id == user_id,
-            UserPromos.completed == False,
-            UserPromos.remaining_wager_games == 0,
-            PromoCodes.type == "freespin"
-        )
-        .first()
-    )
-
-    if promo_freespin:
-        return {
-            "can_free_spin": True,
-            "reason": "promo"
-        }
-
-    # 2️⃣ дневной freespin
+    # 0️⃣ гарантируем дневную запись
     daily = (
         db.query(UserDailyGames)
         .filter_by(user_id=user_id, day_date=today)
         .first()
     )
 
-    if daily and daily.games_played >= 0 and not daily.was_free_spin:
+    if not daily:
+        daily = UserDailyGames(
+            user_id=user_id,
+            day_date=today,
+            games_played=0,
+            was_free_spin=False,
+        )
+        db.add(daily)
+        db.commit()
+        db.refresh(daily)
+
+    # 1️⃣ БЕСПЛАТНЫЙ ДНЕВНОЙ ФРИСПИН (ВСЕГДА ПЕРВЫМ)
+    if not daily.was_free_spin:
         return {
             "can_free_spin": True,
-            "reason": "daily_games",
-            "games_played_today": daily.games_played
+            "reason": "daily_free_spin",
+            "games_played_today": daily.games_played,
         }
 
+    # 2️⃣ ПРОМО-ФРИСПИН (ЕСЛИ ДНЕВНОЙ УЖЕ ИСПОЛЬЗОВАН)
+    freespin_promo = (
+        db.query(UserPromos)
+        .join(PromoCodes, PromoCodes.id == UserPromos.promo_id)
+        .filter(
+            UserPromos.user_id == user_id,
+            UserPromos.completed == False,
+            PromoCodes.type == "freespin",
+            UserPromos.remaining_wager_games == 0,
+        )
+        .first()
+    )
+
+    if freespin_promo:
+        return {
+            "can_free_spin": True,
+            "reason": "promo_freespin_ready",
+            "games_played_today": daily.games_played,
+        }
+
+    # 3️⃣ НИЧЕГО НЕТ
     return {
         "can_free_spin": False,
-        "reason": "not_available",
-        "games_played_today": daily.games_played if daily else 0,
-        "was_free_spin": daily.was_free_spin if daily else False
+        "reason": "no_available_freespins",
+        "games_played_today": daily.games_played,
+        "was_free_spin": daily.was_free_spin,
+    }
+
+
+from datetime import date
+from fastapi import APIRouter, Depends, HTTPException
+from sqlalchemy.orm import Session
+
+from app.database import get_db
+from app.models.user_daily_games import UserDailyGames
+from app.models.users import Users
+
+@router.post("/init-day")
+def init_user_daily_games(
+    user_id: int,
+    db: Session = Depends(get_db),
+):
+    user = db.query(Users).filter(Users.id == user_id).first()
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+
+    today = date.today()
+
+    daily = (
+        db.query(UserDailyGames)
+        .filter_by(user_id=user_id, day_date=today)
+        .first()
+    )
+
+    if not daily:
+        daily = UserDailyGames(
+            user_id=user_id,
+            day_date=today,
+            games_played=0,
+            was_free_spin=False,
+        )
+        db.add(daily)
+        db.commit()
+        db.refresh(daily)
+
+        created = True
+    else:
+        created = False
+
+    return {
+        "status": "ok",
+        "created": created,
+        "day": str(today),
+        "games_played_today": daily.games_played,
+        "was_free_spin": daily.was_free_spin,
     }

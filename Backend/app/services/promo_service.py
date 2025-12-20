@@ -63,6 +63,8 @@ def activate_promo(db, user, code: str):
         if used_ref:
             raise ValueError("Referral promo already used")
 
+
+
         # начисляем награду
         user.balance += ref.reward
 
@@ -101,6 +103,16 @@ def activate_promo(db, user, code: str):
     if not promo:
         raise ValueError("Invalid promo")
 
+    used_before = (
+        db.query(UserPromos)
+        .filter(
+            UserPromos.user_id == user.id,
+            UserPromos.promo_id == promo.id
+        )
+        .first()
+    )
+    if used_before:
+        raise ValueError("You have already used this promo code")
     user_promo = UserPromos(
         user_id=user.id,
         promo_id=promo.id,

@@ -10,60 +10,90 @@ def choose_free_spin_drop(db: Session) -> Drops:
     if not drops:
         raise ValueError("No drops available")
 
-    # 1️⃣ средняя цена
-    avg_price = db.query(func.avg(Drops.price)).scalar() or 0
+    # сортируем по цене
+    drops_sorted = sorted(drops, key=lambda d: d.price)
 
-    # 2️⃣ группы по цене
-    cheap = [d for d in drops if d.price < avg_price / 2]
-    mid = [d for d in drops if avg_price <= d.price <= avg_price * 1.5]
+    # нижние 20% — ОСНОВНОЙ пул
+    min_count = max(1, int(len(drops_sorted) * 0.2))
+    cheap = drops_sorted[:min_count]
 
-    # фолбэки
-    if not cheap:
-        cheap = drops
-    if not mid:
-        mid = cheap
+    # нижние 40% — редкий бонус
+    mid = drops_sorted[:max(1, int(len(drops_sorted) * 0.4))]
 
-    # 3️⃣ вероятность
     r = random.random()
-    pool = cheap if r < 0.98 else mid
+
+    if r < 0.97:
+        pool = cheap
+    else:
+        pool = mid
 
     return random.choice(pool)
 
-def choose_paid_spin_drop(db: Session, bet_price: float) -> Drops:
+
+def choose_paid_spin_drop(
+    db: Session,
+    bet_price: float,
+    last_drop_id: int | None = None
+) -> Drops:
     drops = db.query(Drops).all()
     if not drops:
         raise ValueError("No drops available")
 
-    near = [
+    # --- Пулы ---
+    cheaper = [
         d for d in drops
-        if bet_price * 0.8 <= d.price <= bet_price * 1.05
+        if d.price < bet_price * 0.9
     ]
 
-    better = [
+    near = [
+        d for d in drops
+        if bet_price * 0.9 <= d.price <= bet_price * 1.05
+    ]
+
+    higher = [
         d for d in drops
         if bet_price * 1.05 < d.price <= bet_price * 1.3
     ]
 
     jackpot = [
         d for d in drops
-        if bet_price * 1.3 < d.price <= bet_price * 2
+        if d.price > bet_price * 1.3
     ]
 
     # фолбэки
+    if not cheaper:
+        cheaper = near or drops
     if not near:
-        near = [d for d in drops if d.price <= bet_price]
-    if not better:
-        better = near
+        near = cheaper
+    if not higher:
+        higher = near
     if not jackpot:
-        jackpot = better
+        jackpot = higher
+
+    # --- ВЕСА (важно) ---
+    pools = [
+        (cheaper, 0.45),   # чаще дешевле
+        (near,    0.25),
+        (higher,  0.25),   # суммарно 30–35% выше ставки
+        (jackpot, 0.05),
+    ]
 
     r = random.random()
+    acc = 0.0
 
-    if r < 0.90:
-        pool = near
-    elif r < 0.98:
-        pool = better
+    for pool, weight in pools:
+        acc += weight
+        if r <= acc:
+            candidates = pool
+            break
     else:
-        pool = jackpot
+        candidates = cheaper
 
-    return random.choice(pool)
+    # --- АНТИ-ПОВТОР ---
+    if last_drop_id:
+        filtered = [d for d in candidates if d.id != last_drop_id]
+        if filtered:
+            candidates = filtered
+
+    return random.choice(candidates)
+
