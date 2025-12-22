@@ -24,6 +24,8 @@ from app.models.crash_bots import CrashBots
 from app.models.promo_codes import PromoCodes
 from app.models.user_promos import UserPromos
 from app.models.referral_promos import ReferralPromos
+from app.services.pvp_engine import pvp_engine
+from app.routers import pvp_ws_router
 
 
 
@@ -95,7 +97,7 @@ app.include_router(roulette_router.router)
 # WS
 app.include_router(crash_ws_router.router)
 app.include_router(drops_ws_router.router)
-
+app.include_router(pvp_ws_router.router)
 
 # ---------------------------------------------------------
 #                STREAM SYSTEM
@@ -136,7 +138,7 @@ async def startup_event():
     asyncio.create_task(crash_engine.game_loop())
     asyncio.create_task(drop_global_stream())
     asyncio.create_task(bot_loop())  # ← запускаем ботов!
-
+    asyncio.create_task(pvp_engine.bots_loop())
 # ---------------------------------------------------------
 #               🔥 FASTAPI ADMIN PANEL
 # ---------------------------------------------------------

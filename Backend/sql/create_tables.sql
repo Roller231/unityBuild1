@@ -185,6 +185,29 @@ CREATE TABLE roulette_spins (
         ON DELETE CASCADE
 );
 
+CREATE TABLE pvp_games (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    user_id INT NOT NULL,
+
+    bot_id INT NOT NULL,
+    bot_bet FLOAT NOT NULL,
+
+    user_bet FLOAT NOT NULL,
+    gift BOOLEAN DEFAULT FALSE,
+    gift_id INT NULL,
+
+    result ENUM('win','lose','draw') NOT NULL,
+
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+
+    CONSTRAINT fk_pvp_user
+        FOREIGN KEY (user_id) REFERENCES users(id)
+        ON DELETE CASCADE,
+
+    CONSTRAINT fk_pvp_bot
+        FOREIGN KEY (bot_id) REFERENCES crash_bots(id)
+        ON DELETE CASCADE
+);
 
 CREATE TABLE referral_promos (
     id INT AUTO_INCREMENT PRIMARY KEY,
