@@ -7,5 +7,4 @@ class StarsCreateRequest(BaseModel):
     user_id: int
 
 class StarsSuccessRequest(BaseModel):
-    invoice_id: str
-    payload: Optional[str] = None
+    user_id: int

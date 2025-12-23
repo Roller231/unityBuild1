@@ -81,33 +81,43 @@ async def stars_success(
     data: StarsSuccessRequest,
     db: Session = Depends(get_db)
 ):
-    invoice_id = data.invoice_id
-    payload = data.payload
+    user_id = data.user_id
 
-    deposit = db.query(Deposits).filter(
-        Deposits.payload == payload
-    ).first()
-
-    if not deposit:
-        raise HTTPException(404, "Deposit not found")
-
-    if deposit.status == "success":
-        return {"ok": True}
-
-    user = db.query(Users).filter(Users.id == deposit.user_id).first()
+    # 1️⃣ пользователь
+    user = db.query(Users).filter(Users.id == user_id).first()
     if not user:
         raise HTTPException(404, "User not found")
 
+    # 2️⃣ последний pending депозит
+    deposit = (
+        db.query(Deposits)
+        .filter(
+            Deposits.user_id == user_id,
+            Deposits.type_deposit == "stars",
+            Deposits.status == "pending"
+        )
+        .order_by(Deposits.created_at.desc())
+        .first()
+    )
+
+    if not deposit:
+        raise HTTPException(404, "No pending deposit")
+
+    # 3️⃣ защита от повторного зачисления
+    if deposit.status == "success":
+        return {"ok": True}
+
+    # 4️⃣ курс
     rates = get_rates()
     stars_rate = rates["stars"]
 
     credited_amount = float(deposit.amount) * float(stars_rate)
 
+    # 5️⃣ зачисление
     balance_before = user.balance
     user.balance += credited_amount
 
     deposit.status = "success"
-    deposit.invoice_id = invoice_id
     deposit.completed_at = datetime.utcnow()
 
     tx = Transactions(
@@ -122,4 +132,5 @@ async def stars_success(
     db.commit()
 
     return {"ok": True}
+
 
