@@ -3,6 +3,8 @@
 import random
 from sqlalchemy.orm import Session
 from sqlalchemy import func
+
+from app.core.config import settings
 from app.models import Drops
 
 def choose_free_spin_drop(db: Session) -> Drops:
@@ -29,6 +31,28 @@ def choose_free_spin_drop(db: Session) -> Drops:
 
     return random.choice(pool)
 
+def _pick_weighted_bucket(buckets: list[tuple[float, float, float]]) -> tuple[float, float]:
+    """
+    buckets: [(weight, min_mult, max_mult), ...]
+    Возвращает (min_mult, max_mult).
+    """
+    total = sum(w for w, _, _ in buckets)
+    if total <= 0:
+        # если кто-то сломал конфиг
+        return 0.0, 1.0
+
+    r = random.random() * total
+    acc = 0.0
+    for w, mn, mx in buckets:
+        acc += w
+        if r <= acc:
+            return mn, mx
+
+    # фолбэк
+    return buckets[-1][1], buckets[-1][2]
+
+def _filter_by_price_range(drops: list[Drops], low: float, high: float) -> list[Drops]:
+    return [d for d in drops if low <= float(d.price) <= high]
 
 def choose_paid_spin_drop(
     db: Session,
@@ -39,57 +63,32 @@ def choose_paid_spin_drop(
     if not drops:
         raise ValueError("No drops available")
 
-    # --- Пулы ---
-    cheaper = [
-        d for d in drops
-        if d.price < bet_price * 0.9
-    ]
+    # 1) решаем ветку: дороже/дешевле
+    is_higher = random.random() < float(settings.roulette_higher_chance)
 
-    near = [
-        d for d in drops
-        if bet_price * 0.9 <= d.price <= bet_price * 1.05
-    ]
-
-    higher = [
-        d for d in drops
-        if bet_price * 1.05 < d.price <= bet_price * 1.3
-    ]
-
-    jackpot = [
-        d for d in drops
-        if d.price > bet_price * 1.3
-    ]
-
-    # фолбэки
-    if not cheaper:
-        cheaper = near or drops
-    if not near:
-        near = cheaper
-    if not higher:
-        higher = near
-    if not jackpot:
-        jackpot = higher
-
-    # --- ВЕСА (важно) ---
-    pools = [
-        (cheaper, 0.45),   # чаще дешевле
-        (near,    0.25),
-        (higher,  0.25),   # суммарно 30–35% выше ставки
-        (jackpot, 0.05),
-    ]
-
-    r = random.random()
-    acc = 0.0
-
-    for pool, weight in pools:
-        acc += weight
-        if r <= acc:
-            candidates = pool
-            break
+    if is_higher:
+        low = bet_price * float(settings.roulette_higher_min_mult)
+        high = bet_price * float(settings.roulette_higher_max_mult)
+        candidates = _filter_by_price_range(drops, low, high)
     else:
-        candidates = cheaper
+        mn_mult, mx_mult = _pick_weighted_bucket(settings.roulette_cheaper_buckets)
+        low = bet_price * float(mn_mult)
+        high = bet_price * float(mx_mult)
+        candidates = _filter_by_price_range(drops, low, high)
 
-    # --- АНТИ-ПОВТОР ---
+    # 2) фолбэк — если в диапазоне нет дропов, расширяем диапазон
+    if not candidates:
+        expand = bet_price * float(settings.roulette_fallback_expand_pct)
+        low2 = max(0.0, low - expand)
+        high2 = high + expand
+        candidates = _filter_by_price_range(drops, low2, high2)
+
+    # 3) ещё фолбэк — если всё равно пусто, берём ближайшие по цене
+    if not candidates:
+        drops_sorted = sorted(drops, key=lambda d: abs(float(d.price) - bet_price))
+        candidates = drops_sorted[:max(1, min(30, len(drops_sorted)))]
+
+    # 4) анти-повтор
     if last_drop_id:
         filtered = [d for d in candidates if d.id != last_drop_id]
         if filtered:

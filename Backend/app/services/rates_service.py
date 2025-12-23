@@ -1,11 +1,16 @@
+# ============================================================
+# 💱 RATES / CURRENCY HELPERS
+# ============================================================
+from app.core.config import settings
+
+
 def get_rates():
     """
     Статичные курсы (USD)
-    В будущем можно заменить на внешний API
     """
     return {
-        "coins": 1,
-        "gems": 100,
-        "stars": 50,
-        "shields": 10
+        "coins": settings.rate_coins_usd,
+        "gems": settings.rate_gems_usd,
+        "stars": settings.rate_stars_usd,
+        "shields": settings.rate_shields_usd,
     }

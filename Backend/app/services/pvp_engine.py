@@ -5,7 +5,7 @@ import random
 from datetime import datetime
 from time import time
 from typing import Dict, Optional, Set
-
+from app.core.config import settings
 from fastapi import WebSocket
 from sqlalchemy import func
 from sqlalchemy.orm import Session
@@ -78,7 +78,12 @@ class PvPEngine:
     # -------------------------------------------------------------
     async def bots_loop(self):
         while True:
-            await asyncio.sleep(random.uniform(2, 4))
+            await asyncio.sleep(
+                random.uniform(
+                    settings.pvp_bot_spawn_min_sec,
+                    settings.pvp_bot_spawn_max_sec
+                )
+            )
 
             if not self.clients:
                 continue
@@ -130,7 +135,12 @@ class PvPEngine:
 
     async def bot_lifecycle(self, bot_state: dict):
         # ⏳ бой
-        await asyncio.sleep(random.uniform(4, 8))
+        await asyncio.sleep(
+            random.uniform(
+                settings.pvp_fight_min_sec,
+                settings.pvp_fight_max_sec
+            )
+        )
 
         bot_state["status"] = random.choice(["win", "lose"])
 
@@ -140,9 +150,17 @@ class PvPEngine:
         })
 
         # ⏳ пауза перед уходом
-        await asyncio.sleep(random.uniform(2, 4))
+        await asyncio.sleep(
+            random.uniform(
+                settings.pvp_bot_leave_delay_min_sec,
+                settings.pvp_bot_leave_delay_max_sec
+            )
+        )
 
-        cooldown = random.uniform(5, 10)  # ⏱ перерыв бота
+        cooldown = random.uniform(
+            settings.pvp_bot_cooldown_min_sec,
+            settings.pvp_bot_cooldown_max_sec
+        )
 
         async with self.lock:
             self.active_bots = [
@@ -275,13 +293,16 @@ class PvPEngine:
                 # RESULT (50%)
                 # -------------------------------------------------
                 roll = random.random()
+                acc = settings.pvp_win_chance
 
-                if roll < 0.45:
-                    result = "win"  # 45%
-                elif roll < 0.90:
-                    result = "lose"  # 45%
+                if roll < acc:
+                    result = "win"
                 else:
-                    result = "draw"  # 10%
+                    acc += settings.pvp_lose_chance
+                    if roll < acc:
+                        result = "lose"
+                    else:
+                        result = "draw"
 
                 # -------------------------------------------------
                 # RESULT HANDLING
@@ -389,7 +410,10 @@ class PvPEngine:
         """
         Бот ставит ТОЛЬКО тем же типом, что и пользователь
         """
-        deviation = random.uniform(0.1, 0.2)  # 10–20%
+        deviation = random.uniform(
+            settings.pvp_bot_deviation_min,
+            settings.pvp_bot_deviation_max
+        )
         sign = random.choice([-1, 1])
         target = round(max(0.1, user_amount * (1 + sign * deviation)), 2)
 

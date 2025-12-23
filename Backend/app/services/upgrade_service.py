@@ -7,16 +7,28 @@ from app.services.inventory_service import (
     add_drop_to_inventory,
     remove_drop_from_inventory,
 )
-
-# 🔧 НАСТРОЙКИ БАЛАНСА
-RATIO_BORDER = 1.5
-LOW_CHANCE = 0.8   # < 1.5x
-HIGH_CHANCE = 0.05  # >= 1.5x
-
+from app.core.config import settings
 
 def calc_upgrade_chance(from_price: float, to_price: float) -> float:
+    """
+    Шанс апгрейда:
+    - до равной цены — фиксированный
+    - после равной цены — плавно уменьшается
+    """
     ratio = to_price / from_price
-    return HIGH_CHANCE if ratio >= RATIO_BORDER else LOW_CHANCE
+
+    if ratio <= 1.0:
+        chance = settings.upgrade_base_chance
+    else:
+        chance = settings.upgrade_base_chance * (ratio ** -settings.upgrade_decay_factor)
+
+    # жёсткие границы
+    return max(
+        settings.upgrade_min_chance,
+        min(settings.upgrade_max_chance, chance)
+    )
+
+
 
 
 
@@ -43,7 +55,7 @@ def upgrade_service(
     if to_drop.price <= from_drop.price:
         raise HTTPException(400, "Target drop must be more expensive")
 
-    # 3️⃣ ПЫТАЕМСЯ СНЯТЬ ПРЕДМЕТ ИЗ ИНВЕНТАРЯ
+    # 3️⃣ списываем предмет
     removed = remove_drop_from_inventory(user, from_drop_id, count=1)
     if not removed:
         raise HTTPException(400, "Drop not in inventory")
@@ -53,7 +65,7 @@ def upgrade_service(
     roll = random.random()
     win = roll <= chance
 
-    # 5️⃣ если выиграл — добавляем новый предмет
+    # 5️⃣ награда
     if win:
         add_drop_to_inventory(user, to_drop_id, count=1)
 
@@ -63,21 +75,17 @@ def upgrade_service(
         to_drop_id=to_drop_id,
         chance=chance,
         roll=roll,
-        result='win' if win else 'lose'
+        result="win" if win else "lose",
     )
 
     db.add(upgrade_log)
-
-    # 6️⃣ сохраняем изменения
     db.commit()
     db.refresh(user)
 
-
-
     return {
         "result": "win" if win else "lose",
-        "chance": chance,
-        "roll": round(roll, 4),  # полезно для отладки
+        "chance": round(chance, 4),
+        "roll": round(roll, 4),
         "user_id": user_id,
         "from_drop_id": from_drop_id,
         "to_drop_id": to_drop_id,
