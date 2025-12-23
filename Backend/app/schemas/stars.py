@@ -1,3 +1,5 @@
+from typing import Optional
+
 from pydantic import BaseModel
 
 class StarsCreateRequest(BaseModel):
@@ -6,4 +8,4 @@ class StarsCreateRequest(BaseModel):
 
 class StarsSuccessRequest(BaseModel):
     invoice_id: str
-    payload: str
+    payload: Optional[str] = None
