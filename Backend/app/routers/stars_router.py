@@ -74,12 +74,16 @@ async def create_stars_invoice(
 # -------------------------------------------------
 # STARS PAYMENT SUCCESS
 # -------------------------------------------------
+from app.schemas.stars import StarsSuccessRequest
+
 @router.post("/success")
 async def stars_success(
-    invoice_id: str,
-    payload: str,
+    data: StarsSuccessRequest,
     db: Session = Depends(get_db)
 ):
+    invoice_id = data.invoice_id
+    payload = data.payload
+
     deposit = db.query(Deposits).filter(
         Deposits.payload == payload
     ).first()
@@ -88,14 +92,14 @@ async def stars_success(
         raise HTTPException(404, "Deposit not found")
 
     if deposit.status == "success":
-        return {"ok": True}  # idempotent
+        return {"ok": True}
 
     user = db.query(Users).filter(Users.id == deposit.user_id).first()
     if not user:
         raise HTTPException(404, "User not found")
 
     rates = get_rates()
-    stars_rate = rates["stars"]  # rate_stars_usd
+    stars_rate = rates["stars"]
 
     credited_amount = float(deposit.amount) * float(stars_rate)
 
@@ -118,3 +122,4 @@ async def stars_success(
     db.commit()
 
     return {"ok": True}
+
