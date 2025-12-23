@@ -14,5 +14,6 @@ from . import (
     games_router,
     roulette_router,
     upgrade_router,
+    stars_router,
 
 )

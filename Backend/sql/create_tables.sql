@@ -134,6 +134,47 @@ CREATE TABLE promo_codes (
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP
 );
 
+
+CREATE TABLE deposits (
+  id INT NOT NULL AUTO_INCREMENT,
+
+  -- user
+  user_id INT NOT NULL,
+  username VARCHAR(64) NOT NULL,
+
+  -- deposit info
+  amount DECIMAL(12,2) NOT NULL,
+  currency VARCHAR(16) NOT NULL,           -- XTR / TON / USDT
+  type_deposit VARCHAR(32) NOT NULL,       -- stars / ton / cryptobot
+
+  -- payment identifiers
+  payload VARCHAR(128) UNIQUE,
+  invoice_id VARCHAR(128) UNIQUE,
+
+  -- status
+  status VARCHAR(16) NOT NULL DEFAULT 'pending',  -- pending / success / failed
+
+  -- provider meta
+  provider_tx_id VARCHAR(128),
+  comment VARCHAR(255),
+
+  created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  completed_at TIMESTAMP NULL,
+
+  PRIMARY KEY (id),
+
+  KEY ix_deposits_user_id (user_id),
+  KEY ix_deposits_status (status),
+  KEY ix_deposits_user_status (user_id, status),
+
+  CONSTRAINT fk_deposits_user
+    FOREIGN KEY (user_id) REFERENCES users(id)
+    ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+
+
+
 CREATE TABLE upgrade_logs (
     id INT AUTO_INCREMENT PRIMARY KEY,
 
