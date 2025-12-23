@@ -45,7 +45,8 @@ from app.routers import (
     rates_router,
     games_router,
     promo_router,
-    roulette_router
+    roulette_router,
+    upgrade_router
 )
 
 from app.services.crash_engine import crash_engine
@@ -92,6 +93,7 @@ app.include_router(rates_router.router)
 app.include_router(promo_router.router)
 app.include_router(games_router.router)
 app.include_router(roulette_router.router)
+app.include_router(upgrade_router.router)
 
 
 # WS
@@ -189,9 +191,22 @@ class CrashBotsAdmin(ModelView, model=CrashBots):
 
 
 # ------- DROPS -------
+# ------- DROPS -------
 class DropsAdmin(ModelView, model=Drops):
-    column_list = ["id", "name", "rarity", "price", "icon", "created_at"]
+    column_list = [
+        "id",
+        "name",
+        "rarity",
+        "price",
+        "UseInUpgrade",
+        "UseInLive",
+        "IsNft",
+        "icon",
+        "created_at",
+    ]
+
     form_excluded_columns = ["case_drops"]
+
 
 
 # ------- CASES -------
@@ -237,13 +252,25 @@ class CasesAdmin(ModelView, model=Cases):
 
 # ------- CASE DROPS -------
 class CaseDropsAdmin(ModelView, model=CaseDrops):
-    column_list = ["case", "drop", "chance"]
+    column_list = [
+        "case",
+        "drop",
+        "chance",
+        "position",   # ✅ ВЫВОДИМ ПОРЯДОК
+    ]
+
+    column_sortable_list = [
+        "position",  # ✅ можно сортировать
+    ]
+
+    column_default_sort = ("position", True)  # ASC по умолчанию
 
     # чтобы выпадающие списки искали по названию дропа и кейса
     form_ajax_refs = {
         "case": {"fields": ["name"]},
         "drop": {"fields": ["name"]},
     }
+
 
 
 # ------- CRASH ROUNDS -------
@@ -290,6 +317,19 @@ class PromoCodesAdmin(ModelView, model=PromoCodes):
         "wager_games", "max_uses",
         "used_count", "active", "created_at"
     ]
+
+    # ✅ ЯВНО ДОБАВЛЯЕМ freecase В АДМИНКУ
+    form_choices = {
+        "type": [
+            ("deposit_percent", "deposit_percent"),
+            ("deposit_fixed", "deposit_fixed"),
+            ("freespin", "freespin"),
+            ("ref_fixed", "ref_fixed"),
+            ("freecase", "freecase"),   # 🎁 НОВЫЙ ВИД
+        ]
+    }
+
+
 
 
 class UserPromosAdmin(ModelView, model=UserPromos):

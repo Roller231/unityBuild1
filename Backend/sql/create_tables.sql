@@ -8,6 +8,9 @@ CREATE TABLE drops (
     price FLOAT NOT NULL,
     icon VARCHAR(255),
     lottie_anim VARCHAR(255) NULL,
+    UseInUpgrade BOOLEAN NOT NULL DEFAULT FALSE,
+    UseInLive BOOLEAN NOT NULL DEFAULT FALSE,
+    IsNft BOOLEAN NOT NULL DEFAULT FALSE,
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP
 );
 
@@ -27,6 +30,7 @@ CREATE TABLE case_drops (
     case_id INT NOT NULL,
     drop_id INT NOT NULL,
     chance FLOAT NOT NULL,
+    position INT NOT NULL DEFAULT 0;
     PRIMARY KEY (case_id, drop_id),
     CONSTRAINT fk_case_drops_case
         FOREIGN KEY (case_id) REFERENCES cases(id)
@@ -114,8 +118,9 @@ CREATE TABLE promo_codes (
         'deposit_percent',  -- +50% к депозиту
         'deposit_fixed',    -- +500 TON
         'freespin',         -- N бесплатных игр
-        'ref_fixed'         -- реферальный фикс
-    ) NOT NULL,
+    'ref_fixed',
+    'freecase'
+        ) NOT NULL,
 
     value FLOAT NOT NULL,         -- 50 / 500 / N / 1.5
     wager_games INT DEFAULT 0,    -- сколько игр нужно отыграть
@@ -128,6 +133,38 @@ CREATE TABLE promo_codes (
 
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP
 );
+
+CREATE TABLE upgrade_logs (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+
+    user_id INT NOT NULL,
+
+    from_drop_id INT NOT NULL,
+    to_drop_id INT NOT NULL,
+
+    chance FLOAT NOT NULL,        -- шанс на момент апгрейда (0.15 и т.п)
+    roll FLOAT NOT NULL,          -- фактический roll (0–1)
+
+    result ENUM('win','lose') NOT NULL,
+
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+
+    CONSTRAINT fk_ul_user
+        FOREIGN KEY (user_id)
+        REFERENCES users(id)
+        ON DELETE CASCADE,
+
+    CONSTRAINT fk_ul_from_drop
+        FOREIGN KEY (from_drop_id)
+        REFERENCES drops(id)
+        ON DELETE CASCADE,
+
+    CONSTRAINT fk_ul_to_drop
+        FOREIGN KEY (to_drop_id)
+        REFERENCES drops(id)
+        ON DELETE CASCADE
+);
+
 
 CREATE TABLE user_daily_games (
     user_id INT NOT NULL,

@@ -1,6 +1,7 @@
-from sqlalchemy import Column, Integer, String, Float, DateTime
+from sqlalchemy import Column, Integer, String, Float, DateTime, Boolean
 from datetime import datetime
 from app.database import Base
+
 
 class Drops(Base):
     __tablename__ = "drops"
@@ -12,6 +13,11 @@ class Drops(Base):
     icon = Column(String(255))
 
     lottie_anim = Column(String(255), nullable=True)
+
+    # 🔥 новые чекбоксы
+    UseInUpgrade = Column(Boolean, nullable=False, default=False)
+    UseInLive = Column(Boolean, nullable=False, default=False)
+    IsNft = Column(Boolean, nullable=False, default=False)
 
     created_at = Column(DateTime, default=datetime.utcnow)
 

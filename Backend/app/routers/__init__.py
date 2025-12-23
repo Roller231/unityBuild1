@@ -13,5 +13,6 @@ from . import (
     rates_router,
     games_router,
     roulette_router,
+    upgrade_router,
 
 )

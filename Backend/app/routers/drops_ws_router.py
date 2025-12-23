@@ -4,7 +4,7 @@ import asyncio
 from fastapi import APIRouter, WebSocket, WebSocketDisconnect
 from sqlalchemy.orm import Session
 from app.database import SessionLocal
-from app.models import Drops  # твоя модель Drop из DB
+from app.models import Drops
 
 
 router = APIRouter(prefix="/ws", tags=["Drops WebSocket"])
@@ -12,17 +12,23 @@ router = APIRouter(prefix="/ws", tags=["Drops WebSocket"])
 clients = set()
 
 
-# 🔥 получаем дропы напрямую из БД (без HTTP!)
+# 🔥 получаем ТОЛЬКО live-дропы
 def get_drops_direct():
     db: Session = SessionLocal()
-    drops = db.query(Drops).all()
+
+    drops = (
+        db.query(Drops)
+        .filter(Drops.UseInLive == True)  # ✅ ВАЖНО
+        .all()
+    )
+
     db.close()
 
     return [
         {
             "id": d.id,
             "name": d.name,
-            "icon": d.icon
+            "icon": d.icon,
         }
         for d in drops
     ]
@@ -36,7 +42,7 @@ async def drops_global_ws(websocket: WebSocket):
     print(f"🔌 Drops WS: client connected ({len(clients)} total)")
 
     try:
-        while True:   # держим соединение живым
+        while True:
             await asyncio.sleep(30)
 
     except WebSocketDisconnect:

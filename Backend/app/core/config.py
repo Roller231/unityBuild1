@@ -23,7 +23,7 @@ class CrashSettings:
     # API-токен для WebSocket (очень простой вариант безопасности)
     ws_token: str = os.getenv("CRASH_WS_TOKEN", "supersecret")
     # Периодичность выпадения подарков (секунды)
-    drop_interval_seconds: float = float(os.getenv("DROP_INTERVAL_SECONDS", 1.0))
+    drop_interval_seconds: float = float(os.getenv("DROP_INTERVAL_SECONDS", 2))
     # шанс, что коэффициент будет высоким (0–1)
     luck_chance: float = float(os.getenv("CRASH_LUCK_CHANCE", 0.15))
 

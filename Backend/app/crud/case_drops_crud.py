@@ -10,7 +10,13 @@ def get_case_drop(db: Session, case_id: int, drop_id: int) -> Optional[CaseDrops
     ).first()
 
 def get_case_drops_for_case(db: Session, case_id: int) -> List[CaseDrops]:
-    return db.query(CaseDrops).filter(CaseDrops.case_id == case_id).all()
+    return (
+        db.query(CaseDrops)
+        .filter(CaseDrops.case_id == case_id)
+        .order_by(CaseDrops.position.asc())  # 🔥 сортировка по порядку
+        .all()
+    )
+
 
 def create_case_drop(db: Session, data: CaseDropCreate) -> CaseDrops:
     obj = CaseDrops(**data.dict())

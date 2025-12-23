@@ -9,6 +9,7 @@ class PromoType(str, enum.Enum):
     deposit_fixed = "deposit_fixed"
     freespin = "freespin"
     ref_fixed = "ref_fixed"
+    freecase = "freecase"  # 🎁 НОВЫЙ ТИП
 
 
 class PromoCodes(Base):
