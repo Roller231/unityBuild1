@@ -7,7 +7,7 @@ from aiogram.types import (
     Message,
     InlineKeyboardMarkup,
     InlineKeyboardButton,
-    WebAppInfo
+    WebAppInfo, PreCheckoutQuery
 )
 
 from config import BOT_TOKEN, API_URL
@@ -20,6 +20,10 @@ dp = Dispatcher()
 
 
 # ---------- API FUNCTIONS ----------
+
+@dp.pre_checkout_query()
+async def pre_checkout_handler(pre_checkout_query: PreCheckoutQuery):
+    await pre_checkout_query.answer(ok=True)
 
 async def get_user_by_tg(tg_id: str):
     async with aiohttp.ClientSession() as session:
