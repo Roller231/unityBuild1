@@ -213,7 +213,9 @@ CREATE TABLE user_daily_games (
     games_played INT DEFAULT 0,
     was_free_spin BOOLEAN NOT NULL DEFAULT FALSE,
     was_free_case BOOLEAN NOT NULL DEFAULT FALSE,
-     usedPromoToday BOOLEAN NOT NULL DEFAULT FALSE;
+     usedPromoToday BOOLEAN NOT NULL DEFAULT FALSE,
+     usedFirst BOOLEAN NOT NULL DEFAULT FALSE,
+     usedTenDays BOOLEAN NOT NULL DEFAULT FALSE;
     PRIMARY KEY (user_id, day_date),
 
     CONSTRAINT fk_udg_user

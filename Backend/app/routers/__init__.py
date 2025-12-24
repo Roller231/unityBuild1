@@ -16,6 +16,7 @@ from . import (
     upgrade_router,
     stars_router,
     free_case_router,
-    ton_router
+    ton_router,
+    daily_rewards_router
 
 )
