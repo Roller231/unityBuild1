@@ -48,7 +48,8 @@ from app.routers import (
     roulette_router,
     upgrade_router,
     stars_router,
-    free_case_router
+    free_case_router,
+    ton_router
 )
 
 from app.services.crash_engine import crash_engine
@@ -98,6 +99,7 @@ app.include_router(roulette_router.router)
 app.include_router(upgrade_router.router)
 app.include_router(stars_router.router)
 app.include_router(free_case_router.router)
+app.include_router(ton_router.router)
 
 # WS
 app.include_router(crash_ws_router.router)

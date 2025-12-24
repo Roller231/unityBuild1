@@ -15,6 +15,7 @@ from . import (
     roulette_router,
     upgrade_router,
     stars_router,
-    free_case_router
+    free_case_router,
+    ton_router
 
 )
