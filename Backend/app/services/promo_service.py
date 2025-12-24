@@ -6,7 +6,8 @@ from app.models import Users
 from app.models.promo_codes import PromoCodes
 from app.models.user_promos import UserPromos
 from app.models.referral_promos import ReferralPromos
-
+from datetime import date
+from app.models.user_daily_games import UserDailyGames
 
 def get_active_user_promo(db: Session, user_id: int):
     return (
@@ -36,16 +37,34 @@ def get_active_global_promo(db: Session, user_id: int):
 
 def activate_promo(db, user, code: str):
     code = code.upper().strip()
-
+    today = date.today()
     # =================================================
     # 1️⃣ РЕФЕРАЛЬНЫЙ ПРОМО (РАЗРЕШЁН ВСЕГДА)
     # =================================================
+
+    daily = (
+        db.query(UserDailyGames)
+        .filter_by(user_id=user.id, day_date=today)
+        .first()
+    )
+
+    if not daily:
+        daily = UserDailyGames(
+            user_id=user.id,
+            day_date=today,
+            usedPromoToday=False
+        )
+        db.add(daily)
+        db.flush()
+
+
+
+
     ref = (
         db.query(ReferralPromos)
         .filter_by(code=code, active=True)
         .first()
     )
-
     if ref:
         # нельзя самому себе
         if ref.owner_user_id == user.id:
@@ -87,7 +106,8 @@ def activate_promo(db, user, code: str):
             "type": "referral",
             "reward": ref.reward
         }
-
+    if daily.usedPromoToday:
+        raise ValueError("You have already used a promo code today")
     # =================================================
     # 2️⃣ ГЛОБАЛЬНЫЙ ПРОМО (ТОЛЬКО ЕСЛИ НЕТ АКТИВНОГО)
     # =================================================
@@ -123,6 +143,7 @@ def activate_promo(db, user, code: str):
 
     db.add(user_promo)
     promo.used_count = (promo.used_count or 0) + 1
+    daily.usedPromoToday = True
     db.commit()
 
     return {

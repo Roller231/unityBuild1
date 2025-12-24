@@ -11,3 +11,4 @@ class UserDailyGames(Base):
     games_played = Column(Integer, default=0)
     was_free_spin = Column(Boolean, default=0)
     was_free_case = Column(Boolean, default=False)
+    usedPromoToday = Column(Boolean, default=False)

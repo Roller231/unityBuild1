@@ -131,8 +131,22 @@ def consume_free_case(
 
         daily.was_free_case = True
 
-    db.commit()
+    freecase_promo = (
+        db.query(UserPromos)
+        .join(PromoCodes, PromoCodes.id == UserPromos.promo_id)
+        .filter(
+            UserPromos.user_id == user_id,
+            UserPromos.completed == False,
+            PromoCodes.type == "freecase"
+        )
+        .order_by(UserPromos.activated_at.desc())
+        .first()
+    )
 
+    if freecase_promo:
+        freecase_promo.completed = True
+
+    db.commit()
     return {
         "ok": True,
         "used": True
