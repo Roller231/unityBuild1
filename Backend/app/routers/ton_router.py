@@ -49,19 +49,6 @@ async def ton_success(
     if not user:
         raise HTTPException(status_code=404, detail="User not found")
 
-    # 🔒 защита от повторного tx_hash
-    already_paid = (
-        db.query(Deposits)
-        .filter(
-            Deposits.type_deposit == "ton",
-            Deposits.payload == data.tx_hash,
-            Deposits.status == "success"
-        )
-        .first()
-    )
-    if already_paid:
-        return {"ok": True}
-
     # 🧾 берём последний pending TON депозит
     deposit = (
         db.query(Deposits)
@@ -71,7 +58,6 @@ async def ton_success(
             Deposits.status == "pending"
         )
         .order_by(Deposits.id.desc())
-        .with_for_update()
         .first()
     )
 
@@ -91,7 +77,6 @@ async def ton_success(
             PromoCodes.active == 1
         )
         .order_by(UserPromos.id.asc())
-        .with_for_update()
         .first()
     )
 
@@ -100,7 +85,6 @@ async def ton_success(
 
         if promo.type == "deposit_percent":
             bonus_amount = base_amount * (float(promo.value) / 100)
-
         elif promo.type == "deposit_fixed":
             bonus_amount = float(promo.value)
 
@@ -117,7 +101,6 @@ async def ton_success(
     # ✅ закрываем депозит
     deposit.status = "success"
     deposit.completed_at = datetime.utcnow()
-    deposit.payload = data.tx_hash  # сохраняем tx
 
     tx = Transactions(
         user_id=user.id,
@@ -136,3 +119,4 @@ async def ton_success(
         "base": round(base_amount, 4),
         "bonus": round(bonus_amount, 4)
     }
+

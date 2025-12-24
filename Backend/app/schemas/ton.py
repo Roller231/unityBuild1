@@ -7,4 +7,3 @@ class TonCreateRequest(BaseModel):
 
 class TonSuccessRequest(BaseModel):
     user_id: int
-    tx_hash: str
