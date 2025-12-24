@@ -11,22 +11,24 @@ from app.core.config import settings
 
 def calc_upgrade_chance(from_price: float, to_price: float) -> float:
     """
-    Шанс апгрейда:
-    - до равной цены — фиксированный
-    - после равной цены — плавно уменьшается
+    Upgrade logic:
+    - target дешевле или равен → 95%
+    - target дороже → стандартная формула
     """
+
+    # 🔥 DOWN / EQUAL upgrade
+    if to_price <= from_price:
+        return settings.upgrade_down_chance
+
+    # 📈 UP upgrade
     ratio = to_price / from_price
+    chance = settings.upgrade_base_chance * (ratio ** -settings.upgrade_decay_factor)
 
-    if ratio <= 1.0:
-        chance = settings.upgrade_base_chance
-    else:
-        chance = settings.upgrade_base_chance * (ratio ** -settings.upgrade_decay_factor)
-
-    # жёсткие границы
     return max(
         settings.upgrade_min_chance,
         min(settings.upgrade_max_chance, chance)
     )
+
 
 
 
@@ -52,8 +54,6 @@ def upgrade_service(
     if not from_drop or not to_drop:
         raise HTTPException(404, "Drop not found")
 
-    if to_drop.price <= from_drop.price:
-        raise HTTPException(400, "Target drop must be more expensive")
 
     # 3️⃣ списываем предмет
     removed = remove_drop_from_inventory(user, from_drop_id, count=1)

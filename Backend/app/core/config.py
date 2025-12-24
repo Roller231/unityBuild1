@@ -186,4 +186,11 @@ class CrashSettings:
     upgrade_max_chance: float = float(
         os.getenv("UPGRADE_MAX_CHANCE", 0.80)
     )
+
+    # шанс апгрейда в минус или в равную цену (фиксированный)
+    upgrade_down_chance: float = float(
+        os.getenv("UPGRADE_DOWN_CHANCE", 0.95)
+    )
+
+
 settings = CrashSettings()

@@ -123,7 +123,7 @@ async def stars_success(
     tx = Transactions(
         user_id=user.id,
         type="deposit_stars",
-        amount=credited_amount,
+        amount=deposit.amount,
         balance_before=balance_before,
         balance_after=user.balance
     )

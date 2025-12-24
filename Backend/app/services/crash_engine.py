@@ -94,15 +94,27 @@ class CrashEngine:
     def generate_crash_point(self) -> float:
         r = random.random()
 
-        # базовая формула
-        x = 1 / (1 - r + 1e-5)
+        # 🔴 1.00–1.05 → 65%
+        if r < 0.65:
+            x = random.uniform(1.00, 1.05)
 
-        # luck system
-        if random.random() < settings.luck_chance:
-            x *= settings.luck_multiplier  # увеличиваем коэффициент
+        # 🟠 1.05–1.20 → 15%
+        elif r < 0.80:
+            x = random.uniform(1.05, 1.20)
 
-        x = max(settings.min_x, min(x, settings.max_x))
-        return round(x, 2)
+        # 🟡 1.20–1.60 → 10%
+        elif r < 0.90:
+            x = random.uniform(1.20, 1.60)
+
+        # 🟢 1.60–3.00 → 7%
+        elif r < 0.97:
+            x = random.uniform(1.60, 3.00)
+
+        # 🔵 3.00–MAX → 3%
+        else:
+            x = random.uniform(3.00, settings.max_x)
+
+        return round(min(x, settings.max_x), 2)
 
     # -----------------------------------------------------------------
     # PLACE BET
