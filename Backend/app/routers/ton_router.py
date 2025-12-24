@@ -17,36 +17,27 @@ async def ton_create(
     data: TonCreateRequest,
     db: Session = Depends(get_db)
 ):
-    user_id = data.user_id
-    amount = float(data.amount)
-
-    if amount <= 0:
-        raise HTTPException(status_code=400, detail="Invalid amount")
-
-    user = db.query(Users).filter(Users.id == user_id).first()
+    user = db.query(Users).filter(Users.id == data.user_id).first()
     if not user:
         raise HTTPException(status_code=404, detail="User not found")
 
-    payload = f"ton_{uuid4()}"
+    if data.amount <= 0:
+        raise HTTPException(status_code=400, detail="Invalid amount")
 
     deposit = Deposits(
         user_id=user.id,
         username=user.username,
-        amount=amount,
+        amount=float(data.amount),
         currency="TON",
         type_deposit="ton",
-        payload=payload,          # intent-id
         status="pending"
     )
 
     db.add(deposit)
     db.commit()
 
-    return {
-        "ok": True,
-        "deposit_id": deposit.id,
-        "payload": payload
-    }
+    return {"ok": True}
+
 
 
 @router.post("/success")
@@ -54,25 +45,16 @@ async def ton_success(
     data: TonSuccessRequest,
     db: Session = Depends(get_db)
 ):
-    user_id = data.user_id
-    amount = float(data.amount)
-    tx_hash = data.tx_hash
-    payload = data.payload  # <-- intent-id от /create
-
-    if amount <= 0:
-        raise HTTPException(status_code=400, detail="Invalid amount")
-
-    # 1) пользователь
-    user = db.query(Users).filter(Users.id == user_id).first()
+    user = db.query(Users).filter(Users.id == data.user_id).first()
     if not user:
         raise HTTPException(status_code=404, detail="User not found")
 
-    # 2) защита от повторного tx_hash (если уже был зачислен)
+    # 🔒 защита от повторного tx_hash
     already_paid = (
         db.query(Deposits)
         .filter(
             Deposits.type_deposit == "ton",
-            Deposits.payload == tx_hash,
+            Deposits.payload == data.tx_hash,
             Deposits.status == "success"
         )
         .first()
@@ -80,36 +62,31 @@ async def ton_success(
     if already_paid:
         return {"ok": True}
 
-    # 3) находим pending депозит по payload (intent)
+    # 🧾 берём последний pending TON депозит
     deposit = (
         db.query(Deposits)
         .filter(
-            Deposits.user_id == user_id,
+            Deposits.user_id == user.id,
             Deposits.type_deposit == "ton",
-            Deposits.payload == payload,
             Deposits.status == "pending"
         )
+        .order_by(Deposits.id.desc())
         .with_for_update()
         .first()
     )
 
     if not deposit:
-        raise HTTPException(status_code=404, detail="No pending ton deposit for this payload")
+        raise HTTPException(status_code=404, detail="No pending TON deposits")
 
-    # (опционально) сверяем сумму с create, чтобы нельзя было подменить amount
-    # можно разрешить ">= депозит.amount" если хочешь доплатой
-    if float(deposit.amount) != amount:
-        raise HTTPException(status_code=400, detail="Amount mismatch")
-
-    # 4) промо
-    base_amount = amount
+    base_amount = float(deposit.amount)
     bonus_amount = 0.0
 
+    # 🎁 промо
     promo_row = (
         db.query(UserPromos, PromoCodes)
         .join(PromoCodes, UserPromos.promo_id == PromoCodes.id)
         .filter(
-            UserPromos.user_id == user_id,
+            UserPromos.user_id == user.id,
             UserPromos.completed == 0,
             PromoCodes.active == 1
         )
@@ -125,30 +102,29 @@ async def ton_success(
             bonus_amount = base_amount * (float(promo.value) / 100)
 
         elif promo.type == "deposit_fixed":
-            bonus_amount = float(promo.value)  # фикс бонус уже в TON
+            bonus_amount = float(promo.value)
 
         user_promo.completed = 1
         user_promo.completed_at = datetime.utcnow()
 
     total_credit = base_amount + bonus_amount
 
-    # 5) зачисление
+    # 💰 баланс
     balance_before = user.balance or 0
     user.balance = balance_before + total_credit
     user.totalDEP = (user.totalDEP or 0) + total_credit
 
-    # 6) закрываем депозит (и сохраняем tx_hash в payload, без новых полей)
+    # ✅ закрываем депозит
     deposit.status = "success"
     deposit.completed_at = datetime.utcnow()
-    deposit.payload = tx_hash  # <-- сохраняем факт транзакции
+    deposit.payload = data.tx_hash  # сохраняем tx
 
     tx = Transactions(
         user_id=user.id,
         type="deposit",
         amount=total_credit,
         balance_before=balance_before,
-        balance_after=user.balance,
-
+        balance_after=user.balance
     )
 
     db.add(tx)
