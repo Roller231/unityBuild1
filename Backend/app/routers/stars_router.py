@@ -5,6 +5,7 @@ from sqlalchemy.orm import Session
 from datetime import datetime
 
 from app.database import get_db
+from app.models import UserPromos, PromoCodes
 from app.models.users import Users
 from app.models.deposits import Deposits
 from app.models.transactions import Transactions
@@ -86,9 +87,9 @@ async def stars_success(
     # 1️⃣ пользователь
     user = db.query(Users).filter(Users.id == user_id).first()
     if not user:
-        raise HTTPException(404, "User not found")
+        raise HTTPException(status_code=404, detail="User not found")
 
-    # 2️⃣ последний pending депозит
+    # 2️⃣ pending депозит
     deposit = (
         db.query(Deposits)
         .filter(
@@ -97,26 +98,56 @@ async def stars_success(
             Deposits.status == "pending"
         )
         .order_by(Deposits.created_at.desc())
+        .with_for_update()
         .first()
     )
 
     if not deposit:
-        raise HTTPException(404, "No pending deposit")
+        raise HTTPException(status_code=404, detail="No pending deposit")
 
-    # 3️⃣ защита от повторного зачисления
     if deposit.status == "success":
         return {"ok": True}
 
-    # 4️⃣ курс
+    # 3️⃣ курс
     rates = get_rates()
-    stars_rate = rates["stars"]
+    stars_rate = float(rates["stars"])
 
-    credited_amount = float(deposit.amount) * float(stars_rate)
+    base_amount = float(deposit.amount) * stars_rate
+    bonus_amount = 0.0
+
+    # 4️⃣ активное промо пользователя
+    promo_row = (
+        db.query(UserPromos, PromoCodes)
+        .join(PromoCodes, UserPromos.promo_id == PromoCodes.id)
+        .filter(
+            UserPromos.user_id == user_id,
+            UserPromos.completed == 0,
+            PromoCodes.active == 1
+        )
+        .order_by(UserPromos.id.asc())
+        .with_for_update()
+        .first()
+    )
+
+    if promo_row:
+        user_promo, promo = promo_row
+
+        if promo.type == "deposit_percent":
+            bonus_amount = base_amount * (float(promo.value) / 100)
+
+        elif promo.type == "deposit_fixed":
+            bonus_amount = float(promo.value)
+
+        # помечаем промо использованным
+        user_promo.completed = 1
+        user_promo.completed_at = datetime.utcnow()
+
+    total_credit = base_amount + bonus_amount
 
     # 5️⃣ зачисление
-    balance_before = user.balance
-    user.balance += credited_amount
-    user.totalDEP = (user.totalDEP or 0) + credited_amount
+    balance_before = user.balance or 0
+    user.balance = balance_before + total_credit
+    user.totalDEP = (user.totalDEP or 0) + total_credit
 
     deposit.status = "success"
     deposit.completed_at = datetime.utcnow()
@@ -124,7 +155,7 @@ async def stars_success(
     tx = Transactions(
         user_id=user.id,
         type="deposit",
-        amount=credited_amount,
+        amount=total_credit,
         balance_before=balance_before,
         balance_after=user.balance
     )
@@ -132,6 +163,11 @@ async def stars_success(
     db.add(tx)
     db.commit()
 
-    return {"ok": True}
+    return {
+        "ok": True,
+        "credited": round(total_credit, 2),
+        "base": round(base_amount, 2),
+        "bonus": round(bonus_amount, 2)
+    }
 
 
