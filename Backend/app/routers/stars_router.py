@@ -116,14 +116,15 @@ async def stars_success(
     # 5️⃣ зачисление
     balance_before = user.balance
     user.balance += credited_amount
+    user.totalDEP = (user.totalDEP or 0) + credited_amount
 
     deposit.status = "success"
     deposit.completed_at = datetime.utcnow()
 
     tx = Transactions(
         user_id=user.id,
-        type="deposit_stars",
-        amount=deposit.amount,
+        type="deposit",
+        amount=credited_amount,
         balance_before=balance_before,
         balance_after=user.balance
     )

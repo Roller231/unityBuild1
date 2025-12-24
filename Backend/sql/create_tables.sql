@@ -211,7 +211,8 @@ CREATE TABLE user_daily_games (
     user_id INT NOT NULL,
     day_date DATE NOT NULL,
     games_played INT DEFAULT 0,
-was_free_spin BOOLEAN NOT NULL DEFAULT FALSE,
+    was_free_spin BOOLEAN NOT NULL DEFAULT FALSE,
+    was_free_case BOOLEAN NOT NULL DEFAULT FALSE,  -- ✅ НОВОЕ ПОЛЕ
     PRIMARY KEY (user_id, day_date),
 
     CONSTRAINT fk_udg_user
@@ -219,6 +220,7 @@ was_free_spin BOOLEAN NOT NULL DEFAULT FALSE,
         REFERENCES users(id)
         ON DELETE CASCADE
 );
+
 
 CREATE TABLE user_promos (
     id INT AUTO_INCREMENT PRIMARY KEY,

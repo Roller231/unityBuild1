@@ -10,3 +10,4 @@ class UserDailyGames(Base):
     day_date = Column(Date, primary_key=True)
     games_played = Column(Integer, default=0)
     was_free_spin = Column(Boolean, default=0)
+    was_free_case = Column(Boolean, default=False)
