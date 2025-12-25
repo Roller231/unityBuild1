@@ -74,6 +74,13 @@ CREATE TABLE withdraw_requests (
         REFERENCES drops(id)
         ON DELETE SET NULL
 );
+CREATE TABLE game_settings (
+    id SERIAL PRIMARY KEY,
+    key TEXT UNIQUE NOT NULL,
+    value TEXT NOT NULL,
+    description TEXT,
+    updated_at TIMESTAMP DEFAULT now()
+);
 
 
 

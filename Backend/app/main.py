@@ -8,7 +8,7 @@ from fastapi.staticfiles import StaticFiles
 
 from sqladmin import Admin, ModelView
 
-from app.core.config import settings
+from app.core.config import settings, load_game_settings
 from app.database import Base, engine
 from app.services.crash_bots_engine import bot_loop
 # models
@@ -24,6 +24,7 @@ from app.models.crash_bots import CrashBots
 from app.models.promo_codes import PromoCodes
 from app.models.user_promos import UserPromos
 from app.models.referral_promos import ReferralPromos
+from app.services.online_engine import online_engine
 from app.services.pvp_engine import pvp_engine
 from app.routers import pvp_ws_router
 
@@ -51,7 +52,8 @@ from app.routers import (
     free_case_router,
     ton_router,
     daily_rewards_router,
-    withdraw_router
+    withdraw_router,
+    online_ws_router
 )
 
 from app.services.crash_engine import crash_engine
@@ -109,6 +111,7 @@ app.include_router(withdraw_router.router)
 app.include_router(crash_ws_router.router)
 app.include_router(drops_ws_router.router)
 app.include_router(pvp_ws_router.router)
+app.include_router(online_ws_router.router)
 
 # ---------------------------------------------------------
 #                STREAM SYSTEM
@@ -146,10 +149,22 @@ async def drop_global_stream():
 
 @app.on_event("startup")
 async def startup_event():
+    # 1️⃣ грузим настройки из БД
+    with engine.connect() as conn:
+        result = conn.execute(text("SELECT name, value FROM game_settings"))
+        db_settings = {row.name: row.value for row in result}
+
+    settings.apply_db_settings(db_settings)
+
+    print("✅ SETTINGS LOADED FROM DB")
+    print(settings)
+
+    # 2️⃣ запускаем фоновые процессы
     asyncio.create_task(crash_engine.game_loop())
     asyncio.create_task(drop_global_stream())
-    asyncio.create_task(bot_loop())  # ← запускаем ботов!
+    asyncio.create_task(bot_loop())
     asyncio.create_task(pvp_engine.bots_loop())
+    asyncio.create_task(online_engine.loop())
 # ---------------------------------------------------------
 #               🔥 FASTAPI ADMIN PANEL
 # ---------------------------------------------------------

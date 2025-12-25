@@ -94,23 +94,23 @@ class CrashEngine:
     def generate_crash_point(self) -> float:
         r = random.random()
 
-        # 🔴 1.00–1.05 → 55%
-        if r < 0.55:
+        # 🔴 1.00–1.05 → 30%
+        if r < 0.30:
             x = random.uniform(1.00, 1.05)
 
-        # 🟠 1.05–1.20 → 18%
-        elif r < 0.73:
+        # 🟠 1.05–1.20 → 25%
+        elif r < 0.55:
             x = random.uniform(1.05, 1.20)
 
-        # 🟡 1.20–1.60 → 12%
-        elif r < 0.85:
+        # 🟡 1.20–1.60 → 25%
+        elif r < 0.80:
             x = random.uniform(1.20, 1.60)
 
-        # 🟢 1.60–3.00 → 10%
-        elif r < 0.95:
+        # 🟢 1.60–3.00 → 18%
+        elif r < 0.98:
             x = random.uniform(1.60, 3.00)
 
-        # 🔵 3.00–MAX → 5%
+        # 🔵 3.00–MAX → 2%
         else:
             x = random.uniform(3.00, settings.max_x)
 

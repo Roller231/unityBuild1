@@ -78,25 +78,22 @@ class PvPEngine:
     # -------------------------------------------------------------
     async def bots_loop(self):
         while True:
-            await asyncio.sleep(
-                random.uniform(
-                    settings.pvp_bot_spawn_min_sec,
-                    settings.pvp_bot_spawn_max_sec
-                )
-            )
+            await asyncio.sleep(1)
 
             if not self.clients:
                 continue
 
-            now = time()
+            async with self.lock:
+                live_count = len(self.active_bots)
+
+            if live_count >= 15:
+                continue
 
             db: Session = SessionLocal()
             try:
                 bots = db.query(CrashBots).all()
-                if not bots:
-                    continue
+                now = time()
 
-                # ❌ исключаем активных и на кулдауне
                 available_bots = [
                     b for b in bots
                     if b.id not in self.active_bot_ids
@@ -110,7 +107,7 @@ class PvPEngine:
                 bet = round(random.uniform(bot.min_bet, bot.max_bet), 2)
 
                 bot_state = {
-                    "id": f"{bot.id}-{random.randint(1000, 9999)}",
+                    "id": bot.id,
                     "bot_id": bot.id,
                     "nickname": bot.nickname,
                     "avatar_url": bot.avatar_url,
@@ -120,7 +117,7 @@ class PvPEngine:
 
                 async with self.lock:
                     self.active_bots.append(bot_state)
-                    self.active_bots = self.active_bots[-3:]
+                    self.active_bots = self.active_bots[-25:]
                     self.active_bot_ids.add(bot.id)
 
                 await self.broadcast({

@@ -18,6 +18,7 @@ from . import (
     free_case_router,
     ton_router,
     daily_rewards_router,
-    withdraw_router
+    withdraw_router,
+    online_ws_router
 
 )
