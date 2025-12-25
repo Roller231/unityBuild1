@@ -11,6 +11,8 @@ from app.models.deposits import Deposits
 from app.models.transactions import Transactions
 from bot.config import BOT_TOKEN
 from app.services.rates_service import get_rates
+from app.services.level_service import add_user_xp
+from app.services.telegram_notify_service import notify_success_deposit
 
 router = APIRouter(prefix="/api/stars", tags=["Stars"])
 
@@ -67,6 +69,8 @@ async def create_stars_invoice(
 
     db.add(deposit)
     db.commit()
+
+
 
     return {"invoice_link": data_tg["result"]}
 
@@ -149,6 +153,15 @@ async def stars_success(
     user.balance = balance_before + total_credit
     user.totalDEP = (user.totalDEP or 0) + total_credit
 
+    # 🔥 XP ЗА УСПЕШНЫЙ STARS-ДЕПОЗИТ (+300)
+    xp_result = add_user_xp(
+        db=db,
+        user=user,
+        xp_amount=300,
+        commit=False,  # ⬅️ один общий commit ниже
+    )
+
+
     deposit.status = "success"
     deposit.completed_at = datetime.utcnow()
 
@@ -158,6 +171,14 @@ async def stars_success(
         amount=total_credit,
         balance_before=balance_before,
         balance_after=user.balance
+    )
+
+    notify_success_deposit(
+        user_id=user.id,
+        username=user.username,
+        amount=total_credit,
+        currency="STARS",
+        bonus=bonus_amount,
     )
 
     db.add(tx)

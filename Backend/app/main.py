@@ -50,7 +50,8 @@ from app.routers import (
     stars_router,
     free_case_router,
     ton_router,
-    daily_rewards_router
+    daily_rewards_router,
+    withdraw_router
 )
 
 from app.services.crash_engine import crash_engine
@@ -102,6 +103,7 @@ app.include_router(stars_router.router)
 app.include_router(free_case_router.router)
 app.include_router(ton_router.router)
 app.include_router(daily_rewards_router.router)
+app.include_router(withdraw_router.router)
 
 # WS
 app.include_router(crash_ws_router.router)

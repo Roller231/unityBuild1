@@ -40,12 +40,51 @@ CREATE TABLE case_drops (
         ON DELETE CASCADE
 );
 
+
+CREATE TABLE withdraw_requests (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+
+    -- user
+    user_id INT NOT NULL,
+    tg_id VARCHAR(255) NOT NULL,
+    username VARCHAR(255),
+
+    -- что выводят (ОДНО ИЗ ДВУХ)
+    ton_amount DECIMAL(12,4) NULL,
+    drop_id INT NULL,
+
+    -- тип вывода
+    type ENUM('ton', 'drop') NOT NULL,
+
+    -- статус заявки
+    status ENUM('pending', 'approved', 'rejected', 'processed') NOT NULL DEFAULT 'pending',
+
+    -- служебное
+    comment VARCHAR(255) NULL,          -- комментарий админа
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    processed_at DATETIME NULL,
+
+    CONSTRAINT fk_wr_user
+        FOREIGN KEY (user_id)
+        REFERENCES users(id)
+        ON DELETE CASCADE,
+
+    CONSTRAINT fk_wr_drop
+        FOREIGN KEY (drop_id)
+        REFERENCES drops(id)
+        ON DELETE SET NULL
+);
+
+
+
 CREATE TABLE users (
     id INT AUTO_INCREMENT PRIMARY KEY,
     tg_id VARCHAR(255) UNIQUE,
     username VARCHAR(255),
     firstname VARCHAR(255),
     balance FLOAT DEFAULT 0,
+    level INT NOT NULL DEFAULT 1,
+    xp INT NOT NULL DEFAULT 0,
     refcount INT DEFAULT 0,
     refLink VARCHAR (50),
     refererID VARCHAR(250),

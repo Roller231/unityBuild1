@@ -7,6 +7,7 @@ from app.crud.users_crud import (
     create_user, get_user, get_users,
     update_user, delete_user, get_user_by_tg
 )
+from app.services.telegram_notify_service import notify_user_registration
 
 router = APIRouter(prefix="/users", tags=["Users"])
 
@@ -30,7 +31,17 @@ def read_by_tg(tg_id: str, db: Session = Depends(get_db)):
 
 @router.post("/", response_model=UserOut)
 def create(data: UserCreate, db: Session = Depends(get_db)):
-    return create_user(db, data)
+    user = create_user(db, data)
+
+    # 🔔 уведомление о регистрации пользователя
+    notify_user_registration(
+        user_id=user.id,
+        tg_id=user.tg_id,
+        username=user.username,
+    )
+
+    return user
+
 
 @router.patch("/{user_id}", response_model=UserOut)
 def patch(user_id: int, data: UserUpdate, db: Session = Depends(get_db)):

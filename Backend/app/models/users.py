@@ -22,7 +22,8 @@ class Users(Base):
     url_image = Column(String(255), nullable=True)
     created_at = Column(DateTime, default=datetime.utcnow)
     updated_at = Column(DateTime, default=datetime.utcnow)
-
+    level = Column(Integer, default=1, nullable=False)
+    xp = Column(Integer, default=0, nullable=False)
     transactions = relationship("Transactions", back_populates="user")
     crash_bets = relationship("CrashBets", back_populates="user")
     def __str__(self):

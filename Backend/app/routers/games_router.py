@@ -3,7 +3,7 @@
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 from datetime import date
-
+from app.services.level_service import add_user_xp
 from app.database import get_db
 from app.models.user_daily_games import UserDailyGames
 from app.models.users import Users
@@ -66,6 +66,13 @@ def register_game_play(
             and not user_promo.completed
         ):
             freespin_unlocked = True
+
+    xp_result = add_user_xp(
+        db=db,
+        user=user,
+        xp_amount=50,
+        commit=False,  # ⬅️ важно, коммит ниже общий
+    )
 
     db.commit()
 

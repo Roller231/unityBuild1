@@ -12,6 +12,8 @@ class UserBase(BaseModel):
     totalDEP: Optional[float] = None
     inventory: Optional[Any] = None
     url_image: Optional[str] = None
+    level: Optional[int] = 1
+    xp: Optional[int] = 0
 
 
 class UserCreate(UserBase):
@@ -32,6 +34,9 @@ class UserUpdate(BaseModel):
 
 class UserOut(UserBase):
     id: int
+    level: int
+    xp: int
 
     class Config:
         orm_mode = True
+

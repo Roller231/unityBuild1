@@ -13,6 +13,7 @@ from .user_daily_games import UserDailyGames
 from .roulette_spins import RouletteSpins
 from .pvp_games import PvPGames
 from .deposits import Deposits
+from .withdraw_requests import WithdrawRequests
 
 __all__ = [
     "Drops",
@@ -29,5 +30,6 @@ __all__ = [
     "UserDailyGames",
     "RouletteSpins",
     "PvPGames",
-    "Deposits"
+    "Deposits",
+    "WithdrawRequests"
 ]

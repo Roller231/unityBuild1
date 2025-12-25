@@ -17,6 +17,7 @@ from . import (
     stars_router,
     free_case_router,
     ton_router,
-    daily_rewards_router
+    daily_rewards_router,
+    withdraw_router
 
 )

@@ -13,7 +13,7 @@ from aiogram.types import (
 from config import BOT_TOKEN, API_URL
 
 
-BOT_USERNAME = "CATGG_TEST_BOT"
+BOT_USERNAME = "ggcat_game_bot"
 
 bot = Bot(BOT_TOKEN)
 dp = Dispatcher()

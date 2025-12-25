@@ -2,12 +2,13 @@ from uuid import uuid4
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 from datetime import datetime
-
+from app.services.level_service import add_user_xp
 from app.database import get_db
 from app.models import Transactions, UserPromos, PromoCodes
 from app.models.users import Users
 from app.models.deposits import Deposits
 from app.schemas.ton import TonCreateRequest, TonSuccessRequest
+from app.services.telegram_notify_service import notify_success_deposit
 
 router = APIRouter(prefix="/api/ton", tags=["TON"])
 
@@ -98,6 +99,15 @@ async def ton_success(
     user.balance = balance_before + total_credit
     user.totalDEP = (user.totalDEP or 0) + total_credit
 
+    # 🔥 XP ЗА УСПЕШНЫЙ TON-ДЕПОЗИТ (+300)
+    xp_result = add_user_xp(
+        db=db,
+        user=user,
+        xp_amount=300,
+        commit=False,  # ⬅️ один общий commit ниже
+    )
+
+
     # ✅ закрываем депозит
     deposit.status = "success"
     deposit.completed_at = datetime.utcnow()
@@ -112,6 +122,17 @@ async def ton_success(
 
     db.add(tx)
     db.commit()
+
+
+    # 🔔 уведомление админам о TON-депозите
+    notify_success_deposit(
+        user_id=user.id,
+        username=user.username,
+        amount=total_credit,
+        currency="TON",
+        bonus=bonus_amount,
+    )
+
 
     return {
         "ok": True,
