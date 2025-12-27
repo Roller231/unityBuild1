@@ -130,27 +130,6 @@ class CrashEngine:
 
         is_bot = user_id < 0
 
-        if is_bot:
-            async with self.lock:
-                if self.phase != "betting":
-                    return {"ok": False, "error": "bots_cannot_queue"}
-
-                if user_id in self.bets:
-                    return {"ok": False, "error": "already_bet"}
-
-                st = CrashBetState(user_id=user_id, amount=amount)
-                st.auto_cashout_x = auto_cashout_x
-                self.bets[user_id] = st
-
-            await self.broadcast({
-                "event": "bet_placed",
-                "user_id": user_id,
-                "amount": amount,
-                "gift": False
-            })
-
-            return {"ok": True}
-
         async with self.lock:
             if self.phase != "betting":
                 self.next_round_pending_bets.append({
@@ -316,24 +295,6 @@ class CrashEngine:
     async def _auto_cashout(self, user_id: int, multiplier: float):
         is_bot = user_id < 0
 
-        is_bot = user_id < 0
-
-        if is_bot:
-            bet = self.bets.get(user_id)
-            if not bet or bet.cashout_x is not None:
-                return
-
-            bet.cashout_x = multiplier
-            bet.profit = bet.amount * multiplier - bet.amount
-
-            await self.broadcast({
-                "event": "cashout",
-                "user_id": user_id,
-                "multiplier": multiplier,
-                "auto": True
-            })
-            return
-
         bet = self.bets.get(user_id)
         if not bet or bet.cashout_x is not None:
             return
@@ -482,8 +443,6 @@ class CrashEngine:
 
                 # --- ПЕРЕНОС ОТЛОЖЕННЫХ СТАВОК ТОЛЬКО ОДИН РАЗ ---
                 pending = list(self.next_round_pending_bets)
-                pending = [p for p in pending if p["user_id"] >= 0]
-
                 self.next_round_pending_bets.clear()
 
                 if pending:

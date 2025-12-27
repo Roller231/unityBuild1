@@ -19,6 +19,9 @@ async def bot_loop():
     while True:
         await asyncio.sleep(random.uniform(0.4, 1.2))
 
+        if crash_engine.phase != "betting":
+            continue
+
         bot = random.choice(bots)
         now = time.time()
 
