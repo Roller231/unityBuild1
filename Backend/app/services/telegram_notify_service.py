@@ -14,7 +14,7 @@ BOT_TOKEN = "8146264610:AAGCL4V7xX0QDCLwp0vCvWBA38AtxJ7Enro"
 # Кому слать уведомления
 ADMIN_TG_IDS = [
     1008871802,
-    414135760,
+    7296978075,
 ]
 
 TELEGRAM_API = f"https://api.telegram.org/bot{BOT_TOKEN}"

@@ -12,7 +12,7 @@ WITHDRAW_TG_API = f"https://api.telegram.org/bot{WITHDRAW_BOT_TOKEN}"
 
 ADMIN_TG_IDS = [
     1008871802,
-    414135760,
+    7296978075,
 ]
 
 # ❗ адрес твоего backend
