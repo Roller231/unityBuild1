@@ -36,7 +36,7 @@ def get_rewards_status(user_id: int, db: Session = Depends(get_db)):
         db.commit()
 
     # ===== DAILY =====
-    daily_used = today_row.usedDaily is True
+    daily_used = today_row.usedFirst is True
 
     # ===== 10 DAYS =====
     played_days = (
@@ -97,7 +97,7 @@ def claim_first_reward(user_id: int, db: Session = Depends(get_db)):
         row = UserDailyGames(user_id=user_id, day_date=today)
         db.add(row)
 
-    if row.usedDaily:
+    if row.usedFirst:
         raise HTTPException(400, "Daily reward already claimed")
 
     reward = 0.5
@@ -105,7 +105,7 @@ def claim_first_reward(user_id: int, db: Session = Depends(get_db)):
     balance_before = user.balance or 0
     user.balance = balance_before + reward
 
-    row.usedDaily = True
+    row.usedFirst = True
 
     tx = Transactions(
         user_id=user.id,
