@@ -1,5 +1,7 @@
 import asyncio
+import re
 import aiohttp
+import aiomysql
 
 from aiogram import Bot, Dispatcher
 from aiogram.filters import CommandStart
@@ -7,19 +9,35 @@ from aiogram.types import (
     Message,
     InlineKeyboardMarkup,
     InlineKeyboardButton,
-    WebAppInfo, PreCheckoutQuery
+    WebAppInfo,
+    PreCheckoutQuery
 )
 
 from config import BOT_TOKEN, API_URL
 
 
+# ================== CONFIG ==================
+
 BOT_USERNAME = "ggcat_game_bot"
+
+DB_CONFIG = {
+    "host": "localhost",
+    "port": 3306,
+    "user": "root",
+    "password": "141722A!",
+    "db": "krash",
+    "autocommit": True,
+    "charset": "utf8mb4"
+}
+
+WEBAPP_URL = "https://unity-build1-r7zk.vercel.app/"
+
+# ============================================
 
 bot = Bot(BOT_TOKEN)
 dp = Dispatcher()
 
-
-# ---------- API FUNCTIONS ----------
+# ================== API FUNCTIONS (ОСТАВИЛ) ==================
 
 @dp.pre_checkout_query()
 async def pre_checkout_handler(pre_checkout_query: PreCheckoutQuery):
@@ -32,33 +50,59 @@ async def get_user_by_tg(tg_id: str):
                 return None
             return await resp.json()
 
-
 async def create_user(payload: dict):
     async with aiohttp.ClientSession() as session:
         async with session.post(f"{API_URL}/users/", json=payload) as resp:
             return await resp.json()
 
-
 async def increment_refcount(tg_id: str):
     async with aiohttp.ClientSession() as session:
         await session.post(f"{API_URL}/users/refcount/{tg_id}")
 
+# ================== MYSQL ==================
 
-# ---------- GET AVATAR URL ----------
+async def fetch_setting(name: str) -> str | None:
+    conn = await aiomysql.connect(**DB_CONFIG)
+    async with conn.cursor() as cur:
+        await cur.execute(
+            "SELECT value FROM game_settings WHERE name=%s LIMIT 1",
+            (name,)
+        )
+        row = await cur.fetchone()
+    conn.close()
+    return row[0] if row else None
+
+# ================== TEMPLATE RENDER ==================
+
+def render_template(text: str, variables: dict):
+    if not text:
+        return "", "🚀 ИГРАТЬ"
+
+    # переменные {var}
+    for k, v in variables.items():
+        text = text.replace(f"{{{k}}}", str(v or ""))
+
+    # кнопка <btn>...</btn>
+    btn_text = "🚀 ИГРАТЬ"
+    match = re.search(r"<btn>(.*?)</btn>", text, re.DOTALL)
+    if match:
+        btn_text = match.group(1).strip()
+        text = re.sub(r"<btn>.*?</btn>", "", text, flags=re.DOTALL)
+
+    return text.strip(), btn_text
+
+# ================== AVATAR ==================
 
 async def get_avatar_url(user_id: int) -> str | None:
     photos = await bot.get_user_profile_photos(user_id, limit=1)
-
     if photos.total_count == 0:
         return None
 
     file_id = photos.photos[0][-1].file_id
     file = await bot.get_file(file_id)
-
     return f"https://api.telegram.org/file/bot{BOT_TOKEN}/{file.file_path}"
 
-
-# ---------- /start HANDLER ----------
+# ================== /start ==================
 
 @dp.message(CommandStart())
 async def start_handler(message: Message):
@@ -66,25 +110,26 @@ async def start_handler(message: Message):
     username = message.from_user.username
     firstname = message.from_user.first_name
 
-    # ref из /start
+    # ref
     ref_param = None
     parts = message.text.split()
     if len(parts) > 1:
         ref_param = parts[1]
 
-    # проверяем пользователя
+    inviter_name = ""
+
+    # ----------- USER / REF LOGIC (КАК БЫЛО) -----------
     user = await get_user_by_tg(tg_id)
 
-    invited_text = ""
-
-    # ---------- ЕСЛИ ПОЛЬЗОВАТЕЛЬ НОВЫЙ ----------
     if not user:
-        # если пришёл по рефке — готовим текст
         if ref_param and ref_param != tg_id:
             referer = await get_user_by_tg(ref_param)
             if referer:
-                inviter_name = referer.get("username") or referer.get("firstname") or "пользователем"
-                invited_text = f"\n👥 **Вы приглашены пользователем:** `{inviter_name}`\n"
+                inviter_name = (
+                    referer.get("username")
+                    or referer.get("firstname")
+                    or "пользователем"
+                )
 
         avatar_url = await get_avatar_url(message.from_user.id)
         ref_link = f"https://t.me/{BOT_USERNAME}?start={tg_id}"
@@ -104,44 +149,47 @@ async def start_handler(message: Message):
 
         await create_user(payload)
 
-        # начисляем refcount ТОЛЬКО ОДИН РАЗ
-        if ref_param and ref_param != tg_id:
-            referer = await get_user_by_tg(ref_param)
-            if referer:
-                await increment_refcount(ref_param)
+        if ref_param and ref_param != tg_id and inviter_name:
+            await increment_refcount(ref_param)
 
-    # ---------- КНОПКА MINI APP ----------
+    # ----------- TEXTS FROM DB -----------
+    start_text_raw = await fetch_setting("start_text")
+    ref_text_raw = await fetch_setting("ref_text")
+
+    variables = {
+        "firstname": firstname,
+        "username": username,
+        "inviter": inviter_name
+    }
+
+    main_text, btn_text = render_template(start_text_raw, variables)
+
+    if inviter_name and ref_text_raw:
+        ref_text, _ = render_template(ref_text_raw, variables)
+        main_text += f"\n\n{ref_text}"
+
+    # ----------- BUTTON -----------
     keyboard = InlineKeyboardMarkup(
         inline_keyboard=[
             [
                 InlineKeyboardButton(
-                    text="🚀 ИГРАТЬ",
-                    web_app=WebAppInfo(
-                        url="https://unity-build1-r7zk.vercel.app/"
-                    )
+                    text=btn_text,
+                    web_app=WebAppInfo(url=WEBAPP_URL)
                 )
             ]
         ]
     )
 
-    # ---------- СООБЩЕНИЕ ----------
     await message.answer(
-        "🐱 **ggCat приветствует тебя!**\n\n"
-        "🎰 Это игра *рулетка*\n"
-        "💰 Крути — выигрывай — поднимай баланс\n"
-        f"{invited_text}\n"
-        "👇 Жми кнопку и играй прямо в Telegram!",
+        main_text,
         reply_markup=keyboard,
         parse_mode="Markdown"
     )
 
-
-
-# ---------- START ----------
+# ================== START ==================
 
 async def main():
     await dp.start_polling(bot)
-
 
 if __name__ == "__main__":
     asyncio.run(main())

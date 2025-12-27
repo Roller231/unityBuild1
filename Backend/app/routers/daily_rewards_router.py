@@ -21,7 +21,6 @@ def get_rewards_status(user_id: int, db: Session = Depends(get_db)):
 
     today = date.today()
 
-    # гарантируем строку на сегодня
     today_row = (
         db.query(UserDailyGames)
         .filter(
@@ -36,49 +35,41 @@ def get_rewards_status(user_id: int, db: Session = Depends(get_db)):
         db.add(today_row)
         db.commit()
 
-    # ===== БОНУС ЗА 1-Й ВХОД (1 раз за всё время) =====
-    first_used_ever = (
-        db.query(UserDailyGames)
-        .filter(
-            UserDailyGames.user_id == user_id,
-            UserDailyGames.usedFirst == True
-        )
-        .first()
-        is not None
-    )
+    # ===== DAILY =====
+    daily_used = today_row.usedDaily is True
 
-    # ===== БОНУС ЗА 10 ДНЕЙ =====
+    # ===== 10 DAYS =====
     played_days = (
         db.query(UserDailyGames)
-        .filter(
-            UserDailyGames.user_id == user_id
-        )
+        .filter(UserDailyGames.user_id == user_id)
         .count()
     )
 
-    ten_days_used = (
+    ten_day_claims = (
         db.query(UserDailyGames)
         .filter(
             UserDailyGames.user_id == user_id,
             UserDailyGames.usedTenDays == True
         )
-        .first()
-        is not None
+        .count()
     )
 
+    available_ten_days = (played_days // 10) > ten_day_claims
+
     return {
-        "first_reward": {
-            "title": "Бонус за 1й вход — 0.5 TON",
-            "available": not first_used_ever,
-            "used": first_used_ever,
+        "daily_reward": {
+            "title": "Ежедневный бонус — 0.5 TON",
+            "available": not daily_used,
+            "used": daily_used,
         },
         "ten_days_reward": {
-            "title": "Бонус за 10й вход — 1 TON",
-            "available": played_days >= 10 and not ten_days_used,
-            "used": ten_days_used,
-            "progress": min(played_days, 10),
+            "title": "Бонус за каждые 10 дней — 1 TON",
+            "available": available_ten_days,
+            "used_count": ten_day_claims,
+            "progress": played_days % 10,
         }
     }
+
 
 
 # =====================================================
@@ -89,19 +80,6 @@ def claim_first_reward(user_id: int, db: Session = Depends(get_db)):
     user = db.query(Users).filter(Users.id == user_id).first()
     if not user:
         raise HTTPException(404, "User not found")
-
-    # 🔒 уже получал когда-либо?
-    already_used = (
-        db.query(UserDailyGames)
-        .filter(
-            UserDailyGames.user_id == user_id,
-            UserDailyGames.usedFirst == True
-        )
-        .first()
-    )
-
-    if already_used:
-        raise HTTPException(400, "First reward already claimed")
 
     today = date.today()
 
@@ -119,16 +97,19 @@ def claim_first_reward(user_id: int, db: Session = Depends(get_db)):
         row = UserDailyGames(user_id=user_id, day_date=today)
         db.add(row)
 
+    if row.usedDaily:
+        raise HTTPException(400, "Daily reward already claimed")
+
     reward = 0.5
 
     balance_before = user.balance or 0
     user.balance = balance_before + reward
 
-    row.usedFirst = True
+    row.usedDaily = True
 
     tx = Transactions(
         user_id=user.id,
-        type="daily_reward_first",
+        type="daily_reward",
         amount=reward,
         balance_before=balance_before,
         balance_after=user.balance
@@ -149,30 +130,23 @@ def claim_ten_days_reward(user_id: int, db: Session = Depends(get_db)):
     if not user:
         raise HTTPException(404, "User not found")
 
-    # 🔒 уже получал 10-дневный бонус?
-    already_used = (
+    played_days = (
+        db.query(UserDailyGames)
+        .filter(UserDailyGames.user_id == user_id)
+        .count()
+    )
+
+    ten_day_claims = (
         db.query(UserDailyGames)
         .filter(
             UserDailyGames.user_id == user_id,
             UserDailyGames.usedTenDays == True
         )
-        .first()
-    )
-
-    if already_used:
-        raise HTTPException(400, "10-day reward already claimed")
-
-    # считаем дни, когда играл
-    played_days = (
-        db.query(UserDailyGames)
-        .filter(
-            UserDailyGames.user_id == user_id
-        )
         .count()
     )
 
-    if played_days < 10:
-        raise HTTPException(400, "Not enough played days")
+    if (played_days // 10) <= ten_day_claims:
+        raise HTTPException(400, "10-day reward not available")
 
     today = date.today()
 
@@ -209,3 +183,4 @@ def claim_ten_days_reward(user_id: int, db: Session = Depends(get_db)):
     db.commit()
 
     return {"ok": True, "reward": reward}
+
