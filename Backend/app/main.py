@@ -7,7 +7,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 
 from sqladmin import Admin, ModelView
-
+import logging
 from app.core.config import settings, load_game_settings
 from app.database import Base, engine
 from app.services.crash_bots_engine import bot_loop
@@ -58,7 +58,9 @@ from app.routers import (
 
 from app.services.crash_engine import crash_engine
 
-
+logging.getLogger("sqlalchemy.engine").setLevel(logging.WARNING)
+logging.getLogger("sqlalchemy.pool").setLevel(logging.WARNING)
+logging.getLogger("sqlalchemy.dialects").setLevel(logging.WARNING)
 # ---------------------------------------------------------
 #                 APP CONFIG
 # ---------------------------------------------------------
