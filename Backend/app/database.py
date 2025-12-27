@@ -6,7 +6,7 @@ DATABASE_URL = "mysql+pymysql://root:141722A!@localhost:3306/krash"
 
 engine = create_engine(
     DATABASE_URL,
-    echo=True,
+    echo=False,
     future=True,
 )
 

@@ -52,7 +52,12 @@ class CrashEngine:
     async def add_client(self, ws: WebSocket):
         async with self.lock:
             self.clients.add(ws)
-        await self.send_state(ws)
+
+        try:
+            await self.send_state(ws)
+        except Exception:
+            # клиент умер сразу — убираем
+            await self.remove_client(ws)
 
     async def remove_client(self, ws: WebSocket):
         async with self.lock:
@@ -76,14 +81,18 @@ class CrashEngine:
             elapsed = time.monotonic() - self.started_at
             multiplier = self.calc_multiplier(elapsed)
 
-        await ws.send_json({
-            "event": "state",
-            "phase": self.phase,
-            "round_id": self.round_id,
-            "crash_point": self.crash_point if self.phase != "betting" else None,
-            "multiplier": multiplier,
-            "betting_ends_at": self.betting_ends_at if self.phase == "betting" else None,
-        })
+        try:
+            await ws.send_json({
+                "event": "state",
+                "phase": self.phase,
+                "round_id": self.round_id,
+                "crash_point": self.crash_point if self.phase != "betting" else None,
+                "multiplier": multiplier,
+                "betting_ends_at": self.betting_ends_at if self.phase == "betting" else None,
+            })
+        except Exception:
+            # соединение закрыто
+            await self.remove_client(ws)
 
     def calc_multiplier(self, elapsed: float) -> float:
         return round(settings.start_x + elapsed * settings.grow_speed, 2)
