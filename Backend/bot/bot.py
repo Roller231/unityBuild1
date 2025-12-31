@@ -30,12 +30,98 @@ DB_CONFIG = {
     "charset": "utf8mb4"
 }
 
+ADMIN_TG_IDS = {
+    1008871802,
+    7296978075,
+}
+
+
 WEBAPP_URL = "https://unity-build1-r7zk.vercel.app/"
 
 # ============================================
 
 bot = Bot(BOT_TOKEN)
 dp = Dispatcher()
+
+
+
+def parse_send_command(raw: str):
+    text = ""
+    buttons = []
+
+    if "BUTTONS:" in raw:
+        text_part, buttons_part = raw.split("BUTTONS:", 1)
+    else:
+        text_part, buttons_part = raw, ""
+
+    if "TEXT:" in text_part:
+        text = text_part.split("TEXT:", 1)[1].strip()
+    else:
+        text = text_part.replace("/send", "", 1).strip()
+
+    for line in buttons_part.strip().splitlines():
+        if "|" not in line:
+            continue
+        label, url = line.split("|", 1)
+        buttons.append(
+            InlineKeyboardButton(text=label.strip(), url=url.strip())
+        )
+
+    keyboard = (
+        InlineKeyboardMarkup(inline_keyboard=[[b] for b in buttons])
+        if buttons else None
+    )
+
+    return text, keyboard
+
+
+async def fetch_all_tg_ids():
+    conn = await aiomysql.connect(**DB_CONFIG)
+    async with conn.cursor() as cur:
+        await cur.execute(
+            "SELECT tg_id FROM users WHERE tg_id IS NOT NULL"
+        )
+        rows = await cur.fetchall()
+    conn.close()
+    return [int(r[0]) for r in rows if r[0]]
+
+
+async def broadcast_message(text: str, keyboard: InlineKeyboardMarkup | None):
+    tg_ids = await fetch_all_tg_ids()
+    print(f"📊 BROADCAST USERS: {len(tg_ids)}")
+
+    for tg_id in tg_ids:
+        try:
+            await bot.send_message(
+                chat_id=tg_id,
+                text=text,
+                reply_markup=keyboard,
+                parse_mode="HTML",
+                disable_web_page_preview=True,
+            )
+            await asyncio.sleep(0.05)  # анти-бан
+        except Exception as e:
+            print(f"❌ FAIL {tg_id}: {e}")
+
+
+@dp.message(lambda m: m.text and m.text.startswith("/send"))
+async def send_broadcast_handler(message: Message):
+    from_id = message.from_user.id
+
+    # 🔒 доступ только админам
+    if from_id not in ADMIN_TG_IDS:
+        await message.reply("⛔ У тебя нет прав на рассылку")
+        return
+
+    text, keyboard = parse_send_command(message.text)
+
+    if not text:
+        await message.reply("❌ Пустое сообщение")
+        return
+
+    await message.reply("📣 Рассылка запущена…")
+    await broadcast_message(text, keyboard)
+    await message.reply("✅ Рассылка завершена")
 
 # ================== API FUNCTIONS (ОСТАВИЛ) ==================
 
@@ -91,6 +177,59 @@ def render_template(text: str, variables: dict):
 
     return text.strip(), btn_text
 
+
+def render_start_message(raw: str, variables: dict):
+    if not raw:
+        return "", None
+
+    # подстановка переменных
+    for k, v in variables.items():
+        raw = raw.replace(f"{{{k}}}", str(v or ""))
+
+    text = ""
+    buttons = []
+
+    if "BUTTONS:" in raw:
+        text_part, buttons_part = raw.split("BUTTONS:", 1)
+    else:
+        text_part, buttons_part = raw, ""
+
+    if "TEXT:" in text_part:
+        text = text_part.split("TEXT:", 1)[1].strip()
+    else:
+        text = text_part.strip()
+
+    for line in buttons_part.strip().splitlines():
+        if "|" not in line:
+            continue
+
+        label, action = line.split("|", 1)
+        label = label.strip()
+        action = action.strip()
+
+        if action == "webapp":
+            buttons.append(
+                InlineKeyboardButton(
+                    text=label,
+                    web_app=WebAppInfo(url=WEBAPP_URL)
+                )
+            )
+        else:
+            buttons.append(
+                InlineKeyboardButton(
+                    text=label,
+                    url=action
+                )
+            )
+
+    # 2 кнопки в ряд (красиво)
+    keyboard = None
+    if buttons:
+        rows = [buttons[i:i+2] for i in range(0, len(buttons), 2)]
+        keyboard = InlineKeyboardMarkup(inline_keyboard=rows)
+
+    return text, keyboard
+
 # ================== AVATAR ==================
 
 async def get_avatar_url(user_id: int) -> str | None:
@@ -118,7 +257,7 @@ async def start_handler(message: Message):
 
     inviter_name = ""
 
-    # ----------- USER / REF LOGIC (КАК БЫЛО) -----------
+    # ----------- USER / REF LOGIC -----------
     user = await get_user_by_tg(tg_id)
 
     if not user:
@@ -152,7 +291,7 @@ async def start_handler(message: Message):
         if ref_param and ref_param != tg_id and inviter_name:
             await increment_refcount(ref_param)
 
-    # ----------- TEXTS FROM DB -----------
+    # ----------- TEXT FROM DB -----------
     start_text_raw = await fetch_setting("start_text")
     ref_text_raw = await fetch_setting("ref_text")
 
@@ -162,29 +301,23 @@ async def start_handler(message: Message):
         "inviter": inviter_name
     }
 
-    main_text, btn_text = render_template(start_text_raw, variables)
+    main_text, keyboard = render_start_message(
+        start_text_raw,
+        variables
+    )
 
+    # 👉 если есть реферал — добавляем текстом
     if inviter_name and ref_text_raw:
         ref_text, _ = render_template(ref_text_raw, variables)
         main_text += f"\n\n{ref_text}"
 
-    # ----------- BUTTON -----------
-    keyboard = InlineKeyboardMarkup(
-        inline_keyboard=[
-            [
-                InlineKeyboardButton(
-                    text=btn_text,
-                    web_app=WebAppInfo(url=WEBAPP_URL)
-                )
-            ]
-        ]
-    )
-
+    # ----------- SEND -----------
     await message.answer(
         main_text,
         reply_markup=keyboard,
-        parse_mode="Markdown"
+        parse_mode="HTML"
     )
+
 
 # ================== START ==================
 

@@ -22,6 +22,7 @@ CREATE TABLE cases (
     gradient_colors JSON,
     main_image VARCHAR(255),
     lottie_anim VARCHAR(255) NULL,
+    position INT NOT NULL DEFAULT 0,
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP
 );
 

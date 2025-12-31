@@ -243,6 +243,7 @@ class CasesAdmin(ModelView, model=Cases):
         "id",
         "name",
         "price",
+        "position",
         "gradient_colors",
         "main_image",
         "created_at",

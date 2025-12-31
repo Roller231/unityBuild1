@@ -8,6 +8,7 @@ class Cases(Base):
     id = Column(Integer, primary_key=True, index=True)
     name = Column(String(255), nullable=False)
     price = Column(Float, nullable=False)
+    position = Column(Integer, nullable=False, default=0)
     gradient_colors = Column(JSON)
     main_image = Column(String(255))
     lottie_anim = Column(String(255), nullable=True)
