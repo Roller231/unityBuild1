@@ -120,8 +120,9 @@ async def send_broadcast_handler(message: Message):
         return
 
     await message.reply("📣 Рассылка запущена…")
-    await broadcast_message(text, keyboard)
-    await message.reply("✅ Рассылка завершена")
+    asyncio.create_task(
+        broadcast_message(text, keyboard)
+    )
 
 # ================== API FUNCTIONS (ОСТАВИЛ) ==================
 
