@@ -138,6 +138,7 @@ async def start_broadcast(message: Message, state: FSMContext):
 
 @dp.message(BroadcastState.waiting_message)
 async def process_broadcast_message(message: Message, state: FSMContext):
+    print("FSM MESSAGE RECEIVED")  # ← ОБЯЗАТЕЛЬНО
     if message.from_user.id not in ADMIN_TG_IDS:
         return
 
