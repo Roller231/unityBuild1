@@ -113,7 +113,7 @@ def can_withdraw(
 
     total_deposit = float(total_deposit or 0)
 
-    if total_deposit <= 3:
+    if total_deposit <= 2.8:
         return {
             "can": False,
             "reason": "low_deposit_sum",
