@@ -14,6 +14,8 @@ from aiogram.types import (
 )
 
 from config import BOT_TOKEN, API_URL
+from aiogram.fsm.state import State, StatesGroup
+from aiogram.fsm.context import FSMContext
 
 
 # ================== CONFIG ==================
@@ -41,8 +43,12 @@ WEBAPP_URL = "https://unity-build1-r7zk.vercel.app/"
 # ============================================
 
 bot = Bot(BOT_TOKEN)
-dp = Dispatcher()
+from aiogram.fsm.storage.memory import MemoryStorage
 
+dp = Dispatcher(storage=MemoryStorage())
+
+class BroadcastState(StatesGroup):
+    waiting_message = State()
 
 
 def parse_send_command(raw: str):
@@ -103,26 +109,43 @@ async def broadcast_message(text: str, keyboard: InlineKeyboardMarkup | None):
         except Exception as e:
             print(f"❌ FAIL {tg_id}: {e}")
 
+async def broadcast_copy(source_message: Message):
+    tg_ids = await fetch_all_tg_ids()
+    print(f"📊 BROADCAST USERS: {len(tg_ids)}")
 
-@dp.message(lambda m: m.text and m.text.startswith("/send"))
-async def send_broadcast_handler(message: Message):
-    from_id = message.from_user.id
+    for tg_id in tg_ids:
+        try:
+            await bot.copy_message(
+                chat_id=tg_id,
+                from_chat_id=source_message.chat.id,
+                message_id=source_message.message_id
+            )
+            await asyncio.sleep(0.05)
+        except Exception as e:
+            print(f"❌ FAIL {tg_id}: {e}")
 
-    # 🔒 доступ только админам
-    if from_id not in ADMIN_TG_IDS:
-        await message.reply("⛔ У тебя нет прав на рассылку")
+@dp.message(lambda m: m.text == "/send")
+async def start_broadcast(message: Message, state: FSMContext):
+    if message.from_user.id not in ADMIN_TG_IDS:
+        await message.answer("⛔ У тебя нет прав")
         return
 
-    text, keyboard = parse_send_command(message.text)
-
-    if not text:
-        await message.reply("❌ Пустое сообщение")
-        return
-
-    await message.reply("📣 Рассылка запущена…")
-    asyncio.create_task(
-        broadcast_message(text, keyboard)
+    await state.set_state(BroadcastState.waiting_message)
+    await message.answer(
+        "📣 Отправь сообщение для рассылки\n"
+        "Можно: текст / фото / видео + кнопки"
     )
+
+@dp.message(BroadcastState.waiting_message)
+async def process_broadcast_message(message: Message, state: FSMContext):
+    if message.from_user.id not in ADMIN_TG_IDS:
+        return
+
+    await state.clear()
+    await message.answer("🚀 Рассылка запущена")
+
+    asyncio.create_task(broadcast_copy(message))
+
 
 # ================== API FUNCTIONS (ОСТАВИЛ) ==================
 
@@ -226,8 +249,9 @@ def render_start_message(raw: str, variables: dict):
     # 2 кнопки в ряд (красиво)
     keyboard = None
     if buttons:
-        rows = [buttons[i:i+2] for i in range(0, len(buttons), 2)]
-        keyboard = InlineKeyboardMarkup(inline_keyboard=rows)
+        keyboard = InlineKeyboardMarkup(
+            inline_keyboard=[[btn] for btn in buttons]
+        )
 
     return text, keyboard
 
