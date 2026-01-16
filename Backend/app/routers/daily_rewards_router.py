@@ -166,7 +166,7 @@ def claim_ten_days_reward(user_id: int, db: Session = Depends(get_db)):
         db.add(row)
 
     reward = float(settings.ten_days_reward_ton)
-    
+
     balance_before = user.balance or 0
     user.balance = balance_before + reward
 

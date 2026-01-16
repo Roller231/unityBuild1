@@ -91,6 +91,52 @@ async def fetch_all_tg_ids():
     conn.close()
     return [int(r[0]) for r in rows if r[0]]
 
+async def broadcast_any(message: Message, text: str, keyboard):
+    tg_ids = await fetch_all_tg_ids()
+    print(f"📊 BROADCAST USERS: {len(tg_ids)}")
+
+    for tg_id in tg_ids:
+        try:
+            if message.photo:
+                await bot.send_photo(
+                    chat_id=tg_id,
+                    photo=message.photo[-1].file_id,
+                    caption=text,
+                    reply_markup=keyboard,
+                    parse_mode="HTML"
+                )
+
+            elif message.video:
+                await bot.send_video(
+                    chat_id=tg_id,
+                    video=message.video.file_id,
+                    caption=text,
+                    reply_markup=keyboard,
+                    parse_mode="HTML"
+                )
+
+            elif message.document:
+                await bot.send_document(
+                    chat_id=tg_id,
+                    document=message.document.file_id,
+                    caption=text,
+                    reply_markup=keyboard,
+                    parse_mode="HTML"
+                )
+
+            else:
+                await bot.send_message(
+                    chat_id=tg_id,
+                    text=text,
+                    reply_markup=keyboard,
+                    parse_mode="HTML",
+                    disable_web_page_preview=True
+                )
+
+            await asyncio.sleep(0.1)
+
+        except Exception as e:
+            print(f"❌ FAIL {tg_id}: {e}")
 
 async def broadcast_message(text: str, keyboard: InlineKeyboardMarkup | None):
     tg_ids = await fetch_all_tg_ids()
@@ -136,16 +182,41 @@ async def start_broadcast(message: Message, state: FSMContext):
         "Можно: текст / фото / видео + кнопки"
     )
 
+def extract_button(text: str):
+    btn_text = None
+
+    match = re.search(r"<btn>(.*?)</btn>", text)
+    if match:
+        btn_text = match.group(1).strip()
+        text = re.sub(r"<btn>.*?</btn>", "", text)
+
+    keyboard = None
+    if btn_text:
+        keyboard = InlineKeyboardMarkup(
+            inline_keyboard=[[
+                InlineKeyboardButton(
+                    text=btn_text,
+                    web_app=WebAppInfo(url=WEBAPP_URL)
+                )
+            ]]
+        )
+
+    return text.strip(), keyboard
+
+
 @dp.message(BroadcastState.waiting_message)
 async def process_broadcast_message(message: Message, state: FSMContext):
-    print("FSM MESSAGE RECEIVED")  # ← ОБЯЗАТЕЛЬНО
     if message.from_user.id not in ADMIN_TG_IDS:
         return
 
     await state.clear()
     await message.answer("🚀 Рассылка запущена")
 
-    asyncio.create_task(broadcast_copy(message))
+    raw_text = message.text or message.caption or ""
+    text, keyboard = extract_button(raw_text)
+    asyncio.create_task(
+        broadcast_any(message, text, keyboard)
+    )
 
 
 # ================== API FUNCTIONS (ОСТАВИЛ) ==================
@@ -334,10 +405,15 @@ async def start_handler(message: Message):
         "inviter": inviter_name
     }
 
-    main_text, keyboard = render_start_message(
+    raw_text, keyboard = render_start_message(
         start_text_raw,
         variables
     )
+
+    main_text, btn_keyboard = extract_button(raw_text)
+
+    # если кнопка была в <btn>, она приоритетнее
+    keyboard = btn_keyboard or keyboard
 
     # 👉 если есть реферал — добавляем текстом
     if inviter_name and ref_text_raw:
@@ -345,8 +421,14 @@ async def start_handler(message: Message):
         main_text += f"\n\n{ref_text}"
 
     # ----------- SEND -----------
-    await message.answer(
-        main_text,
+    from aiogram.types import FSInputFile
+
+    START_BANNER = FSInputFile("bannerSTART.jpg")
+
+    await bot.send_photo(
+        chat_id=message.chat.id,
+        photo=START_BANNER,
+        caption=main_text,
         reply_markup=keyboard,
         parse_mode="HTML"
     )
