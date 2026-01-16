@@ -166,9 +166,13 @@ async def create_user(payload: dict):
         async with session.post(f"{API_URL}/users/", json=payload) as resp:
             return await resp.json()
 
-async def increment_refcount(tg_id: str):
+async def increment_refcount(tg_id: str, reward: float):
     async with aiohttp.ClientSession() as session:
-        await session.post(f"{API_URL}/users/refcount/{tg_id}")
+        await session.post(
+            f"{API_URL}/users/refcount/{tg_id}",
+            json={"reward": reward}
+        )
+
 
 # ================== MYSQL ==================
 
@@ -298,6 +302,8 @@ async def start_handler(message: Message):
 
         avatar_url = await get_avatar_url(message.from_user.id)
         ref_link = f"https://t.me/{BOT_USERNAME}?start={tg_id}"
+        ref_reward_raw = await fetch_setting("REFERRAL_REWARD_TON")
+        ref_reward = float(ref_reward_raw) if ref_reward_raw else 0
 
         payload = {
             "tg_id": tg_id,
@@ -315,11 +321,12 @@ async def start_handler(message: Message):
         await create_user(payload)
 
         if ref_param and ref_param != tg_id and inviter_name:
-            await increment_refcount(ref_param)
+            await increment_refcount(ref_param, ref_reward)
 
     # ----------- TEXT FROM DB -----------
     start_text_raw = await fetch_setting("start_text")
     ref_text_raw = await fetch_setting("ref_text")
+
 
     variables = {
         "firstname": firstname,

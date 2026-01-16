@@ -2,6 +2,7 @@ from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 from datetime import date
 
+from app.core.config import settings
 from app.database import get_db
 from app.models.users import Users
 from app.models.user_daily_games import UserDailyGames
@@ -58,12 +59,12 @@ def get_rewards_status(user_id: int, db: Session = Depends(get_db)):
 
     return {
         "daily_reward": {
-            "title": "Ежедневный бонус — 0.5 TON",
+            "title": f"Ежедневный бонус — {settings.daily_reward_ton} TON",
             "available": not daily_used,
             "used": daily_used,
         },
         "ten_days_reward": {
-            "title": "Бонус за каждые 10 дней — 1 TON",
+            "title": f"Бонус за каждые 10 дней — {settings.ten_days_reward_ton} TON",
             "available": available_ten_days,
             "used_count": ten_day_claims,
             "progress": played_days % 10,
@@ -100,7 +101,7 @@ def claim_first_reward(user_id: int, db: Session = Depends(get_db)):
     if row.usedFirst:
         raise HTTPException(400, "Daily reward already claimed")
 
-    reward = 0.5
+    reward = float(settings.daily_reward_ton)
 
     balance_before = user.balance or 0
     user.balance = balance_before + reward
@@ -164,8 +165,8 @@ def claim_ten_days_reward(user_id: int, db: Session = Depends(get_db)):
         row = UserDailyGames(user_id=user_id, day_date=today)
         db.add(row)
 
-    reward = 1.0
-
+    reward = float(settings.ten_days_reward_ton)
+    
     balance_before = user.balance or 0
     user.balance = balance_before + reward
 

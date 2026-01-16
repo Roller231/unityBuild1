@@ -7,29 +7,53 @@ from sqlalchemy import func
 from app.core.config import settings
 from app.models import Drops
 
+def _get_cheaper_buckets_from_settings():
+    return [
+        (
+            settings.roulette_cheap_bucket_1_weight,
+            settings.roulette_cheap_bucket_1_min,
+            settings.roulette_cheap_bucket_1_max,
+        ),
+        (
+            settings.roulette_cheap_bucket_2_weight,
+            settings.roulette_cheap_bucket_2_min,
+            settings.roulette_cheap_bucket_2_max,
+        ),
+        (
+            settings.roulette_cheap_bucket_3_weight,
+            settings.roulette_cheap_bucket_3_min,
+            settings.roulette_cheap_bucket_3_max,
+        ),
+        (
+            settings.roulette_cheap_bucket_4_weight,
+            settings.roulette_cheap_bucket_4_min,
+            settings.roulette_cheap_bucket_4_max,
+        ),
+    ]
+
+
 def choose_free_spin_drop(db: Session) -> Drops:
     drops = db.query(Drops).all()
     if not drops:
         raise ValueError("No drops available")
 
-    # сортируем по цене
     drops_sorted = sorted(drops, key=lambda d: d.price)
 
-    # нижние 20% — ОСНОВНОЙ пул
-    min_count = max(1, int(len(drops_sorted) * 0.2))
-    cheap = drops_sorted[:min_count]
+    cheap_count = max(1, int(len(drops_sorted) * settings.roulette_free_cheap_pct))
+    mid_count = max(1, int(len(drops_sorted) * settings.roulette_free_mid_pct))
 
-    # нижние 40% — редкий бонус
-    mid = drops_sorted[:max(1, int(len(drops_sorted) * 0.4))]
+    cheap = drops_sorted[:cheap_count]
+    mid = drops_sorted[:mid_count]
 
     r = random.random()
 
-    if r < 0.97:
+    if r < settings.roulette_free_cheap_chance:
         pool = cheap
     else:
         pool = mid
 
     return random.choice(pool)
+
 
 def _pick_weighted_bucket(buckets: list[tuple[float, float, float]]) -> tuple[float, float]:
     """
@@ -71,7 +95,9 @@ def choose_paid_spin_drop(
         high = bet_price * float(settings.roulette_higher_max_mult)
         candidates = _filter_by_price_range(drops, low, high)
     else:
-        mn_mult, mx_mult = _pick_weighted_bucket(settings.roulette_cheaper_buckets)
+        mn_mult, mx_mult = _pick_weighted_bucket(
+            _get_cheaper_buckets_from_settings()
+        )
         low = bet_price * float(mn_mult)
         high = bet_price * float(mx_mult)
         candidates = _filter_by_price_range(drops, low, high)
