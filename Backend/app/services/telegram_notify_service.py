@@ -9,7 +9,7 @@ from typing import Iterable, Optional
 # =================================================
 
 # ❗ ТЕСТОВЫЙ BOT TOKEN (как ты просил)
-BOT_TOKEN = "8146264610:AAGCL4V7xX0QDCLwp0vCvWBA38AtxJ7Enro"
+BOT_TOKEN = "8577709747:AAGg7kbQhP90gvOCJj5FPSiClgIdcZkPgsM"
 
 # Кому слать уведомления
 ADMIN_TG_IDS = [

@@ -153,6 +153,35 @@ async def stars_success(
     user.balance = balance_before + total_credit
     user.totalDEP = (user.totalDEP or 0) + total_credit
 
+    # -------------------------------------------------
+    # 🎁 РЕФЕРАЛЬНЫЙ БОНУС (15%)
+    # -------------------------------------------------
+    if user.refererID and user.refererID != "local":
+        referrer = (
+            db.query(Users)
+            .filter(Users.tg_id == user.refererID)
+            .with_for_update()
+            .first()
+        )
+
+        if referrer:
+            referral_bonus = round(base_amount * 0.15, 2)
+
+            ref_balance_before = referrer.balance or 0
+            referrer.balance = ref_balance_before + referral_bonus
+
+            # транзакция реферала
+            ref_tx = Transactions(
+                user_id=referrer.id,
+                type="referral_bonus",
+                amount=referral_bonus,
+                balance_before=ref_balance_before,
+                balance_after=referrer.balance,
+
+            )
+
+            db.add(ref_tx)
+
     # 🔥 XP ЗА УСПЕШНЫЙ STARS-ДЕПОЗИТ (+300)
     xp_result = add_user_xp(
         db=db,

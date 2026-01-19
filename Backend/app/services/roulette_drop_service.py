@@ -33,26 +33,26 @@ def _get_cheaper_buckets_from_settings():
 
 
 def choose_free_spin_drop(db: Session) -> Drops:
-    drops = db.query(Drops).all()
+    drops = (
+        db.query(Drops)
+        .filter(Drops.price >= 0.2, Drops.price <= 1.0)
+        .all()
+    )
+
     if not drops:
-        raise ValueError("No drops available")
+        raise ValueError("No drops in free spin range")
 
-    drops_sorted = sorted(drops, key=lambda d: d.price)
+    drops_sorted = sorted(drops, key=lambda d: float(d.price))
 
-    cheap_count = max(1, int(len(drops_sorted) * settings.roulette_free_cheap_pct))
-    mid_count = max(1, int(len(drops_sorted) * settings.roulette_free_mid_pct))
+    # bias < 1 → чаще дешёвые
+    bias = float(0.5)  # например 0.35
+    r = random.random() ** (1 / bias)
 
-    cheap = drops_sorted[:cheap_count]
-    mid = drops_sorted[:mid_count]
+    index = int(r * len(drops_sorted))
+    index = min(index, len(drops_sorted) - 1)
 
-    r = random.random()
+    return drops_sorted[index]
 
-    if r < settings.roulette_free_cheap_chance:
-        pool = cheap
-    else:
-        pool = mid
-
-    return random.choice(pool)
 
 
 def _pick_weighted_bucket(buckets: list[tuple[float, float, float]]) -> tuple[float, float]:
@@ -87,38 +87,45 @@ def choose_paid_spin_drop(
     if not drops:
         raise ValueError("No drops available")
 
-    # 1) решаем ветку: дороже/дешевле
-    is_higher = random.random() < float(settings.roulette_higher_chance)
+    win_chance = float(settings.roulette_win_chance)  # например 0.30
+    win_range = float(settings.roulette_win_range)    # например 40
+    lose_range = float(settings.roulette_lose_range)  # например 40
 
-    if is_higher:
-        low = bet_price * float(settings.roulette_higher_min_mult)
-        high = bet_price * float(settings.roulette_higher_max_mult)
-        candidates = _filter_by_price_range(drops, low, high)
+    is_win = random.random() < win_chance
+
+    if is_win:
+        low = bet_price
+        high = bet_price + win_range
     else:
-        mn_mult, mx_mult = _pick_weighted_bucket(
-            _get_cheaper_buckets_from_settings()
-        )
-        low = bet_price * float(mn_mult)
-        high = bet_price * float(mx_mult)
-        candidates = _filter_by_price_range(drops, low, high)
+        low = max(0.0, bet_price - lose_range)
+        high = bet_price
 
-    # 2) фолбэк — если в диапазоне нет дропов, расширяем диапазон
+    candidates = [
+        d for d in drops
+        if low <= float(d.price) <= high
+    ]
+
+    # 🔁 фолбэк 1 — расширяем диапазон
     if not candidates:
-        expand = bet_price * float(settings.roulette_fallback_expand_pct)
-        low2 = max(0.0, low - expand)
-        high2 = high + expand
-        candidates = _filter_by_price_range(drops, low2, high2)
+        expand = bet_price * 0.5
+        candidates = [
+            d for d in drops
+            if (low - expand) <= float(d.price) <= (high + expand)
+        ]
 
-    # 3) ещё фолбэк — если всё равно пусто, берём ближайшие по цене
+    # 🔁 фолбэк 2 — ближайшие по цене
     if not candidates:
-        drops_sorted = sorted(drops, key=lambda d: abs(float(d.price) - bet_price))
-        candidates = drops_sorted[:max(1, min(30, len(drops_sorted)))]
+        candidates = sorted(
+            drops,
+            key=lambda d: abs(float(d.price) - bet_price)
+        )[:30]
 
-    # 4) анти-повтор
+    # 🔁 анти-повтор
     if last_drop_id:
         filtered = [d for d in candidates if d.id != last_drop_id]
         if filtered:
             candidates = filtered
 
     return random.choice(candidates)
+
 

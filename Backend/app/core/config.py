@@ -42,7 +42,7 @@ class CrashSettings:
     # 🎟️ PROMO
     # ============================================================
 
-    referral_reward_ton: float = float(os.getenv("REFERRAL_REWARD_TON", 1.5))
+    referral_reward_ton: float = float(os.getenv("REFERRAL_REWARD_TON", 0.5))
 
     # ============================================================
     # 👥 ONLINE
@@ -148,6 +148,27 @@ class CrashSettings:
     roulette_fallback_expand_pct: float = float(os.getenv("ROULETTE_FALLBACK_EXPAND_PCT", 0.10))
     daily_reward_ton: float = float(os.getenv("DAILY_REWARD_TON", 0.5))
     ten_days_reward_ton: float = float(os.getenv("TEN_DAYS_REWARD_TON", 1.0))
+
+
+
+    # ============================================================
+    # 🎰 ROULETTE — PAID SPIN (NEW LOGIC)
+    # ============================================================
+
+    # шанс, что дроп будет дороже ставки (например 0.30 = 30%)
+    roulette_win_chance: float = float(os.getenv("ROULETTE_WIN_CHANCE", 0.4))
+
+    # максимальная разница В БОЛЬШУЮ сторону (TON)
+    roulette_win_range: float = float(os.getenv("ROULETTE_WIN_RANGE", 25.0))
+
+    # максимальная разница В МЕНЬШУЮ сторону (TON)
+    roulette_lose_range: float = float(os.getenv("ROULETTE_LOSE_RANGE", 40.0))
+
+
+    # bias < 1 → чаще дешёвые дропы
+    roulette_free_bias: float = float(os.getenv("ROULETTE_FREE_BIAS", 0.35))
+
+
     # ============================================================
     # 🔁 APPLY DB OVERRIDES
     # ============================================================

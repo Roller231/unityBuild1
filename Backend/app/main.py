@@ -182,7 +182,7 @@ class SimpleAuth(AuthenticationBackend):
         password = form.get("password")
 
         # ---------- ТУТ ЛОГИН/ПАРОЛЬ ----------
-        if username == "admin" and password == "123456":
+        if username == "admin" and password == "KVA272!6662":
             request.session.update({"logged_in": True})
             return True
 
