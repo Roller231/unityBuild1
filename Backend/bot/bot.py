@@ -1,5 +1,7 @@
 import asyncio
 import re
+import uuid
+
 import aiohttp
 import aiomysql
 
@@ -10,12 +12,20 @@ from aiogram.types import (
     InlineKeyboardMarkup,
     InlineKeyboardButton,
     WebAppInfo,
-    PreCheckoutQuery
+    PreCheckoutQuery,
+
+    InlineQuery,
+    InlineQueryResultArticle,
+    InputTextMessageContent,
+    FSInputFile
 )
 
-from config import BOT_TOKEN, API_URL
 from aiogram.fsm.state import State, StatesGroup
 from aiogram.fsm.context import FSMContext
+from aiogram.fsm.storage.memory import MemoryStorage
+
+from config import BOT_TOKEN, API_URL
+
 
 
 # ================== CONFIG ==================
@@ -432,6 +442,48 @@ async def start_handler(message: Message):
         caption=main_text,
         reply_markup=keyboard,
         parse_mode="HTML"
+    )
+
+
+@dp.inline_query()
+async def inline_handler(inline_query: InlineQuery):
+    query = inline_query.query or ""
+
+    # ожидаем ref_123
+    ref_id = None
+    if query.startswith("ref_"):
+        ref_id = query.replace("ref_", "")
+
+    # fallback если без ref
+    webapp_url = WEBAPP_URL
+    if ref_id:
+        webapp_url = f"{WEBAPP_URL}?ref={ref_id}"
+
+    result = InlineQueryResultArticle(
+        id=str(uuid.uuid4()),
+        title="🚀 Crash Gifts",
+        description="№1 Crash Game in Telegram",
+        thumb_url="https://ggcat.org/media/images/bannerInline.jpg",  # 🔥 замени на свой баннер
+
+        input_message_content=InputTextMessageContent(
+            message_text="🚀 <b>№1 Crash Game in Telegram</b>",
+            parse_mode="HTML"
+        ),
+
+        reply_markup=InlineKeyboardMarkup(
+            inline_keyboard=[[
+                InlineKeyboardButton(
+                    text="🚀 PLAY",
+                    web_app=WebAppInfo(url=webapp_url)
+                )
+            ]]
+        )
+    )
+
+    await inline_query.answer(
+        results=[result],
+        cache_time=0,
+        is_personal=True
     )
 
 
