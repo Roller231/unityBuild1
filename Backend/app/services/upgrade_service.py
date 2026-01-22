@@ -81,16 +81,7 @@ def upgrade_service(
     if win:
         add_drop_to_inventory(user, to_drop_id, count=1)
 
-        # 🧾 TRANSACTION: upgrade_win
-        tx_win = Transactions(
-            user_id=user_id,
-            type="upgrade_win",
-            amount=float(to_drop.price),
-            balance_before=user.balance,
-            balance_after=user.balance,
-            created_at=datetime.utcnow()
-        )
-        db.add(tx_win)
+
 
     # 6️⃣ лог апгрейда
     upgrade_log = UpgradeLog(
