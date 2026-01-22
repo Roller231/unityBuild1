@@ -8,6 +8,8 @@ from app.services.inventory_service import (
     remove_drop_from_inventory,
 )
 from app.core.config import settings
+from app.models.transactions import Transactions
+from datetime import datetime
 
 def calc_upgrade_chance(from_price: float, to_price: float) -> float:
     """
@@ -54,11 +56,21 @@ def upgrade_service(
     if not from_drop or not to_drop:
         raise HTTPException(404, "Drop not found")
 
-
-    # 3️⃣ списываем предмет
+    # 3️⃣ списываем предмет (СТАВКА)
     removed = remove_drop_from_inventory(user, from_drop_id, count=1)
     if not removed:
         raise HTTPException(400, "Drop not in inventory")
+
+    # 🧾 TRANSACTION: upgrade_bet
+    tx_bet = Transactions(
+        user_id=user_id,
+        type="upgrade_bet",
+        amount=float(from_drop.price),
+        balance_before=user.balance,
+        balance_after=user.balance,  # баланс не меняется
+        created_at=datetime.utcnow()
+    )
+    db.add(tx_bet)
 
     # 4️⃣ шанс + ролл
     chance = calc_upgrade_chance(from_drop.price, to_drop.price)
@@ -69,6 +81,18 @@ def upgrade_service(
     if win:
         add_drop_to_inventory(user, to_drop_id, count=1)
 
+        # 🧾 TRANSACTION: upgrade_win
+        tx_win = Transactions(
+            user_id=user_id,
+            type="upgrade_win",
+            amount=float(to_drop.price),
+            balance_before=user.balance,
+            balance_after=user.balance,
+            created_at=datetime.utcnow()
+        )
+        db.add(tx_win)
+
+    # 6️⃣ лог апгрейда
     upgrade_log = UpgradeLog(
         user_id=user_id,
         from_drop_id=from_drop_id,
@@ -91,3 +115,4 @@ def upgrade_service(
         "to_drop_id": to_drop_id,
         "inventory": user.inventory,
     }
+

@@ -11,6 +11,8 @@ from app.models.roulette_spins import RouletteSpins
 from app.services.roulette_drop_service import choose_free_spin_drop, choose_paid_spin_drop
 from app.services.inventory_service import add_drop_to_inventory
 from app.schemas.roulette import RoulettePaidSpinRequest
+from app.models.transactions import Transactions
+from datetime import datetime
 
 router = APIRouter(prefix="/roulette", tags=["Roulette"])
 
@@ -61,7 +63,15 @@ def free_spin(
 
     # 3️⃣ добавляем в инвентарь
     add_drop_to_inventory(user, drop.id, 1)
-
+    tx = Transactions(
+        user_id=user_id,
+        type="roulette_free_win",
+        amount=float(drop.price),
+        balance_before=user.balance,
+        balance_after=user.balance,
+        created_at=datetime.utcnow()
+    )
+    db.add(tx)
     # 4️⃣ логируем спин
     spin = RouletteSpins(
         user_id=user_id,
@@ -128,8 +138,18 @@ def paid_spin(
             inventory.pop(idx)
         else:
             inventory[idx] = mutable_item
+        from app.models.transactions import Transactions
 
         user.inventory = inventory
+        tx_bet = Transactions(
+            user_id=user_id,
+            type="roulette_gift_bet",
+            amount=float(bet_price),
+            balance_before=user.balance,
+            balance_after=user.balance,
+            created_at=datetime.utcnow()
+        )
+        db.add(tx_bet)
 
     # 💰 СТАВКА ДЕНЬГАМИ
     else:
@@ -140,12 +160,33 @@ def paid_spin(
             raise HTTPException(status_code=400, detail="Not enough balance")
 
         bet_price = amount
+        from app.models.transactions import Transactions
+        balance_before = user.balance
         user.balance -= amount
+        tx_bet = Transactions(
+            user_id=user_id,
+            type="roulette_bet",
+            amount=bet_price,
+            balance_before=balance_before,
+            balance_after=user.balance,
+            created_at=datetime.utcnow()
+        )
+        db.add(tx_bet)
+
 
     # 🎰 ПРИЗ
     prize = choose_paid_spin_drop(db, bet_price)
 
     add_drop_to_inventory(user, prize.id, 1)
+    tx_win = Transactions(
+        user_id=user_id,
+        type="roulette_win",
+        amount=float(prize.price),
+        balance_before=user.balance,
+        balance_after=user.balance,
+        created_at=datetime.utcnow()
+    )
+    db.add(tx_win)
 
     spin = RouletteSpins(
         user_id=user_id,
@@ -154,17 +195,7 @@ def paid_spin(
     )
     db.add(spin)
 
-    if amount:
-        from app.models import Transactions
-        tx = Transactions(
-            user_id=user_id,
-            type="roulette_spin",
-            amount=amount,
-            balance_before=user.balance + amount,
-            balance_after=user.balance,
-            related_round_id=None
-        )
-        db.add(tx)
+
 
     db.commit()
 

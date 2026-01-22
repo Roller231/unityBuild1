@@ -6,6 +6,8 @@ from sqlalchemy import func
 
 from app.core.config import settings
 from app.models import Drops
+from app.models.transactions import Transactions
+from datetime import datetime
 
 def _get_cheaper_buckets_from_settings():
     return [
