@@ -17,7 +17,8 @@ from aiogram.types import (
     InlineQuery,
     InlineQueryResultArticle,
     InputTextMessageContent,
-    FSInputFile
+    FSInputFile,
+    InlineQueryResultPhoto
 )
 
 from aiogram.fsm.state import State, StatesGroup
@@ -444,6 +445,7 @@ async def start_handler(message: Message):
         parse_mode="HTML"
     )
 
+
 @dp.inline_query()
 async def inline_handler(inline_query: InlineQuery):
     query = (inline_query.query or "").strip()
@@ -458,17 +460,18 @@ async def inline_handler(inline_query: InlineQuery):
         f"https://t.me/{BOT_USERNAME}"
     )
 
-    result = InlineQueryResultArticle(
+    result = InlineQueryResultPhoto(
         id=str(uuid.uuid4()),
-        title="🚀 Crash Gifts",
-        description="№1 Краш Игра в Телеграм",
+        photo_url="https://ggcat.org/media/images/bannerInline.jpg",
         thumb_url="https://ggcat.org/media/images/bannerInline.jpg",
-
-        input_message_content=InputTextMessageContent(
-            message_text="🚀 <b>№1 Crash Game in Telegram</b>",
-            parse_mode="HTML"
+        caption=(
+            "🐱🔥 <b>ggCat — Crash Game №1</b>\n\n"
+            "Выбивай NFT-подарки 🎁\n"
+            "Лови бешеные иксы 🚀\n"
+            "Получай ежедневные бонусы 💎\n"
+            "Выводи TON мгновенно 💸"
         ),
-
+        parse_mode="HTML",
         reply_markup=InlineKeyboardMarkup(
             inline_keyboard=[[
                 InlineKeyboardButton(
