@@ -463,7 +463,7 @@ async def inline_handler(inline_query: InlineQuery):
     result = InlineQueryResultPhoto(
         id=str(uuid.uuid4()),
         photo_url="https://ggcat.org/media/images/bannerInline.jpg",
-        thumb_url="https://ggcat.org/media/images/bannerInline.jpg",
+        thumbnail_url="https://ggcat.org/media/images/bannerInline.jpg",
         caption=(
             "🐱🔥 <b>ggCat — Crash Game №1</b>\n\n"
             "Выбивай NFT-подарки 🎁\n"
