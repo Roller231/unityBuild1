@@ -460,15 +460,18 @@ async def inline_handler(inline_query: InlineQuery):
         f"https://t.me/{BOT_USERNAME}"
     )
 
+    image_url = "https://ggcat.org/media/images/bannerInline.jpg"
+
     result = InlineQueryResultPhoto(
         id=str(uuid.uuid4()),
-        photo_url="https://ggcat.org/media/images/bannerInline.jpg",
+        photo_url=image_url,
+        thumbnail_url=image_url,  # 🔥 ВОТ ЭТОГО НЕ ХВАТАЛО
         caption=(
             "🐱🔥 <b>ggCat — Crash Game №1</b>\n\n"
-            "Выбивай NFT-подарки 🎁\n"
-            "Лови бешеные иксы 🚀\n"
-            "Получай ежедневные бонусы 💎\n"
-            "Выводи TON мгновенно 💸"
+            "🎁 NFT-подарки\n"
+            "🚀 Бешеные иксы\n"
+            "💎 Ежедневные бонусы\n"
+            "💸 Мгновенный вывод TON"
         ),
         parse_mode="HTML",
         reply_markup=InlineKeyboardMarkup(
@@ -486,7 +489,6 @@ async def inline_handler(inline_query: InlineQuery):
         cache_time=0,
         is_personal=True
     )
-
 
 # ================== START ==================
 
