@@ -25,12 +25,13 @@ BOT_USERNAME = "ggcat_game_bot"
 DB_CONFIG = {
     "host": "localhost",
     "port": 3306,
-    "user": "root",
-    "password": "141722A!",
+    "user": "remote_user",
+    "password": "STRONG_PASSWORD",
     "db": "krash",
     "autocommit": True,
     "charset": "utf8mb4"
 }
+
 
 ADMIN_TG_IDS = {
     1008871802,
