@@ -444,7 +444,6 @@ async def start_handler(message: Message):
         parse_mode="HTML"
     )
 
-
 @dp.inline_query()
 async def inline_handler(inline_query: InlineQuery):
     query = (inline_query.query or "").strip()
@@ -453,9 +452,11 @@ async def inline_handler(inline_query: InlineQuery):
     if query.startswith("ref_"):
         ref_id = query.replace("ref_", "").strip()
 
-    # 👉 ГЕНЕРИМ РЕФЕРАЛЬНУЮ ССЫЛКУ НА БОТА
-    # именно ту, которую ты уже используешь
-    invite_link = f"https://t.me/{BOT_USERNAME}?start={ref_id}" if ref_id else f"https://t.me/{BOT_USERNAME}"
+    invite_link = (
+        f"https://t.me/{BOT_USERNAME}?start={ref_id}"
+        if ref_id else
+        f"https://t.me/{BOT_USERNAME}"
+    )
 
     result = InlineQueryResultArticle(
         id=str(uuid.uuid4()),
@@ -472,46 +473,7 @@ async def inline_handler(inline_query: InlineQuery):
             inline_keyboard=[[
                 InlineKeyboardButton(
                     text="🚀 ИГРАТЬ",
-                    url=invite_link   # ← ВАЖНО: просто URL
-                )
-            ]]
-        )
-    )
-
-    await inline_query.answer(
-        results=[result],
-        cache_time=0,
-        is_personal=True
-    )
-
-    query = inline_query.query or ""
-
-    # ожидаем ref_123
-    ref_id = None
-    if query.startswith("ref_"):
-        ref_id = query.replace("ref_", "")
-
-    # fallback если без ref
-    webapp_url = WEBAPP_URL
-    if ref_id:
-        webapp_url = f"{WEBAPP_URL}?ref={ref_id}"
-
-    result = InlineQueryResultArticle(
-        id=str(uuid.uuid4()),
-        title="🚀 Crash Gifts",
-        description="№1 Crash Game in Telegram",
-        thumb_url="https://ggcat.org/media/images/bannerInline.jpg",  # 🔥 замени на свой баннер
-
-        input_message_content=InputTextMessageContent(
-            message_text="🚀 <b>№1 Crash Game in Telegram</b>",
-            parse_mode="HTML"
-        ),
-
-        reply_markup=InlineKeyboardMarkup(
-            inline_keyboard=[[
-                InlineKeyboardButton(
-                    text="🚀 PLAY",
-                    web_app=WebAppInfo(url=webapp_url)
+                    url=invite_link
                 )
             ]]
         )
