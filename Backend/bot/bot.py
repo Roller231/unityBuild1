@@ -465,7 +465,7 @@ async def inline_handler(inline_query: InlineQuery):
     result = InlineQueryResultPhoto(
         id=str(uuid.uuid4()),
         photo_url=image_url,
-        thumb_url=image_url,  # 🔥 ВОТ ЭТОГО НЕ ХВАТАЛО
+        thumbnail_url=image_url,  # 🔥 ВОТ ЭТОГО НЕ ХВАТАЛО
         caption=(
             "🐱🔥 <b>ggCat — Crash Game №1</b>\n\n"
             "🎁 NFT-подарки\n"
