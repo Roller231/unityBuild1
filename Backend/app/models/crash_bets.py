@@ -5,22 +5,36 @@ from app.database import Base
 
 class CrashBets(Base):
     __tablename__ = "crash_bets"
+    __table_args__ = {"mysql_autoincrement": True}  # 🔥 КРИТИЧНО
 
-    id = Column(Integer, primary_key=True, index=True)
-    round_id = Column(Integer, ForeignKey("crash_rounds.id", ondelete="CASCADE"))
-    user_id = Column(Integer, ForeignKey("users.id", ondelete="CASCADE"))
+    id = Column(
+        Integer,
+        primary_key=True,
+        autoincrement=True
+    )
+
+    round_id = Column(
+        Integer,
+        ForeignKey("crash_rounds.id", ondelete="CASCADE"),
+        nullable=False
+    )
+
+    user_id = Column(
+        Integer,
+        ForeignKey("users.id", ondelete="CASCADE"),
+        nullable=False
+    )
+
     amount = Column(Float, nullable=False)
-    cashout_multiplier = Column(Float)
-    profit = Column(Float)
-    created_at = Column(DateTime, default=datetime.utcnow)
 
-    # NEW
-    gift = Column(Boolean, default=False)
+    cashout_multiplier = Column(Float, nullable=True)
+    profit = Column(Float, nullable=True)
+
+    created_at = Column(DateTime, nullable=False, default=datetime.utcnow)
+
+    gift = Column(Boolean, nullable=False, default=False)
     gift_id = Column(Integer, nullable=True)
     auto_cashout_x = Column(Float, nullable=True)
 
     round = relationship("CrashRounds", back_populates="bets")
     user = relationship("Users", back_populates="crash_bets")
-
-    def __str__(self):
-        return f"Ставка №{self.id} = {self.amount}$"

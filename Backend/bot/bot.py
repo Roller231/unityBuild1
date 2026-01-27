@@ -1,5 +1,7 @@
 import asyncio
 import re
+import uuid
+
 import aiohttp
 import aiomysql
 
@@ -10,12 +12,21 @@ from aiogram.types import (
     InlineKeyboardMarkup,
     InlineKeyboardButton,
     WebAppInfo,
-    PreCheckoutQuery
+    PreCheckoutQuery,
+
+    InlineQuery,
+    InlineQueryResultArticle,
+    InputTextMessageContent,
+    FSInputFile,
+    InlineQueryResultPhoto
 )
 
-from config import BOT_TOKEN, API_URL
 from aiogram.fsm.state import State, StatesGroup
 from aiogram.fsm.context import FSMContext
+from aiogram.fsm.storage.memory import MemoryStorage
+
+from config import BOT_TOKEN, API_URL
+
 
 
 # ================== CONFIG ==================
@@ -25,12 +36,13 @@ BOT_USERNAME = "ggcat_game_bot"
 DB_CONFIG = {
     "host": "localhost",
     "port": 3306,
-    "user": "root",
-    "password": "141722A!",
+    "user": "remote_user",
+    "password": "STRONG_PASSWORD",
     "db": "krash",
     "autocommit": True,
     "charset": "utf8mb4"
 }
+
 
 ADMIN_TG_IDS = {
     1008871802,
@@ -433,6 +445,50 @@ async def start_handler(message: Message):
         parse_mode="HTML"
     )
 
+
+@dp.inline_query()
+async def inline_handler(inline_query: InlineQuery):
+    query = (inline_query.query or "").strip()
+
+    ref_id = None
+    if query.startswith("ref_"):
+        ref_id = query.replace("ref_", "").strip()
+
+    invite_link = (
+        f"https://t.me/{BOT_USERNAME}?start={ref_id}"
+        if ref_id else
+        f"https://t.me/{BOT_USERNAME}"
+    )
+
+    image_url = "https://ggcat.org/media/images/bannerInline.jpg"
+
+    result = InlineQueryResultPhoto(
+        id=str(uuid.uuid4()),
+        photo_url=image_url,
+        thumbnail_url=image_url,  # 🔥 ВОТ ЭТОГО НЕ ХВАТАЛО
+        caption=(
+            "🐱🔥 <b>ggCat — Crash Game №1</b>\n\n"
+            "🎁 NFT-подарки\n"
+            "🚀 Бешеные иксы\n"
+            "💎 Ежедневные бонусы\n"
+            "💸 Мгновенный вывод TON"
+        ),
+        parse_mode="HTML",
+        reply_markup=InlineKeyboardMarkup(
+            inline_keyboard=[[
+                InlineKeyboardButton(
+                    text="🚀 ИГРАТЬ",
+                    url=invite_link
+                )
+            ]]
+        )
+    )
+
+    await inline_query.answer(
+        results=[result],
+        cache_time=0,
+        is_personal=True
+    )
 
 # ================== START ==================
 

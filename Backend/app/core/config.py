@@ -16,7 +16,7 @@ class CrashSettings:
     # 🎮 CRASH GAME SETTINGS
     # ============================================================
 
-    bet_phase_seconds: float = float(os.getenv("CRASH_BET_PHASE", 10.0))
+    bet_phase_seconds: float = float(os.getenv("CRASH_BET_PHASE", 20.0))
     pause_between_rounds: float = float(os.getenv("CRASH_PAUSE_BETWEEN", 3.0))
     tick_ms: int = int(os.getenv("CRASH_TICK_MS", 50))
     min_x: float = float(os.getenv("CRASH_MIN_X", 1.00))
@@ -125,9 +125,7 @@ class CrashSettings:
     # 🎰 ROULETTE — PAID SPIN
     # ============================================================
 
-    roulette_higher_chance: float = float(os.getenv("ROULETTE_HIGHER_CHANCE", 0.05))
-    roulette_higher_min_mult: float = float(os.getenv("ROULETTE_HIGHER_MIN_MULT", 1.05))
-    roulette_higher_max_mult: float = float(os.getenv("ROULETTE_HIGHER_MAX_MULT", 1.30))
+
 
     roulette_cheap_bucket_1_weight: float = float(os.getenv("ROULETTE_CHEAP_BUCKET_1_WEIGHT", 0.20))
     roulette_cheap_bucket_1_min: float = float(os.getenv("ROULETTE_CHEAP_BUCKET_1_MIN", 0.80))
@@ -145,7 +143,6 @@ class CrashSettings:
     roulette_cheap_bucket_4_min: float = float(os.getenv("ROULETTE_CHEAP_BUCKET_4_MIN", 0.90))
     roulette_cheap_bucket_4_max: float = float(os.getenv("ROULETTE_CHEAP_BUCKET_4_MAX", 0.95))
 
-    roulette_fallback_expand_pct: float = float(os.getenv("ROULETTE_FALLBACK_EXPAND_PCT", 0.10))
     daily_reward_ton: float = float(os.getenv("DAILY_REWARD_TON", 0.5))
     ten_days_reward_ton: float = float(os.getenv("TEN_DAYS_REWARD_TON", 1.0))
 
